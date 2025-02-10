@@ -609,30 +609,27 @@ int msm_vb2_queue_setup(struct vb2_queue *q,
 	}
 	core = inst->core;
 
-	if (is_state(inst, MSM_VIDC_STREAMING)) {
-		i_vpr_e(inst, "%s: invalid state %d\n", __func__, inst->state);
-		return -EINVAL;
-	}
-
 	port = v4l2_type_to_driver_port(inst, q->type, __func__);
 	if (port < 0)
 		return -EINVAL;
 
-	/* prepare dependency list once per session */
-	if (!inst->caps_list_prepared) {
-		rc = msm_vidc_prepare_dependency_list(inst);
-		if (rc)
-			return rc;
-		inst->caps_list_prepared = true;
-	}
+	if (!is_state(inst, MSM_VIDC_STREAMING)) {
+		/* prepare dependency list once per session */
+		if (!inst->caps_list_prepared) {
+			rc = msm_vidc_prepare_dependency_list(inst);
+			if (rc)
+				return rc;
+			inst->caps_list_prepared = true;
+		}
 
-	/* adjust v4l2 properties for master port */
-	if ((is_encode_session(inst) && port == OUTPUT_PORT) ||
-		(is_decode_session(inst) && port == INPUT_PORT)) {
-		rc = msm_vidc_adjust_v4l2_properties(inst);
-		if (rc) {
-			i_vpr_e(inst, "%s: failed to adjust properties\n", __func__);
-			return rc;
+		/* adjust v4l2 properties for master port */
+		if ((is_encode_session(inst) && port == OUTPUT_PORT) ||
+			(is_decode_session(inst) && port == INPUT_PORT)) {
+			rc = msm_vidc_adjust_v4l2_properties(inst);
+			if (rc) {
+				i_vpr_e(inst, "%s: failed to adjust properties\n", __func__);
+				return rc;
+			}
 		}
 	}
 
@@ -654,22 +651,28 @@ int msm_vb2_queue_setup(struct vb2_queue *q,
 	if (!buffer_type)
 		return -EINVAL;
 
-	rc = msm_vidc_free_buffers(inst, buffer_type);
-	if (rc) {
-		i_vpr_e(inst, "%s: failed to free buffers, type %s\n",
-			__func__, v4l2_type_name(q->type));
-		return rc;
+	if (!is_state(inst, MSM_VIDC_STREAMING)) {
+		rc = msm_vidc_free_buffers(inst, buffer_type);
+		if (rc) {
+			i_vpr_e(inst, "%s: failed to free buffers, type %s\n",
+				__func__, v4l2_type_name(q->type));
+			return rc;
+		}
 	}
 
 	buffers = msm_vidc_get_buffers(inst, buffer_type, __func__);
 	if (!buffers)
 		return -EINVAL;
 
-	buffers->min_count = call_session_op(core, min_count, inst, buffer_type);
-	buffers->extra_count = call_session_op(core, extra_count, inst, buffer_type);
-	if (*num_buffers < buffers->min_count + buffers->extra_count)
-		*num_buffers = buffers->min_count + buffers->extra_count;
-	buffers->actual_count = *num_buffers;
+	if (!is_state(inst, MSM_VIDC_STREAMING)) {
+		buffers->min_count = call_session_op(core, min_count, inst, buffer_type);
+		buffers->extra_count = call_session_op(core, extra_count, inst, buffer_type);
+		if (*num_buffers < buffers->min_count + buffers->extra_count)
+			*num_buffers = buffers->min_count + buffers->extra_count;
+		buffers->actual_count = *num_buffers;
+	} else {
+		buffers->actual_count += *num_buffers;
+	}
 	*num_planes = 1;
 
 	buffers->size = call_session_op(core, buffer_size, inst, buffer_type);
@@ -699,7 +702,7 @@ int msm_vb2_queue_setup(struct vb2_queue *q,
 	cb = msm_vidc_get_context_bank_for_region(core, region);
 	if (!cb) {
 		d_vpr_e("%s: Failed to get context bank device\n",
-			 __func__);
+			__func__);
 		return -EIO;
 	}
 	q->dev = cb->dev;

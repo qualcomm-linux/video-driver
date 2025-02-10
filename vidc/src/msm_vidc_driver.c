@@ -2102,6 +2102,8 @@ int msm_vidc_allocate_buffers(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf = NULL;
 	struct msm_vidc_buffers *buffers;
 	struct msm_vidc_core *core;
+	struct msm_vidc_inst *i;
+	u32 count = 0;
 
 	core = inst->core;
 
@@ -2109,7 +2111,10 @@ int msm_vidc_allocate_buffers(struct msm_vidc_inst *inst,
 	if (!buffers)
 		return -EINVAL;
 
-	for (idx = 0; idx < num_buffers; idx++) {
+	list_for_each_entry(i, &buffers->list, list)
+		count++;
+
+	for (idx = 0; idx < num_buffers; idx++, count++) {
 		buf = msm_vidc_pool_alloc(inst, MSM_MEM_POOL_BUFFER);
 		if (!buf) {
 			i_vpr_e(inst, "%s: alloc failed\n", __func__);
@@ -2118,7 +2123,7 @@ int msm_vidc_allocate_buffers(struct msm_vidc_inst *inst,
 		INIT_LIST_HEAD(&buf->list);
 		list_add_tail(&buf->list, &buffers->list);
 		buf->type = buf_type;
-		buf->index = idx;
+		buf->index = count;
 		buf->region = call_mem_op(core, buffer_region, inst, buf_type);
 	}
 	i_vpr_h(inst, "%s: allocated %d buffers for type %s\n",
