@@ -18,6 +18,9 @@
 
 extern struct msm_vidc_core *g_core;
 
+static void msm_vb2_vm_open(struct vm_area_struct *vma);
+static void msm_vb2_vm_close(struct vm_area_struct *vma);
+
 struct vb2_queue *msm_vidc_get_vb2q(struct msm_vidc_inst *inst,
 	u32 type, const char *func)
 {
@@ -70,7 +73,7 @@ void *msm_vb2_alloc(struct vb2_buffer *vb, struct device *dev,
 	inst = get_inst_ref(g_core, inst);
 	if (!inst || !inst->core) {
 		d_vpr_e("%s: invalid params %pK\n", __func__, inst);
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 
 	core = inst->core;
@@ -176,13 +179,48 @@ exit:
 }
 #endif
 
+void msm_vb2_vm_open(struct vm_area_struct *vma)
+{
+	struct vb2_vmarea_handler *h = vma->vm_private_data;
+
+	if (IS_ERR_OR_NULL(h))
+		return;
+
+	refcount_inc(h->refcount);
+}
+
+void msm_vb2_vm_close(struct vm_area_struct *vma)
+{
+	struct vb2_vmarea_handler *h = vma->vm_private_data;
+
+	if (IS_ERR_OR_NULL(h))
+		return;
+
+	if (h->put && h->arg)
+		h->put(h->arg);
+}
+
+static const struct vm_operations_struct msm_vb2_vm_dma_ops = {
+	.open = msm_vb2_vm_open,
+	.close = msm_vb2_vm_close,
+};
+
 void msm_vb2_put(void *buf_priv)
 {
 	struct msm_vidc_buffer *buf = buf_priv;
-	struct msm_vidc_inst *inst = buf->inst;
-	struct msm_vidc_core *core = inst->core;
-	struct context_bank_info *cb = NULL;
 	enum msm_vidc_buffer_region region;
+	struct context_bank_info *cb;
+	struct msm_vidc_inst *inst;
+	struct msm_vidc_core *core;
+
+	if (IS_ERR_OR_NULL(buf_priv))
+		return;
+
+	inst = buf->inst;
+	if (!inst || !inst->core)
+		return;
+
+	core = inst->core;
 
 	if (refcount_read(&buf->refcount) == 0)
 		return;
@@ -209,14 +247,20 @@ void msm_vb2_put(void *buf_priv)
 int msm_vb2_mmap(void *buf_priv, struct vm_area_struct *vma)
 {
 	struct msm_vidc_buffer *buf = buf_priv;
-	struct msm_vidc_inst *inst = buf->inst;
-	struct msm_vidc_core *core = inst->core;
-	struct context_bank_info *cb = NULL;
 	enum msm_vidc_buffer_region region;
+	struct context_bank_info *cb;
+	struct msm_vidc_inst *inst;
+	struct msm_vidc_core *core;
 	int ret;
 
-	if (!buf)
+	if (IS_ERR_OR_NULL(buf_priv))
 		return -EINVAL;
+
+	inst = buf->inst;
+    if (!inst || !inst->core)
+		return -EINVAL;
+
+    core = inst->core;
 
 	region = call_mem_op(core, buffer_region, inst, buf->type);
 	cb = msm_vidc_get_context_bank_for_region(inst->core, region);
@@ -234,7 +278,7 @@ int msm_vb2_mmap(void *buf_priv, struct vm_area_struct *vma)
 
 	vm_flags_set(vma, VM_DONTEXPAND | VM_DONTDUMP);
 	vma->vm_private_data	= &buf->handler;
-	vma->vm_ops		= &vb2_common_vm_ops;
+	vma->vm_ops		= &msm_vb2_vm_dma_ops;
 
 	vma->vm_ops->open(vma);
 
