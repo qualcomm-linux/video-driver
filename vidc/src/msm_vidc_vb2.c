@@ -695,7 +695,7 @@ int msm_vb2_queue_setup(struct vb2_queue *q,
 	if (!buffer_type)
 		return -EINVAL;
 
-	if (!is_state(inst, MSM_VIDC_STREAMING)) {
+	if (!is_state(inst, MSM_VIDC_STREAMING) && !(*num_buffers)) {
 		rc = msm_vidc_free_buffers(inst, buffer_type);
 		if (rc) {
 			i_vpr_e(inst, "%s: failed to free buffers, type %s\n",
@@ -708,11 +708,11 @@ int msm_vb2_queue_setup(struct vb2_queue *q,
 	if (!buffers)
 		return -EINVAL;
 
-	if (!is_state(inst, MSM_VIDC_STREAMING)) {
-		buffers->min_count = call_session_op(core, min_count, inst, buffer_type);
-		buffers->extra_count = call_session_op(core, extra_count, inst, buffer_type);
-		if (*num_buffers < buffers->min_count + buffers->extra_count)
-			*num_buffers = buffers->min_count + buffers->extra_count;
+	buffers->min_count = call_session_op(core, min_count, inst, buffer_type);
+	buffers->extra_count = call_session_op(core, extra_count, inst, buffer_type);
+
+	if ((vb2_get_num_buffers(q) + *num_buffers) < (buffers->min_count + buffers->extra_count)) {
+		*num_buffers = buffers->min_count + buffers->extra_count;
 		buffers->actual_count = *num_buffers;
 	} else {
 		buffers->actual_count += *num_buffers;
