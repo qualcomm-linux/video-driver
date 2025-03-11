@@ -715,7 +715,10 @@ int msm_vb2_queue_setup(struct vb2_queue *q,
 		*num_buffers = buffers->min_count + buffers->extra_count;
 		buffers->actual_count = *num_buffers;
 	} else {
-		buffers->actual_count += *num_buffers;
+		if (*num_buffers > (buffers->min_count + buffers->extra_count))
+			buffers->actual_count = *num_buffers;
+		else
+			buffers->actual_count += *num_buffers;
 	}
 	*num_planes = 1;
 
