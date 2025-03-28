@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2022, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/iommu.h>
@@ -802,6 +802,7 @@ int msm_vidc_qbuf_cache_operation(struct msm_vidc_inst *inst,
 			cache_type = MSM_MEM_CACHE_CLEAN_INVALIDATE;
 			break;
 		case MSM_VIDC_BUF_OUTPUT:
+		case MSM_VIDC_BUF_OUTPUT_META:
 			cache_type = MSM_MEM_CACHE_INVALIDATE;
 			break;
 		default:
@@ -841,6 +842,7 @@ int msm_vidc_dqbuf_cache_operation(struct msm_vidc_inst *inst,
 			skip = true;
 			break;
 		case MSM_VIDC_BUF_OUTPUT:
+		case MSM_VIDC_BUF_OUTPUT_META:
 			cache_type = MSM_MEM_CACHE_INVALIDATE;
 			break;
 		default:
