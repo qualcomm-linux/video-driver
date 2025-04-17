@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -305,13 +305,13 @@ int msm_vidc_querybuf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
 			b->m.planes[0].m.mem_offset += 0;
 			break;
 		case INPUT_META_PORT:
-			b->m.planes[0].m.mem_offset += SRC_META_QUEUE_OFF_BASE;
+			b->m.offset += SRC_META_QUEUE_OFF_BASE;
 			break;
 		case OUTPUT_PORT:
 			b->m.planes[0].m.mem_offset += DST_QUEUE_OFF_BASE;
 			break;
 		case OUTPUT_META_PORT:
-			b->m.planes[0].m.mem_offset += DST_META_QUEUE_OFF_BASE;
+			b->m.offset += DST_META_QUEUE_OFF_BASE;
 			break;
 		default:
 			break;
