@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "msm_media_info.h"
@@ -2583,6 +2583,11 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 		inst->power.dcvs_mode = true;
 
 	f = &inst->fmts[INPUT_PORT];
+
+	inst->crop.left = inst->crop.top = 0;
+	inst->crop.width = f->fmt.pix_mp.width;
+	inst->crop.height = f->fmt.pix_mp.height;
+
 	f->type = INPUT_MPLANE;
 	f->fmt.pix_mp.width = DEFAULT_WIDTH;
 	f->fmt.pix_mp.height = DEFAULT_HEIGHT;
@@ -2600,10 +2605,6 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 			inst->buffers.input.min_count +
 			inst->buffers.input.extra_count;
 	inst->buffers.input.size = f->fmt.pix_mp.plane_fmt[0].sizeimage;
-
-	inst->crop.left = inst->crop.top = 0;
-	inst->crop.width = f->fmt.pix_mp.width;
-	inst->crop.height = f->fmt.pix_mp.height;
 
 	f = &inst->fmts[INPUT_META_PORT];
 	f->type = INPUT_META_PLANE;
