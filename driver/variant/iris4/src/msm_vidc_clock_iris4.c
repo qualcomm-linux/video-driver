@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved
- * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "perf_static_model.h"
 #include "msm_vidc_debug.h"
+#include "msm_vidc_platform.h"
 
 #define ENABLE_FINEBITRATE_SUBUHD60 0
 
@@ -53,6 +54,15 @@ static u32 encoder_vpp_cycles_2pipe_iris4[3][8] = {
 	{ 156, 156, 156, 156, 156, 156, 156, 156},
 };
 
+static u32 encoder_vpp_cycles_1pipe_iris4[3][8] = {
+	//h264e LCU16: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 141, 141, 141, 141, 141, 143, 145, 145},
+	//h265e LCU32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 141, 141, 141, 142, 143, 145, 146, 146},
+	//vpss_m2m   : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 156, 156, 156, 156, 156, 156, 156, 156},
+};
+
 static u32 decoder_vpp_cycles_2pipe_iris4[4][8] = {
 	//h265/h264 LCU16/32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
 	{ 204, 204, 204, 204, 203, 210, 217, 219},
@@ -62,6 +72,17 @@ static u32 decoder_vpp_cycles_2pipe_iris4[4][8] = {
 	{ 205, 217, 217, 230, 242, 240, 238, 241},
 	//vvc/200cycle LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
 	{ 205, 217, 217, 230, 242, 240, 238, 241},
+};
+
+static u32 decoder_vpp_cycles_1pipe_iris4[4][8] = {
+	//h265/h264 LCU16/32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 202, 202, 202, 202, 202, 202, 202, 202},
+	//h265/vp9/av1 LCU64: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 203, 203, 203, 203, 202, 209, 215, 215},
+	//av1          LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 203, 203, 203, 209, 214, 216, 218, 218},
+	//vvc/200cycle LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 203, 203, 203, 209, 214, 216, 218, 218},
 };
 
 //Video IP Core Technology: bitrate constraint
@@ -314,7 +335,7 @@ static int initialize_encoder_complexity_table(void)
 	return 0;
 }
 
-u32 get_bitrate_entry(u32 pixle_count)
+static u32 get_bitrate_entry(u32 pixle_count)
 {
 	u32 bitrate_entry = 0;
 
@@ -342,7 +363,7 @@ u32 get_bitrate_entry(u32 pixle_count)
 	return bitrate_entry;
 }
 
-u32 get_vpp_cycles(struct api_calculation_input codec_input)
+static u32 get_vpp_cycles(struct api_calculation_input codec_input)
 {
 	u8 i = 0, j = 0;
 	u32 ret = 0;
@@ -396,10 +417,19 @@ u32 get_vpp_cycles(struct api_calculation_input codec_input)
 		j = 7;
 	}
 
-	if (codec_input.decoder_or_encoder == CODEC_DECODER)
-		ret = decoder_vpp_cycles_2pipe_iris4[i][j];
-	else
-		ret = encoder_vpp_cycles_2pipe_iris4[i][j];
+	if (codec_input.decoder_or_encoder == CODEC_DECODER) {
+		if (codec_input.vpu_ver == VPU_VERSION_IRIS4_1P) {
+			ret = decoder_vpp_cycles_1pipe_iris4[i][j];
+		} else {
+			ret = decoder_vpp_cycles_2pipe_iris4[i][j];
+		}
+	} else {
+		if (codec_input.vpu_ver == VPU_VERSION_IRIS4_1P) {
+			ret = encoder_vpp_cycles_1pipe_iris4[i][j];
+		} else {
+			ret = encoder_vpp_cycles_2pipe_iris4[i][j];
+		}
+	}
 	return ret;
 }
 
@@ -411,6 +441,8 @@ static int calculate_vsp_min_freq(struct api_calculation_input codec_input,
 	 * different methodology from Lahaina
 	 */
 	u32 vsp_hw_min_frequency = 0;
+	u32 allintra_bitrate_533 = 343; //@533MHz  max UHD30 or UHD60 HDR10; HEVC ONLY
+	u32 lossless_bitrate_533 = 720; //@533MHz  max 720p30 HDR10; HEVC only
 
 	if (codec_input.codec == CODEC_APV) {
 		codec_output->vsp_min_freq = 0;
@@ -451,9 +483,11 @@ static int calculate_vsp_min_freq(struct api_calculation_input codec_input,
 			if (codec_input.hierachical_layer == CODEC_GOP_LOSSLESS) {
 				vsp_hw_min_frequency = frequency_table_iris4[0][2] *
 					input_bitrate_fp * 1000;
-				corner_bitrate = frequency_table_iris4[0][2];
+				corner_bitrate = lossless_bitrate_533;
 			} else if (codec_input.hierachical_layer == CODEC_GOP_IONLY) {
-				corner_bitrate = freq_4bitrate;
+				vsp_hw_min_frequency = frequency_table_iris4[0][2] *
+					input_bitrate_fp * 1000;
+				corner_bitrate = allintra_bitrate_533;
 			}
 		}
 		vsp_hw_min_frequency = vsp_hw_min_frequency +

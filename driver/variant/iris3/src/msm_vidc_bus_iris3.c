@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "perf_static_model.h"
@@ -86,7 +86,7 @@ static u32 iris3_en_readfactor[7] = {1000, 1500, 1750, 1875, 1000, 2000, 2000};
 static u32 iris3_en_writefactor[7] = {1000, 500, 500, 500, 1000, 0, 1000};
 static u32 iris3_en_frame_num_parallel = 1;
 
-u32 calculate_number_lcus_iris3(u32 width, u32 height, u32 lcu_size)
+static u32 calculate_number_lcus_iris3(u32 width, u32 height, u32 lcu_size)
 {
 	u32 mbs_width = (width % lcu_size) ?
 		(width / lcu_size + 1) : (width / lcu_size);
@@ -96,7 +96,7 @@ u32 calculate_number_lcus_iris3(u32 width, u32 height, u32 lcu_size)
 	return mbs_width * mbs_height;
 }
 
-u32 calculate_number_ubwctiles_iris3(
+static u32 calculate_number_ubwctiles_iris3(
 		u32 width, u32 height, u32 tile_w, u32 tile_h)
 {
 	u32 tiles_width = (width % tile_w) ?
@@ -116,7 +116,7 @@ struct compression_factors {
 	u32 ipb_cr;
 } compression_factor;
 
-u32 get_compression_factors(struct compression_factors *compression_factor,
+static u32 get_compression_factors(struct compression_factors *compression_factor,
 		struct api_calculation_input codec_input)
 {
 	u8 cr_index_entry, cr_index_y, cr_index_c, cr_index_uni;

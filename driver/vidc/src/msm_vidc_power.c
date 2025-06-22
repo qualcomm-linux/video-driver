@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/bits.h>
@@ -346,7 +346,7 @@ static int msm_vidc_set_buses(struct msm_vidc_inst *inst)
 	return 0;
 }
 
-int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
+static int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct msm_vidc_core *core;
@@ -670,7 +670,7 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 	return 0;
 }
 
-void msm_vidc_dcvs_data_reset(struct msm_vidc_inst *inst)
+static void msm_vidc_dcvs_data_reset(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_power *dcvs;
 	u32 min_count, actual_count, max_count;

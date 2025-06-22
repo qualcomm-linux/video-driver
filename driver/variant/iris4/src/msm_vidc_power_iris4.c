@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/types.h>
@@ -10,6 +10,7 @@
 #include "msm_vidc_driver.h"
 #include "msm_vidc_inst.h"
 #include "msm_vidc_core.h"
+#include "msm_vidc_platform.h"
 #include "msm_vidc_debug.h"
 #include "perf_static_model.h"
 #include "msm_vidc_power.h"
@@ -92,6 +93,7 @@ static int msm_vidc_init_codec_input_freq(struct msm_vidc_inst *inst, u32 data_s
 	u32 color_fmt, tile_rows_columns = 0;
 	int rc = 0;
 	u32 max_rate, frame_rate;
+	struct msm_vidc_core *core;
 
 	codec_input->chipset_gen = MSM_CANOE;
 
@@ -184,6 +186,9 @@ static int msm_vidc_init_codec_input_freq(struct msm_vidc_inst *inst, u32 data_s
 	codec_input->video_adv_feature = VIDEO_ADV_FEATURE_NONE;
 	if (inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value)
 		codec_input->video_adv_feature = FEATURE_LOOKAHEAD_ENCODE;
+
+	core = inst->core;
+	codec_input->vpu_ver = core->platform->data.vpu_ver;
 
 	return 0;
 }
@@ -708,7 +713,27 @@ int msm_vidc_calc_bw_iris4(struct msm_vidc_inst *inst,
 	vidc_data->calc_bw_ddr = kbps(codec_output.ddr_bw_rd + codec_output.ddr_bw_wr);
 	vidc_data->calc_bw_llcc = kbps(codec_output.noc_bw_rd + codec_output.noc_bw_wr);
 
-	i_vpr_l(inst, "%s: calc_bw_ddr %llu calc_bw_llcc %llu",
+	/*
+	 * if lookahead encoding enabled, then increase the bandwidth
+	 * based on downscaled reslution extra processing, downscaling
+	 * is equal to half the original resolution
+	 */
+	if (inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value) {
+		codec_input.frame_width /= 2;
+		codec_input.frame_height /= 2;
+		ret = msm_vidc_calculate_bandwidth(codec_input, &codec_output);
+		if (ret)
+			return ret;
+		vidc_data->calc_bw_ddr +=
+			kbps(codec_output.ddr_bw_rd + codec_output.ddr_bw_wr);
+		vidc_data->calc_bw_llcc +=
+			kbps(codec_output.noc_bw_rd + codec_output.noc_bw_wr);
+		i_vpr_l(inst, "%s: lookahead extra bw %u, %u kbps\n", __func__,
+			kbps(codec_output.ddr_bw_rd + codec_output.ddr_bw_wr),
+			kbps(codec_output.noc_bw_rd + codec_output.noc_bw_wr));
+	}
+
+	i_vpr_l(inst, "%s: calc_bw_ddr %llu calc_bw_llcc %llu kbps\n",
 		__func__, vidc_data->calc_bw_ddr, vidc_data->calc_bw_llcc);
 
 	return ret;

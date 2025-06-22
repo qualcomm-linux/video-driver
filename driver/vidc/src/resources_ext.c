@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -12,6 +12,7 @@
 #endif
 
 #include "resources.h"
+#include "resources_ext.h"
 #include "msm_vidc_core.h"
 #include "msm_vidc_debug.h"
 #include "msm_vidc_power.h"

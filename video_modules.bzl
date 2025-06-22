@@ -66,6 +66,7 @@ module_entry(
             "driver/variant/iris4/src/msm_vidc_power_iris4.c",
             "driver/variant/iris4/src/msm_vidc_iris4.c",
             "driver/platform/canoe/src/msm_vidc_canoe.c",
+            "driver/platform/alor/src/msm_vidc_alor.c",
         ],
         "CONFIG_MSM_VIDC_SERAPH" : [
             "driver/variant/iris4/src/msm_vidc_buffer_iris4.c",
@@ -141,6 +142,7 @@ module_entry(
         ],
         "CONFIG_MSM_VIDC_CANOE" : [
             "driver/platform/canoe/src/canoe.c",
+            "driver/platform/alor/src/alor.c",
             "driver/variant/iris4/src/msm_vidc_buffer_iris4.c",
             "driver/variant/iris4/src/msm_vidc_power_iris4.c",
             "driver/variant/iris4/src/msm_vidc_bus_iris4.c",

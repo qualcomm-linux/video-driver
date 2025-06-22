@@ -639,7 +639,7 @@ err_venus_power_on:
 	return rc;
 }
 
-int __load_fw(struct msm_vidc_core *core)
+static int __load_fw(struct msm_vidc_core *core)
 {
 	int rc = 0;
 
@@ -670,7 +670,7 @@ fail_power:
 	return rc;
 }
 
-void __unload_fw(struct msm_vidc_core *core)
+static void __unload_fw(struct msm_vidc_core *core)
 {
 	if (!core->resource->fw_cookie)
 		return;
@@ -2363,7 +2363,7 @@ int venus_hfi_set_ir_period(struct msm_vidc_inst *inst, u32 ir_type,
 
 	rc = __cmdq_write(inst->core, inst->packet);
 	if (rc) {
-		i_vpr_e(inst, "%s: failed to set inst->capabilities[%d] %s to fw\n",
+		i_vpr_e(inst, "%s: failed to set inst->capabilities[%u] %s to fw\n",
 			__func__, cap_id, cap_name(cap_id));
 		goto exit;
 	}

@@ -61,6 +61,7 @@ endif
 
 ifeq ($(CONFIG_MSM_VIDC_CANOE), y)
 LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/canoe/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/platform/alor/inc \
                   -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris4/inc
 endif
 
@@ -85,6 +86,10 @@ LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/common/inc \
 USERINCLUDE    += -I$(VIDEO_ROOT)/include/uapi/vidc/media \
                   -I$(VIDEO_ROOT)/include/uapi/vidc
 
+ccflags-y += ${ccflags-m}
+ccflags-y += -Wmissing-prototypes
+ccflags-y += -Werror
+ccflags-y += -Wno-enum-conversion
 obj-m += msm_video.o
 
 ifeq ($(CONFIG_MSM_VIDC_NIOBE), y)
@@ -113,6 +118,7 @@ msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/sun/src/msm_vidc_sun.o \
 endif
 ifeq ($(CONFIG_MSM_VIDC_CANOE), y)
 msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/canoe/src/msm_vidc_canoe.o \
+                  $(VIDEO_DRIVER_REL_PATH)/platform/alor/src/msm_vidc_alor.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris4/src/msm_vidc_buffer_iris4.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris4/src/msm_vidc_power_iris4.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris4/src/msm_vidc_bus_iris4.o \

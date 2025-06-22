@@ -1,13 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MSM_VIDC_INST_H_
 #define _MSM_VIDC_INST_H_
 
-#include <linux/videodev2.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-ctrls.h>
 
@@ -90,8 +89,6 @@ struct msm_vidc_inst {
 	struct v4l2_format                 fmts[MAX_PORT];
 	struct v4l2_ctrl_handler           ctrl_handler;
 	struct v4l2_fh                     fh;
-	struct v4l2_m2m_dev               *m2m_dev;
-	struct v4l2_m2m_ctx               *m2m_ctx;
 	u32                                num_ctrls;
 	enum hfi_rate_control              hfi_rc_type;
 	enum hfi_layer_encoding_type       hfi_layer_type;

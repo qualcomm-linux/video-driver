@@ -4,7 +4,6 @@
  * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#include <media/v4l2-ioctl.h>
 #include <media/v4l2-mem2mem.h>
 #include <media/videobuf2-core.h>
 #include <media/v4l2_vidc_extensions.h>
@@ -42,6 +41,7 @@
 #endif
 #if defined(CONFIG_MSM_VIDC_CANOE)
 #include "msm_vidc_canoe.h"
+#include "msm_vidc_alor.h"
 #include "msm_vidc_iris4.h"
 #endif
 #if defined(CONFIG_MSM_VIDC_SERAPH)
@@ -93,134 +93,6 @@ u32 vpe_csc_custom_bias_coeff[MAX_BIAS_COEFFS] = {
 /* clamping value for Y/U/V([min,max] for Y/U/V) */
 u32 vpe_csc_custom_limit_coeff[MAX_LIMIT_COEFFS] = {
 	16, 235, 16, 240, 16, 240
-};
-
-static struct v4l2_file_operations msm_v4l2_file_operations = {
-	.owner                          = THIS_MODULE,
-	.open                           = msm_v4l2_open,
-	.release                        = msm_v4l2_close,
-	.unlocked_ioctl                 = video_ioctl2,
-	.poll                           = msm_v4l2_poll,
-};
-
-static struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_enc = {
-	.vidioc_querycap                = msm_v4l2_querycap,
-	.vidioc_enum_fmt_vid_cap        = msm_v4l2_enum_fmt,
-	.vidioc_enum_fmt_vid_out        = msm_v4l2_enum_fmt,
-	.vidioc_enum_fmt_meta_cap       = msm_v4l2_enum_fmt,
-	.vidioc_enum_fmt_meta_out       = msm_v4l2_enum_fmt,
-	.vidioc_enum_framesizes         = msm_v4l2_enum_framesizes,
-	.vidioc_enum_frameintervals     = msm_v4l2_enum_frameintervals,
-	.vidioc_try_fmt_vid_cap_mplane  = msm_v4l2_try_fmt,
-	.vidioc_try_fmt_vid_out_mplane  = msm_v4l2_try_fmt,
-	.vidioc_try_fmt_meta_cap        = msm_v4l2_try_fmt,
-	.vidioc_try_fmt_meta_out        = msm_v4l2_try_fmt,
-	.vidioc_s_fmt_vid_cap           = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_vid_out           = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_vid_cap_mplane    = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_vid_out_mplane    = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_meta_out          = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_meta_cap          = msm_v4l2_s_fmt,
-	.vidioc_g_fmt_vid_cap           = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_vid_out           = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_vid_cap_mplane    = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_vid_out_mplane    = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_meta_out          = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_meta_cap          = msm_v4l2_g_fmt,
-	.vidioc_g_selection             = msm_v4l2_g_selection,
-	.vidioc_s_selection             = msm_v4l2_s_selection,
-	.vidioc_s_parm                  = msm_v4l2_s_parm,
-	.vidioc_g_parm                  = msm_v4l2_g_parm,
-	.vidioc_reqbufs                 = msm_v4l2_reqbufs,
-	.vidioc_querybuf                = msm_v4l2_querybuf,
-	.vidioc_create_bufs             = msm_v4l2_create_bufs,
-	.vidioc_prepare_buf             = msm_v4l2_prepare_buf,
-	.vidioc_qbuf                    = msm_v4l2_qbuf,
-	.vidioc_dqbuf                   = msm_v4l2_dqbuf,
-	.vidioc_streamon                = msm_v4l2_streamon,
-	.vidioc_streamoff               = msm_v4l2_streamoff,
-	.vidioc_queryctrl               = msm_v4l2_queryctrl,
-	.vidioc_querymenu               = msm_v4l2_querymenu,
-	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
-	.vidioc_unsubscribe_event       = msm_v4l2_unsubscribe_event,
-	.vidioc_try_encoder_cmd         = msm_v4l2_try_encoder_cmd,
-	.vidioc_encoder_cmd             = msm_v4l2_encoder_cmd,
-};
-
-static struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_dec = {
-	.vidioc_querycap                = msm_v4l2_querycap,
-	.vidioc_enum_fmt_vid_cap        = msm_v4l2_enum_fmt,
-	.vidioc_enum_fmt_vid_out        = msm_v4l2_enum_fmt,
-	.vidioc_enum_fmt_meta_cap       = msm_v4l2_enum_fmt,
-	.vidioc_enum_fmt_meta_out       = msm_v4l2_enum_fmt,
-	.vidioc_enum_framesizes         = msm_v4l2_enum_framesizes,
-	.vidioc_enum_frameintervals     = msm_v4l2_enum_frameintervals,
-	.vidioc_try_fmt_vid_cap_mplane  = msm_v4l2_try_fmt,
-	.vidioc_try_fmt_vid_out_mplane  = msm_v4l2_try_fmt,
-	.vidioc_try_fmt_meta_cap        = msm_v4l2_try_fmt,
-	.vidioc_try_fmt_meta_out        = msm_v4l2_try_fmt,
-	.vidioc_s_fmt_vid_cap           = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_vid_out           = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_vid_cap_mplane    = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_vid_out_mplane    = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_meta_out          = msm_v4l2_s_fmt,
-	.vidioc_s_fmt_meta_cap          = msm_v4l2_s_fmt,
-	.vidioc_g_fmt_vid_cap           = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_vid_out           = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_vid_cap_mplane    = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_vid_out_mplane    = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_meta_out          = msm_v4l2_g_fmt,
-	.vidioc_g_fmt_meta_cap          = msm_v4l2_g_fmt,
-	.vidioc_g_selection             = msm_v4l2_g_selection,
-	.vidioc_s_selection             = msm_v4l2_s_selection,
-	.vidioc_reqbufs                 = msm_v4l2_reqbufs,
-	.vidioc_querybuf                = msm_v4l2_querybuf,
-	.vidioc_create_bufs             = msm_v4l2_create_bufs,
-	.vidioc_prepare_buf             = msm_v4l2_prepare_buf,
-	.vidioc_qbuf                    = msm_v4l2_qbuf,
-	.vidioc_dqbuf                   = msm_v4l2_dqbuf,
-	.vidioc_streamon                = msm_v4l2_streamon,
-	.vidioc_streamoff               = msm_v4l2_streamoff,
-	.vidioc_queryctrl               = msm_v4l2_queryctrl,
-	.vidioc_querymenu               = msm_v4l2_querymenu,
-	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
-	.vidioc_unsubscribe_event       = msm_v4l2_unsubscribe_event,
-	.vidioc_try_decoder_cmd         = msm_v4l2_try_decoder_cmd,
-	.vidioc_decoder_cmd             = msm_v4l2_decoder_cmd,
-};
-
-static struct v4l2_ctrl_ops msm_v4l2_ctrl_ops = {
-	.s_ctrl                         = msm_v4l2_op_s_ctrl,
-	.g_volatile_ctrl                = msm_v4l2_op_g_volatile_ctrl,
-};
-
-static struct vb2_ops msm_vb2_ops = {
-	.queue_setup                    = msm_vb2_queue_setup,
-	.start_streaming                = msm_vb2_start_streaming,
-	.buf_queue                      = msm_vb2_buf_queue,
-	.stop_streaming                 = msm_vb2_stop_streaming,
-	.buf_out_validate               = msm_vb2_buf_out_validate,
-	.buf_request_complete           = msm_vb2_request_complete,
-};
-
-static struct vb2_mem_ops msm_vb2_mem_ops = {
-	.alloc                          = msm_vb2_alloc,
-	.put                            = msm_vb2_put,
-	.mmap                           = msm_vb2_mmap,
-	.attach_dmabuf                  = msm_vb2_attach_dmabuf,
-	.detach_dmabuf                  = msm_vb2_detach_dmabuf,
-	.map_dmabuf                     = msm_vb2_map_dmabuf,
-	.unmap_dmabuf                   = msm_vb2_unmap_dmabuf,
-};
-
-static struct media_device_ops msm_v4l2_media_ops = {
-	.req_validate                   = msm_v4l2_request_validate,
-	.req_queue                      = msm_v4l2_request_queue,
-};
-
-static struct v4l2_m2m_ops msm_v4l2_m2m_ops = {
-	.device_run                     = msm_v4l2_m2m_device_run,
-	.job_abort                      = msm_v4l2_m2m_job_abort,
 };
 
 static const struct msm_vidc_compat_handle compat_handle[] = {
@@ -281,6 +153,12 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.init_platform              = msm_vidc_init_platform_canoe,
 		.init_iris                  = msm_vidc_init_iris4,
 	},
+	{
+		.compat                     = "qcom,alor-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_alor,
+		.init_platform              = msm_vidc_init_platform_alor,
+		.init_iris                  = msm_vidc_init_iris4,
+	},
 #endif
 #if defined(CONFIG_MSM_VIDC_SERAPH)
 	{
@@ -303,14 +181,9 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 static int msm_vidc_init_ops(struct msm_vidc_core *core)
 {
 	d_vpr_h("%s: initialize ops\n", __func__);
-	core->v4l2_file_ops = &msm_v4l2_file_operations;
-	core->v4l2_ioctl_ops_enc = &msm_v4l2_ioctl_ops_enc;
-	core->v4l2_ioctl_ops_dec = &msm_v4l2_ioctl_ops_dec;
-	core->v4l2_ctrl_ops = &msm_v4l2_ctrl_ops;
-	core->vb2_ops = &msm_vb2_ops;
-	core->vb2_mem_ops = &msm_vb2_mem_ops;
-	core->media_device_ops = &msm_v4l2_media_ops;
-	core->v4l2_m2m_ops = &msm_v4l2_m2m_ops;
+	msm_vidc_core_init_v4l2_ops(core);
+	msm_vidc_core_init_vb2_ops(core);
+
 	core->md_ops = get_md_ops();
 	core->mem_ops = get_mem_ops();
 	if (!core->mem_ops) {
@@ -4133,21 +4006,6 @@ int msm_vidc_set_u32_enum(void *instance,
 
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32_ENUM,
 					&hfi_value, sizeof(u32), __func__);
-
-	return rc;
-}
-
-int msm_vidc_set_s32(void *instance,
-		     enum msm_vidc_inst_capability_type cap_id)
-{
-	int rc = 0;
-	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
-	s32 hfi_value = 0;
-
-	hfi_value = inst->capabilities[cap_id].value;
-
-	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_S32,
-					&hfi_value, sizeof(s32), __func__);
 
 	return rc;
 }

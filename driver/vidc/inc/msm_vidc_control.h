@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MSM_VIDC_CONTROL_H_
@@ -13,8 +13,6 @@ enum msm_vidc_inst_capability_type;
 
 int msm_vidc_ctrl_handler_init(struct msm_vidc_inst *inst, bool init);
 int msm_vidc_ctrl_handler_deinit(struct msm_vidc_inst *inst);
-int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl);
-int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl);
 int msm_vidc_s_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl);
 int msm_vidc_prepare_dependency_list(struct msm_vidc_inst *inst);
 int msm_vidc_adjust_v4l2_properties(struct msm_vidc_inst *inst);

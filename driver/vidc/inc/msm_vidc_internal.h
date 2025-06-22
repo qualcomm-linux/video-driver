@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _MSM_VIDC_INTERNAL_H_
@@ -15,6 +15,7 @@
 #elif (KERNEL_VERSION(5, 11, 0) <= LINUX_VERSION_CODE)
 #include <linux/dma-buf-map.h>
 #endif
+#include <media/videobuf2-memops.h>
 
 struct v4l2_ctrl;
 
@@ -1042,6 +1043,10 @@ struct msm_vidc_buffer {
 	void                              *dmabuf;
 	struct sg_table                   *sg_table;
 	struct dma_buf_attachment         *attach;
+	struct vb2_vmarea_handler          handler;
+	refcount_t                         refcount;
+	unsigned long                      dma_attrs;
+	void                              *kvaddr;
 	u32                                dbuf_get:1;
 	u32                                start_time_ms;
 	u32                                end_time_ms;

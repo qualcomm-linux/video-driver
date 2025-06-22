@@ -10,6 +10,7 @@
 
 #include "msm_vidc_internal.h"
 #include "msm_vidc_driver.h"
+#include "msm_vidc.h"
 #include "msm_venc.h"
 #include "msm_vidc_platform.h"
 #include "msm_vidc_debug.h"
@@ -856,44 +857,6 @@ static int msm_vidc_allow_secure_session(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-int msm_v4l2_op_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
-{
-	int rc = 0;
-	struct msm_vidc_inst *inst;
-
-	if (!ctrl) {
-		d_vpr_e("%s: invalid ctrl parameter\n", __func__);
-		return -EINVAL;
-	}
-
-	inst = container_of(ctrl->handler,
-			    struct msm_vidc_inst, ctrl_handler);
-	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
-		d_vpr_e("%s: could not find inst for ctrl %s id %#x\n",
-			__func__, ctrl->name, ctrl->id);
-		return -EINVAL;
-	}
-	client_lock(inst, __func__);
-	inst_lock(inst, __func__);
-
-	rc = msm_vidc_get_control(inst, ctrl);
-	if (rc) {
-		i_vpr_e(inst, "%s: failed for ctrl %s id %#x\n",
-			__func__, ctrl->name, ctrl->id);
-		goto unlock;
-	} else {
-		i_vpr_h(inst, "%s: ctrl %s id %#x, value %d\n",
-			__func__, ctrl->name, ctrl->id, ctrl->val);
-	}
-
-unlock:
-	inst_unlock(inst, __func__);
-	client_unlock(inst, __func__);
-	put_inst(inst);
-	return rc;
-}
-
 static int msm_vidc_update_static_property(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id, struct v4l2_ctrl *ctrl)
 {
@@ -1034,48 +997,6 @@ int msm_vidc_s_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 			return rc;
 	}
 
-	return rc;
-}
-
-int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
-{
-	struct msm_vidc_inst *inst;
-	struct msm_vidc_ctrl_data *priv_ctrl_data;
-	int rc = 0;
-
-	if (!ctrl) {
-		d_vpr_e("%s: invalid ctrl parameter\n", __func__);
-		return -EINVAL;
-	}
-
-	/*
-	 * v4l2_ctrl_modify_range may internally call s_ctrl
-	 * which will again try to acquire lock leading to deadlock,
-	 * Add check to avoid such scenario.
-	 */
-	priv_ctrl_data = ctrl->priv ? ctrl->priv : NULL;
-	if (priv_ctrl_data && priv_ctrl_data->skip_s_ctrl) {
-		d_vpr_l("%s: skip s_ctrl (%s)\n", __func__, ctrl->name);
-		return 0;
-	}
-
-	inst = container_of(ctrl->handler, struct msm_vidc_inst, ctrl_handler);
-	inst = get_inst_ref(g_core, inst);
-	if (!inst) {
-		d_vpr_e("%s: invalid instance\n", __func__);
-		return -EINVAL;
-	}
-
-	client_lock(inst, __func__);
-	inst_lock(inst, __func__);
-	rc = inst->event_handle(inst, MSM_VIDC_S_CTRL, ctrl);
-	if (rc)
-		goto unlock;
-
-unlock:
-	inst_unlock(inst, __func__);
-	client_unlock(inst, __func__);
-	put_inst(inst);
 	return rc;
 }
 

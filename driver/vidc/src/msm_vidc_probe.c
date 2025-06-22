@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/of_platform.h>
@@ -54,7 +54,8 @@ static inline bool is_video_device(struct device *dev)
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2") ||
 		of_device_is_compatible(dev->of_node, "qcom,seraph-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,sa8797-vidc") ||
-		of_device_is_compatible(dev->of_node, "qcom,niobe-vidc"));
+		of_device_is_compatible(dev->of_node, "qcom,niobe-vidc") ||
+		of_device_is_compatible(dev->of_node, "qcom,alor-vidc"));
 }
 
 static inline bool is_video_context_bank_device_node(struct device_node *of_node)
@@ -144,6 +145,7 @@ static const struct of_device_id msm_vidc_dt_match[] = {
 	{.compatible = "qcom,canoe-vidc"},
 	{.compatible = "qcom,canoe-vidc-v2"},
 	{.compatible = "qcom,seraph-vidc"},
+	{.compatible = "qcom,alor-vidc"},
 	{.compatible = "qcom,sa8797-vidc"},
 	{.compatible = "qcom,cliffs-vidc"},
 	{.compatible = "qcom,volcano-vidc"},
@@ -166,81 +168,65 @@ static void msm_vidc_release_video_device(struct video_device *vdev)
 static void msm_vidc_unregister_video_device(struct msm_vidc_core *core,
 		enum msm_vidc_domain_type type)
 {
-	int index;
+	struct msm_video_device *vdev = get_msm_video_device(core, type);
 
 	d_vpr_h("%s: domain %d\n", __func__, type);
 
-	if (type == MSM_VIDC_DECODER)
-		index = 0;
-	else if (type == MSM_VIDC_ENCODER)
-		index = 1;
-	else
-		return;
-
-
 #ifdef CONFIG_MEDIA_CONTROLLER
-	v4l2_m2m_unregister_media_controller(core->vdev[index].m2m_dev);
-	v4l2_m2m_release(core->vdev[index].m2m_dev);
+	v4l2_m2m_unregister_media_controller(vdev->m2m_dev);
+	v4l2_m2m_release(vdev->m2m_dev);
 #endif
-	//rc = device_create_file(&core->vdev[index].vdev.dev, &dev_attr_link_name);
-	video_set_drvdata(&core->vdev[index].vdev, NULL);
-	video_unregister_device(&core->vdev[index].vdev);
-	//memset vdev to 0
+	//rc = device_create_file(vdev->vdev.dev, &dev_attr_link_name);
+	video_set_drvdata(&vdev->vdev, NULL);
+	video_unregister_device(&vdev->vdev);
+	//memset &vdev->vdev to 0
 }
 
 static int msm_vidc_register_video_device(struct msm_vidc_core *core,
 		enum msm_vidc_domain_type type, int nr)
 {
+	struct msm_video_device *vdev = get_msm_video_device(core, type);
+	int media_index;
 	int rc = 0;
-	int index, media_index;
 
 	d_vpr_h("%s: domain %d\n", __func__, type);
 
 	if (type == MSM_VIDC_DECODER) {
-		index = 0;
 		media_index = MEDIA_ENT_F_PROC_VIDEO_DECODER;
-	} else if (type == MSM_VIDC_ENCODER) {
-		index = 1;
-		media_index = MEDIA_ENT_F_PROC_VIDEO_ENCODER;
+		vdev->vdev.ioctl_ops = core->v4l2_ioctl_ops_dec;
 	} else {
-		return -EINVAL;
+		media_index = MEDIA_ENT_F_PROC_VIDEO_ENCODER;
+		vdev->vdev.ioctl_ops = core->v4l2_ioctl_ops_enc;
 	}
 
-	core->vdev[index].vdev.release =
-		msm_vidc_release_video_device;
-	core->vdev[index].vdev.fops = core->v4l2_file_ops;
-	if (type == MSM_VIDC_DECODER)
-		core->vdev[index].vdev.ioctl_ops = core->v4l2_ioctl_ops_dec;
-	else
-		core->vdev[index].vdev.ioctl_ops = core->v4l2_ioctl_ops_enc;
-	core->vdev[index].vdev.vfl_dir = VFL_DIR_M2M;
-	core->vdev[index].type = type;
-	core->vdev[index].vdev.v4l2_dev = &core->v4l2_dev;
-	core->vdev[index].vdev.device_caps = core->capabilities[DEVICE_CAPS].value;
-	rc = video_register_device(&core->vdev[index].vdev,
-					VFL_TYPE_VIDEO, nr);
+	vdev->vdev.release     = msm_vidc_release_video_device;
+	vdev->vdev.fops        = core->v4l2_file_ops;
+	vdev->vdev.vfl_dir     = VFL_DIR_M2M;
+	vdev->vdev.v4l2_dev    = &core->v4l2_dev;
+	vdev->vdev.device_caps = core->capabilities[DEVICE_CAPS].value;
+	vdev->type             = type;
+	rc = video_register_device(&vdev->vdev, VFL_TYPE_VIDEO, nr);
 	if (rc) {
 		d_vpr_e("Failed to register the video device\n");
 		return rc;
 	}
-	video_set_drvdata(&core->vdev[index].vdev, core);
-	//rc = device_create_file(&core->vdev[index].vdev.dev, &dev_attr_link_name);
+	video_set_drvdata(&vdev->vdev, core);
+	//rc = device_create_file(&vdev->vdev.dev, &dev_attr_link_name);
 	if (rc) {
 		d_vpr_e("Failed to create video device file\n");
 		goto video_reg_failed;
 	}
 #ifdef CONFIG_MEDIA_CONTROLLER
-	core->vdev[index].m2m_dev = v4l2_m2m_init(core->v4l2_m2m_ops);
-	if (IS_ERR(core->vdev[index].m2m_dev)) {
+	vdev->m2m_dev = v4l2_m2m_init(core->v4l2_m2m_ops);
+	if (IS_ERR(vdev->m2m_dev)) {
 		d_vpr_e("Failed to initialize V4L2 M2M device\n");
-		rc = PTR_ERR(core->vdev[index].m2m_dev);
+		rc = PTR_ERR(vdev->m2m_dev);
 		goto m2m_init_failed;
 	}
-	rc = v4l2_m2m_register_media_controller(core->vdev[index].m2m_dev,
-			&core->vdev[index].vdev, media_index);
+	rc = v4l2_m2m_register_media_controller(vdev->m2m_dev, &vdev->vdev, media_index);
 	if (rc) {
 		d_vpr_e("%s: m2m_dev controller register failed for session type %d\n",
-			__func__, index);
+			__func__, type);
 		goto m2m_mc_failed;
 	}
 #endif
@@ -248,11 +234,11 @@ static int msm_vidc_register_video_device(struct msm_vidc_core *core,
 	return 0;
 #ifdef CONFIG_MEDIA_CONTROLLER
 m2m_mc_failed:
-	v4l2_m2m_release(core->vdev[index].m2m_dev);
+	v4l2_m2m_release(vdev->m2m_dev);
 m2m_init_failed:
 #endif
 video_reg_failed:
-	video_unregister_device(&core->vdev[index].vdev);
+	video_unregister_device(&vdev->vdev);
 
 	return rc;
 }
@@ -411,7 +397,7 @@ static int msm_vidc_initialize_core(struct msm_vidc_core *core)
 	}
 
 	core->response_packet = devm_kzalloc(&core->pdev->dev, core->packet_size, GFP_KERNEL);
-	if (!core->packet) {
+	if (!core->response_packet) {
 		d_vpr_e("%s: failed to alloc core response packet\n", __func__);
 		rc = -ENOMEM;
 		goto exit;

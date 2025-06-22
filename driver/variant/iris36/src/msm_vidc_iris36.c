@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024,2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/delay.h>
@@ -1182,7 +1182,7 @@ static int __boot_firmware_iris36(struct msm_vidc_core *core)
 	return rc;
 }
 
-int msm_vidc_decide_work_mode_iris36(struct msm_vidc_inst *inst)
+static int msm_vidc_decide_work_mode_iris36(struct msm_vidc_inst *inst)
 {
 	u32 work_mode = 0;
 	struct v4l2_format *inp_f = NULL;
@@ -1240,7 +1240,7 @@ exit:
 	return 0;
 }
 
-int msm_vidc_decide_work_route_iris36(struct msm_vidc_inst *inst)
+static int msm_vidc_decide_work_route_iris36(struct msm_vidc_inst *inst)
 {
 	u32 work_route = 0;
 	struct msm_vidc_core *core = NULL;
@@ -1277,7 +1277,7 @@ exit:
 	return 0;
 }
 
-int msm_vidc_decide_quality_mode_iris36(struct msm_vidc_inst *inst)
+static int msm_vidc_decide_quality_mode_iris36(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_core *core = NULL;
 	u32 mbpf = 0, mbps = 0, max_hq_mbpf = 0, max_hq_mbps = 0;

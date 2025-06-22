@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <media/v4l2-event.h>
@@ -16,7 +16,6 @@
 #include "msm_vidc_internal.h"
 #include "msm_vidc_driver.h"
 #include "msm_vidc_vb2.h"
-#include "msm_vidc_v4l2.h"
 #include "msm_vidc_debug.h"
 #include "msm_vidc_control.h"
 #include "msm_vidc_power.h"
@@ -25,6 +24,7 @@
 #include "venus_hfi_response.h"
 #include "msm_vidc.h"
 
+extern struct msm_vidc_core *g_core;
 extern const char video_banner[];
 
 #define MSM_VIDC_DRV_NAME "msm_vidc_driver"
@@ -96,8 +96,31 @@ int msm_vidc_poll(struct msm_vidc_inst *inst, struct file *filp,
 	return poll;
 }
 
-int msm_vidc_querycap(struct msm_vidc_inst *inst, struct v4l2_capability *cap)
+int msm_vidc_mmap(struct msm_vidc_inst *inst, struct file *filp, struct vm_area_struct *vma)
 {
+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	int ret = 0;
+
+	if (offset < SRC_META_QUEUE_OFF_BASE) {
+		ret = vb2_mmap(inst->bufq[INPUT_PORT].vb2q, vma);
+	} else if (offset < DST_QUEUE_OFF_BASE) {
+		vma->vm_pgoff -= (SRC_META_QUEUE_OFF_BASE >> PAGE_SHIFT);
+		ret = vb2_mmap(inst->bufq[INPUT_META_PORT].vb2q, vma);
+	} else if (offset < DST_META_QUEUE_OFF_BASE) {
+		vma->vm_pgoff -= (DST_QUEUE_OFF_BASE >> PAGE_SHIFT);
+		ret = vb2_mmap(inst->bufq[OUTPUT_PORT].vb2q, vma);
+	} else {
+		vma->vm_pgoff -= (DST_META_QUEUE_OFF_BASE >> PAGE_SHIFT);
+		ret = vb2_mmap(inst->bufq[OUTPUT_META_PORT].vb2q, vma);
+	}
+
+	return ret;
+}
+
+int msm_vidc_querycap(struct msm_vidc_inst *inst, void *data)
+{
+	struct v4l2_capability *cap = data;
+
 	strscpy(cap->driver, MSM_VIDC_DRV_NAME, sizeof(cap->driver));
 	strscpy(cap->bus_info, MSM_VIDC_BUS_NAME, sizeof(cap->bus_info));
 	cap->version = MSM_VIDC_VERSION;
@@ -114,7 +137,7 @@ int msm_vidc_querycap(struct msm_vidc_inst *inst, struct v4l2_capability *cap)
 	return 0;
 }
 
-int msm_vidc_enum_fmt(struct msm_vidc_inst *inst, struct v4l2_fmtdesc *f)
+int msm_vidc_enum_fmt(struct msm_vidc_inst *inst, void *f)
 {
 	if (is_decode_session(inst))
 		return msm_vdec_enum_fmt(inst, f);
@@ -124,8 +147,9 @@ int msm_vidc_enum_fmt(struct msm_vidc_inst *inst, struct v4l2_fmtdesc *f)
 	return -EINVAL;
 }
 
-int msm_vidc_query_ctrl(struct msm_vidc_inst *inst, struct v4l2_queryctrl *q_ctrl)
+int msm_vidc_query_ctrl(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_queryctrl *q_ctrl = data;
 	int rc = 0;
 	struct v4l2_ctrl *ctrl;
 
@@ -147,8 +171,9 @@ int msm_vidc_query_ctrl(struct msm_vidc_inst *inst, struct v4l2_queryctrl *q_ctr
 	return rc;
 }
 
-int msm_vidc_query_menu(struct msm_vidc_inst *inst, struct v4l2_querymenu *qmenu)
+int msm_vidc_query_menu(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_querymenu *qmenu = data;
 	int rc = 0;
 	struct v4l2_ctrl *ctrl;
 
@@ -207,8 +232,9 @@ int msm_vidc_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	return rc;
 }
 
-int msm_vidc_g_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
+int msm_vidc_g_fmt(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_format *f = data;
 	int rc = 0;
 
 	if (is_decode_session(inst))
@@ -231,7 +257,7 @@ int msm_vidc_g_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	return 0;
 }
 
-int msm_vidc_s_selection(struct msm_vidc_inst *inst, struct v4l2_selection *s)
+int msm_vidc_s_selection(struct msm_vidc_inst *inst, void *s)
 {
 	int rc = 0;
 
@@ -243,7 +269,7 @@ int msm_vidc_s_selection(struct msm_vidc_inst *inst, struct v4l2_selection *s)
 	return rc;
 }
 
-int msm_vidc_g_selection(struct msm_vidc_inst *inst, struct v4l2_selection *s)
+int msm_vidc_g_selection(struct msm_vidc_inst *inst, void *s)
 {
 	int rc = 0;
 
@@ -255,46 +281,43 @@ int msm_vidc_g_selection(struct msm_vidc_inst *inst, struct v4l2_selection *s)
 	return rc;
 }
 
-int msm_vidc_s_param(struct msm_vidc_inst *inst, struct v4l2_streamparm *param)
+int msm_vidc_s_param(struct msm_vidc_inst *inst, void *data)
 {
-	int rc = 0;
+	struct v4l2_streamparm *parm = data;
 
-	if (param->type != V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
-		param->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
-		return -EINVAL;
-
-	if (is_encode_session(inst)) {
-		rc = msm_venc_s_param(inst, param);
-	} else {
-		i_vpr_e(inst, "%s: invalid domain %#x\n",
-			__func__, inst->domain);
+	if (parm->type != OUTPUT_MPLANE && parm->type != INPUT_MPLANE) {
+		i_vpr_e(inst, "%s: invalid type %d\n", __func__, parm->type);
 		return -EINVAL;
 	}
 
-	return rc;
-}
-
-int msm_vidc_g_param(struct msm_vidc_inst *inst, struct v4l2_streamparm *param)
-{
-	int rc = 0;
-
-	if (param->type != V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
-		param->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
-		return -EINVAL;
-
-	if (is_encode_session(inst)) {
-		rc = msm_venc_g_param(inst, param);
-	} else {
-		i_vpr_e(inst, "%s: invalid domain %#x\n",
-			__func__, inst->domain);
+	if (!is_encode_session(inst)) {
+		i_vpr_e(inst, "%s: invalid domain %#x\n", __func__, inst->domain);
 		return -EINVAL;
 	}
 
-	return rc;
+	return msm_venc_s_param(inst, parm);
 }
 
-int msm_vidc_reqbufs(struct msm_vidc_inst *inst, struct v4l2_requestbuffers *b)
+int msm_vidc_g_param(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_streamparm *parm = data;
+
+	if (parm->type != OUTPUT_MPLANE && parm->type != INPUT_MPLANE) {
+		i_vpr_e(inst, "%s: invalid type %d\n", __func__, parm->type);
+		return -EINVAL;
+	}
+
+	if (!is_encode_session(inst)) {
+		i_vpr_e(inst, "%s: invalid domain %#x\n", __func__, inst->domain);
+		return -EINVAL;
+	}
+
+	return msm_venc_g_param(inst, parm);
+}
+
+int msm_vidc_reqbufs(struct msm_vidc_inst *inst, void *data)
+{
+	struct v4l2_requestbuffers *b = data;
 	int rc = 0;
 	int port;
 
@@ -315,8 +338,9 @@ exit:
 	return rc;
 }
 
-int msm_vidc_querybuf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
+int msm_vidc_querybuf(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_buffer *b = data;
 	int rc = 0;
 	int port;
 
@@ -333,12 +357,31 @@ int msm_vidc_querybuf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
 		goto exit;
 	}
 
+	if (b->memory == V4L2_MEMORY_MMAP) {
+		switch (port) {
+		case INPUT_PORT:
+			b->m.planes[0].m.mem_offset += 0;
+			break;
+		case INPUT_META_PORT:
+			b->m.offset += SRC_META_QUEUE_OFF_BASE;
+			break;
+		case OUTPUT_PORT:
+			b->m.planes[0].m.mem_offset += DST_QUEUE_OFF_BASE;
+			break;
+		case OUTPUT_META_PORT:
+			b->m.offset += DST_META_QUEUE_OFF_BASE;
+			break;
+		default:
+			break;
+		}
+	}
 exit:
 	return rc;
 }
 
-int msm_vidc_create_bufs(struct msm_vidc_inst *inst, struct v4l2_create_buffers *b)
+int msm_vidc_create_bufs(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_create_buffers *b = data;
 	int rc = 0;
 	int port;
 	struct v4l2_format *f;
@@ -361,11 +404,12 @@ exit:
 	return rc;
 }
 
-int msm_vidc_prepare_buf(struct msm_vidc_inst *inst, struct media_device *mdev,
-	struct v4l2_buffer *b)
+int msm_vidc_prepare_buf(struct msm_vidc_inst *inst, void *data)
 {
-	int rc = 0;
+	struct video_device *vdev = get_video_device(inst);
+	struct v4l2_buffer *b = data;
 	struct vb2_queue *q;
+	int rc = 0;
 
 	if (!valid_v4l2_buffer(b, inst)) {
 		d_vpr_e("%s: invalid params %pK %pK\n", __func__, inst, b);
@@ -378,7 +422,7 @@ int msm_vidc_prepare_buf(struct msm_vidc_inst *inst, struct media_device *mdev,
 		goto exit;
 	}
 
-	rc = vb2_prepare_buf(q, mdev, b);
+	rc = vb2_prepare_buf(q, vdev->v4l2_dev->mdev, b);
 	if (rc) {
 		i_vpr_e(inst, "%s: failed with %d\n", __func__, rc);
 		goto exit;
@@ -388,11 +432,35 @@ exit:
 	return rc;
 }
 
-int msm_vidc_qbuf(struct msm_vidc_inst *inst, struct media_device *mdev,
-		struct v4l2_buffer *b)
+int msm_vidc_exportbuf(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_exportbuffer *eb = data;
 	int rc = 0;
 	struct vb2_queue *q;
+
+	q = msm_vidc_get_vb2q(inst, eb->type, __func__);
+	if (!q) {
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	rc = vb2_expbuf(q, eb);
+	if (rc) {
+		i_vpr_e(inst, "%s: vb2_expbuf(%d) failed, %d\n",
+			__func__, eb->type, rc);
+		goto exit;
+	}
+
+exit:
+	return rc;
+}
+
+int msm_vidc_qbuf(struct msm_vidc_inst *inst, void *data)
+{
+	struct video_device *vdev = get_video_device(inst);
+	struct v4l2_buffer *b = data;
+	struct vb2_queue *q;
+	int rc = 0;
 
 	if (!valid_v4l2_buffer(b, inst)) {
 		d_vpr_e("%s: invalid params %pK %pK\n", __func__, inst, b);
@@ -405,7 +473,7 @@ int msm_vidc_qbuf(struct msm_vidc_inst *inst, struct media_device *mdev,
 		goto exit;
 	}
 
-	rc = vb2_qbuf(q, mdev, b);
+	rc = vb2_qbuf(q, vdev->v4l2_dev->mdev, b);
 	if (rc)
 		i_vpr_e(inst, "%s: failed with %d\n", __func__, rc);
 
@@ -413,8 +481,9 @@ exit:
 	return rc;
 }
 
-int msm_vidc_dqbuf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
+int msm_vidc_dqbuf(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_buffer *b = data;
 	int rc = 0;
 	struct vb2_queue *q;
 
@@ -441,8 +510,9 @@ exit:
 	return rc;
 }
 
-int msm_vidc_streamon(struct msm_vidc_inst *inst, enum v4l2_buf_type type)
+int msm_vidc_streamon(struct msm_vidc_inst *inst, void *data)
 {
+	u32 type = *(u32 *)data;
 	int rc = 0;
 	int port;
 
@@ -463,8 +533,9 @@ exit:
 	return rc;
 }
 
-int msm_vidc_streamoff(struct msm_vidc_inst *inst, enum v4l2_buf_type type)
+int msm_vidc_streamoff(struct msm_vidc_inst *inst, void *data)
 {
+	u32 type = *(u32 *)data;
 	int rc = 0;
 	int port;
 
@@ -485,8 +556,9 @@ exit:
 	return rc;
 }
 
-int msm_vidc_try_cmd(struct msm_vidc_inst *inst, union msm_v4l2_cmd *cmd)
+int msm_vidc_try_cmd(struct msm_vidc_inst *inst, void *data)
 {
+	union msm_v4l2_cmd *cmd = data;
 	int rc = 0;
 	struct v4l2_decoder_cmd *dec = NULL;
 	struct v4l2_encoder_cmd *enc = NULL;
@@ -558,8 +630,9 @@ int msm_vidc_stop_cmd(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-int msm_vidc_enum_framesizes(struct msm_vidc_inst *inst, struct v4l2_frmsizeenum *fsize)
+int msm_vidc_enum_framesizes(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_frmsizeenum *fsize = data;
 	enum msm_vidc_colorformat_type colorfmt;
 	enum msm_vidc_codec_type codec;
 	u32 meta_fmt;
@@ -596,8 +669,9 @@ int msm_vidc_enum_framesizes(struct msm_vidc_inst *inst, struct v4l2_frmsizeenum
 	return 0;
 }
 
-int msm_vidc_enum_frameintervals(struct msm_vidc_inst *inst, struct v4l2_frmivalenum *fival)
+int msm_vidc_enum_frameintervals(struct msm_vidc_inst *inst, void *data)
 {
+	struct v4l2_frmivalenum *fival = data;
 	struct msm_vidc_core *core;
 	enum msm_vidc_colorformat_type colorfmt;
 	u32 fps, mbpf;
@@ -653,8 +727,9 @@ int msm_vidc_enum_frameintervals(struct msm_vidc_inst *inst, struct v4l2_frmival
 }
 
 int msm_vidc_subscribe_event(struct msm_vidc_inst *inst,
-		const struct v4l2_event_subscription *sub)
+		void *data)
 {
+	const struct v4l2_event_subscription *sub = data;
 	int rc = 0;
 
 	i_vpr_h(inst, "%s: type %d id %d\n", __func__, sub->type, sub->id);
@@ -668,8 +743,9 @@ int msm_vidc_subscribe_event(struct msm_vidc_inst *inst,
 }
 
 int msm_vidc_unsubscribe_event(struct msm_vidc_inst *inst,
-		const struct v4l2_event_subscription *sub)
+		void *data)
 {
+	const struct v4l2_event_subscription *sub = data;
 	int rc = 0;
 
 	i_vpr_h(inst, "%s: type %d id %d\n", __func__, sub->type, sub->id);
@@ -893,6 +969,42 @@ int msm_vidc_close(struct msm_vidc_inst *inst)
 	msm_vidc_show_stats(inst);
 	put_inst(inst);
 	msm_vidc_schedule_core_deinit(core);
+
+	return rc;
+}
+
+int msm_vidc_session(struct msm_vidc_inst *inst,
+	int (*function_op)(struct msm_vidc_inst *inst, void *arg), void *data,
+	bool skip_error_check, const char *func)
+{
+	int rc = 0;
+
+	if (!data) {
+		d_vpr_e("%s: invalid params\n", func);
+		return -EINVAL;
+	}
+
+	inst = get_inst_ref(g_core, inst);
+	if (!inst) {
+		d_vpr_e("%s: invalid instance\n", func);
+		return -EINVAL;
+	}
+
+	client_lock(inst, func);
+	inst_lock(inst, func);
+	if (!skip_error_check && is_session_error(inst)) {
+		i_vpr_e(inst, "%s: inst in error state\n", func);
+		rc = -EBUSY;
+		goto unlock;
+	}
+	rc = function_op(inst, data);
+	if (rc)
+		goto unlock;
+
+unlock:
+	inst_unlock(inst, func);
+	client_unlock(inst, func);
+	put_inst(inst);
 
 	return rc;
 }

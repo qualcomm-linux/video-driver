@@ -64,6 +64,10 @@ LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/common/inc \
 USERINCLUDE    += -I$(VIDEO_ROOT)/include/uapi/vidc/media \
                   -I$(VIDEO_ROOT)/include/uapi/vidc
 
+ccflags-y += ${ccflags-m}
+ccflags-y += -Wmissing-prototypes
+ccflags-y += -Werror
+ccflags-y += -Wno-enum-conversion
 obj-m += video.o
 
 ifeq ($(CONFIG_MSM_VIDC_NIOBE), y)

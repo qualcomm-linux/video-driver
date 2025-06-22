@@ -672,3 +672,37 @@ const struct msm_vidc_memory_ops *get_mem_ops(void)
 {
 	return &msm_mem_ops;
 }
+
+int msm_memory_cache_operations(struct msm_vidc_inst *inst,
+	struct dma_buf *dbuf, enum msm_memory_cache_type cache_type)
+{
+	int rc = 0;
+
+	if (!inst || !dbuf) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	switch (cache_type) {
+	case MSM_MEM_CACHE_CLEAN:
+	case MSM_MEM_CACHE_CLEAN_INVALIDATE:
+		rc = dma_buf_begin_cpu_access(dbuf, DMA_TO_DEVICE);
+		if (rc)
+			break;
+		rc = dma_buf_end_cpu_access(dbuf, DMA_FROM_DEVICE);
+		break;
+	case MSM_MEM_CACHE_INVALIDATE:
+		rc = dma_buf_begin_cpu_access(dbuf, DMA_FROM_DEVICE);
+		if (rc)
+			break;
+		rc = dma_buf_end_cpu_access(dbuf, DMA_FROM_DEVICE);
+		break;
+	default:
+		i_vpr_e(inst, "%s: cache (%d) operation not supported\n",
+			__func__, cache_type);
+		rc = -EINVAL;
+		break;
+	}
+
+	return rc;
+}

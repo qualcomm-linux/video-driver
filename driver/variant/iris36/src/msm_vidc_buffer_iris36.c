@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/types.h>
@@ -317,7 +317,7 @@ static u32 msm_vidc_decoder_dpb_size_iris36(struct msm_vidc_inst *inst)
 	return size;
 }
 
-bool vidc_session_is_multicore(struct msm_vidc_inst *inst)
+static bool vidc_session_is_multicore(struct msm_vidc_inst *inst)
 {
 	bool is_multicore = false;
 

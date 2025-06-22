@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "perf_static_model.h"
@@ -344,7 +344,7 @@ static int initialize_encoder_complexity_table(void)
 	return 0;
 }
 
-u32 get_bitrate_entry(u32 pixle_count)
+static u32 get_bitrate_entry(u32 pixle_count)
 {
 	u32 bitrate_entry = 0;
 
@@ -396,6 +396,9 @@ static int calculate_vsp_min_freq(struct api_calculation_input codec_input,
 
 	input_bitrate_fp = ((u32)(codec_input.bitrate_mbps * 100 + 99)) / 100;
 
+	u32 allintra_bitrate_533 = 245; //@533MHz  max UHD30 or UHD60 HDR10; HEVC ONLY
+	u32 lossless_bitrate_533 = 400; //@533MHz  max 720p30 HDR10; HEVC only
+
 	/*
 	 * bitrate was profiled at 444MHz for legacy codec
 	 * bitrate was profiled at 533MHz for av1
@@ -414,9 +417,11 @@ static int calculate_vsp_min_freq(struct api_calculation_input codec_input,
 			if (codec_input.hierachical_layer == CODEC_GOP_LOSSLESS) {
 				vsp_hw_min_frequency = frequency_table_iris35[0][2] *
 					input_bitrate_fp * 1000;
-				corner_bitrate = frequency_table_iris35[0][2];
+				corner_bitrate = lossless_bitrate_533;
 			} else if (codec_input.hierachical_layer == CODEC_GOP_IONLY) {
-				corner_bitrate = frequency_table_iris35[0][3];
+				vsp_hw_min_frequency = frequency_table_iris35[0][2] *
+					input_bitrate_fp * 1000;
+				corner_bitrate = allintra_bitrate_533;
 			}
 		}
 		vsp_hw_min_frequency = vsp_hw_min_frequency +

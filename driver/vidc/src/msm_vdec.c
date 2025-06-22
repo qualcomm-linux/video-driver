@@ -1136,7 +1136,7 @@ int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 					inst, i, port)) {
 				if (count + 1 >= sizeof(payload) / sizeof(u32)) {
 					i_vpr_e(inst,
-						"%s: input metadatas (%d) exceeded limit (%lu)\n",
+						"%s: input metadatas (%u) exceeded limit (%lu)\n",
 						__func__, count, sizeof(payload) / sizeof(u32));
 					return -EINVAL;
 				}
@@ -1151,7 +1151,7 @@ int msm_vdec_subscribe_metadata(struct msm_vidc_inst *inst,
 					inst, i, port)) {
 				if (count + 1 >= sizeof(payload) / sizeof(u32)) {
 					i_vpr_e(inst,
-						"%s: input metadatas (%d) exceeded limit (%lu)\n",
+						"%s: input metadatas (%u) exceeded limit (%lu)\n",
 						__func__, count, sizeof(payload) / sizeof(u32));
 					return -EINVAL;
 				}
@@ -1193,7 +1193,7 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 			if (is_meta_tx_inp_enabled(inst, i)) {
 				if (count + 1 >= sizeof(payload) / sizeof(u32)) {
 					i_vpr_e(inst,
-						"%s: input metadatas (%d) exceeded limit (%lu)\n",
+						"%s: input metadatas (%u) exceeded limit (%lu)\n",
 						__func__, count, sizeof(payload) / sizeof(u32));
 					return -EINVAL;
 				}
@@ -1208,7 +1208,7 @@ static int msm_vdec_set_delivery_mode_metadata(struct msm_vidc_inst *inst,
 					inst, i, port)) {
 				if (count + 1 >= sizeof(payload) / sizeof(u32)) {
 					i_vpr_e(inst,
-						"%s: input metadatas (%d) exceeded limit (%lu)\n",
+						"%s: input metadatas (%u) exceeded limit (%lu)\n",
 						__func__, count, sizeof(payload) / sizeof(u32));
 					return -EINVAL;
 				}
@@ -2710,7 +2710,7 @@ int msm_vdec_enum_fmt(struct msm_vidc_inst *inst, struct v4l2_fmtdesc *f)
 				__func__);
 		if (!f->pixelformat)
 			return -EINVAL;
-		f->flags = V4L2_FMT_FLAG_COMPRESSED;
+		f->flags = V4L2_FMT_FLAG_COMPRESSED | V4L2_FMT_FLAG_DYN_RESOLUTION;
 		strscpy(f->description, "codec", sizeof(f->description));
 	} else if (f->type == OUTPUT_MPLANE) {
 		u32 formats = inst->capabilities[PIX_FMTS].step_or_mask;

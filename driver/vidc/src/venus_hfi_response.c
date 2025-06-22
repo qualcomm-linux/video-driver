@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/irqreturn.h>
@@ -44,7 +44,7 @@ struct msm_vidc_hfi_packet_handle {
 	int (*handle)(struct msm_vidc_inst *inst, struct hfi_packet *pkt);
 };
 
-void print_psc_properties(const char *str, struct msm_vidc_inst *inst,
+static void print_psc_properties(const char *str, struct msm_vidc_inst *inst,
 	struct msm_vidc_subscription_params subsc_params)
 {
 	i_vpr_h(inst,
@@ -84,7 +84,7 @@ static void print_sfr_message(struct msm_vidc_core *core)
 	}
 }
 
-u32 vidc_port_from_hfi(struct msm_vidc_inst *inst,
+static u32 vidc_port_from_hfi(struct msm_vidc_inst *inst,
 	enum hfi_packet_port_type hfi_port)
 {
 	enum msm_vidc_port_type port = MAX_PORT;
@@ -129,7 +129,7 @@ u32 vidc_port_from_hfi(struct msm_vidc_inst *inst,
 	return port;
 }
 
-bool is_valid_hfi_port(struct msm_vidc_inst *inst, u32 port,
+static bool is_valid_hfi_port(struct msm_vidc_inst *inst, u32 port,
 	u32 buffer_type, const char *func)
 {
 	if (port == HFI_PORT_NONE &&
@@ -610,6 +610,9 @@ static int handle_read_only_buffer(struct msm_vidc_inst *inst,
 		ro_buf->fd = buf->fd;
 		ro_buf->dmabuf = buf->dmabuf;
 		ro_buf->device_addr = buf->device_addr;
+		ro_buf->kvaddr = buf->kvaddr;
+		ro_buf->handler = buf->handler;
+		ro_buf->refcount = buf->refcount;
 		ro_buf->data_offset = buf->data_offset;
 		ro_buf->dbuf_get = buf->dbuf_get;
 		buf->dbuf_get = 0;
@@ -1451,15 +1454,24 @@ static int handle_dequeue_buffers(struct msm_vidc_inst *inst)
 				if (buf->attr & MSM_VIDC_ATTR_BUFFER_DONE) {
 					print_vidc_buffer(VIDC_HIGH, "high",
 						"vb2 done already", inst, buf);
-				} else {
-					buf->attr |= MSM_VIDC_ATTR_BUFFER_DONE;
-					rc = msm_vidc_vb2_buffer_done(inst, buf);
-					if (rc) {
-						print_vidc_buffer(VIDC_HIGH, "err ",
-							"vb2 done failed", inst, buf);
-						/* ignore the error */
-						rc = 0;
-					}
+					continue;
+				}
+
+				buf->attr |= MSM_VIDC_ATTR_BUFFER_DONE;
+
+				if (buf->type == MSM_VIDC_BUF_INPUT ||
+					buf->type == MSM_VIDC_BUF_OUTPUT) {
+					rc = msm_vidc_dqbuf_cache_operation(inst, buf);
+					if (rc)
+						return rc;
+				}
+
+				rc = msm_vidc_vb2_buffer_done(inst, buf);
+				if (rc) {
+					print_vidc_buffer(VIDC_HIGH, "err ",
+						"vb2 done failed", inst, buf);
+					/* ignore the error */
+					rc = 0;
 				}
 			}
 		}

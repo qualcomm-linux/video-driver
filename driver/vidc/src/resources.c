@@ -174,14 +174,14 @@ static int __opp_set_rate(struct msm_vidc_core *core, u64 freq)
 	if (IS_ERR(opp)) {
 		opp = dev_pm_opp_find_freq_floor(&core->pdev->dev, &opp_freq);
 		if (IS_ERR(opp)) {
-			d_vpr_e("%s: unable to find freq %lld in opp table\n", __func__, freq);
+			d_vpr_e("%s: unable to find freq %llu in opp table\n", __func__, freq);
 			return -EINVAL;
 		}
 	}
 	dev_pm_opp_put(opp);
 
 	/* print freq value */
-	d_vpr_h("%s: set rate %lu (requested %lld)\n",
+	d_vpr_h("%s: set rate %lu (requested %llu)\n",
 		__func__, opp_freq, freq);
 
 	/* scale freq to power up mxc & mmcx */
@@ -269,7 +269,7 @@ static int __init_bus(struct msm_vidc_core *core)
 	bus_count = core->platform->data.bw_tbl_size;
 
 	if (!bus_tbl || !bus_count) {
-		d_vpr_e("%s: invalid bus tbl %pK or count %d\n",
+		d_vpr_e("%s: invalid bus tbl %pK or count %u\n",
 			__func__, bus_tbl, bus_count);
 		return -EINVAL;
 	}
@@ -510,7 +510,7 @@ static int __init_clocks(struct msm_vidc_core *core)
 	clk_count = core->platform->data.clk_tbl_size;
 
 	if (!clk_tbl || !clk_count) {
-		d_vpr_e("%s: invalid clock tbl %pK or count %d\n",
+		d_vpr_e("%s: invalid clock tbl %pK or count %u\n",
 			__func__, clk_tbl, clk_count);
 		return -EINVAL;
 	}
@@ -614,7 +614,7 @@ static int __init_reset_clocks(struct msm_vidc_core *core)
 	rst_count = core->platform->data.clk_rst_tbl_size;
 
 	if (!rst_tbl || !rst_count) {
-		d_vpr_h("%s: reset tbl %pK or count %d\n",
+		d_vpr_h("%s: reset tbl %pK or count %u\n",
 			__func__, rst_tbl, rst_count);
 		return rc;
 	}
@@ -677,7 +677,7 @@ static int __init_subcaches(struct msm_vidc_core *core)
 	llcc_count = core->platform->data.subcache_tbl_size;
 
 	if (!llcc_tbl || !llcc_count) {
-		d_vpr_e("%s: invalid llcc tbl %pK or count %d\n",
+		d_vpr_e("%s: invalid llcc tbl %pK or count %u\n",
 			__func__, llcc_tbl, llcc_count);
 		return -EINVAL;
 	}
@@ -732,7 +732,7 @@ static int __init_context_banks(struct msm_vidc_core *core)
 	cb_count = core->platform->data.context_bank_tbl_size;
 
 	if (!cb_tbl || !cb_count) {
-		d_vpr_e("%s: invalid context bank tbl %pK or count %d\n",
+		d_vpr_e("%s: invalid context bank tbl %pK or count %u\n",
 			__func__, cb_tbl, cb_count);
 		return -EINVAL;
 	}
