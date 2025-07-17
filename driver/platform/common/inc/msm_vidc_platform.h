@@ -308,6 +308,12 @@ struct h265_level_table {
 	u64 max_br_high_tier;
 };
 
+struct apv_level_table {
+	u64 level;
+	u64 max_luma_sample;
+	u64 max_coded_rate;
+};
+
 static inline bool is_sys_cache_present(struct msm_vidc_core *core)
 {
 	return !!core->platform->data.subcache_tbl_size;
@@ -354,6 +360,7 @@ int msm_vidc_adjust_input_buf_host_max_count(void *instance, struct v4l2_ctrl *c
 int msm_vidc_adjust_output_buf_host_max_count(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_transform_8x8(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_chroma_qp_index_offset(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_chroma_qp_index_offset_iris35(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_layer_count(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_gop_size(void *instance, struct v4l2_ctrl *ctrl);
@@ -429,5 +436,6 @@ int msm_vidc_set_conceal_color(void *instance, enum msm_vidc_inst_capability_typ
 int msm_vidc_adjust_lookahead_encode_enable(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_lookahead_encode_size(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_set_lookahead_encode_size(void *instance, enum msm_vidc_inst_capability_type cap_id);
+int msm_vidc_adjust_log_mode(void *instance, struct v4l2_ctrl *ctrl);
 
 #endif // _MSM_VIDC_PLATFORM_H_

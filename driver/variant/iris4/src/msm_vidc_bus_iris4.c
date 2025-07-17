@@ -387,7 +387,7 @@ static int calculate_bandwidth_decoder_iris4(
 	u32 lcu_per_frame;
 	u32 target_bitrate;
 	u32 collocated_bytes_per_lcu = 16; /* initialized to h264 */
-	u32 av1d_segment_read_per_lcu;
+	u32 av1d_segment_read_per_lcu = 32; /* initialized to AV1 */
 	u32 av1d_fe_leftlinebuffer_perlcu_tileboudary;
 
 	u32 frame420_y_bw_linear_8bpp;
@@ -1192,7 +1192,7 @@ static int calculate_bandwidth_encoder_iris4(
 	return 0;
 }
 
-int msm_vidc_calculate_bandwidth(struct api_calculation_input codec_input,
+int msm_vidc_calculate_bandwidth_iris4(struct api_calculation_input codec_input,
 		struct api_calculation_bw_output *codec_output)
 {
 	int rc = 0;

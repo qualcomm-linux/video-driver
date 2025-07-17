@@ -96,6 +96,7 @@ typedef enum {
 #define WRAPPER_IRIS_CPU_NOC_LPI_CONTROL	(WRAPPER_BASE_OFFS_IRIS33 + 0x5C)
 #define WRAPPER_IRIS_CPU_NOC_LPI_STATUS		(WRAPPER_BASE_OFFS_IRIS33 + 0x60)
 #define WRAPPER_CORE_POWER_STATUS		(WRAPPER_BASE_OFFS_IRIS33 + 0x80)
+#define WRAPPER_CORE_POWER_CONTROL                    (WRAPPER_BASE_OFFS_IRIS33 + 0x84)
 #define WRAPPER_CORE_CLOCK_CONFIG_IRIS33		(WRAPPER_BASE_OFFS_IRIS33 + 0x88)
 
 /*
@@ -138,6 +139,10 @@ typedef enum {
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_LOW_IRIS33   (NOC_BASE_OFFS + 0xA038)
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_HIGH_IRIS33  (NOC_BASE_OFFS + 0xA03C)
 #define NOC_SIDEBANDMANAGER_MAIN_SIDEBANDMANAGER_FAULTINEN0_LOW_IRIS33 (NOC_BASE_OFFS + 0x7040)
+#define VCODEC_NOC_SidebandManager_SenseIn0_Low  (NOC_BASE_OFFS + 0x7100)
+#define VCODEC_NOC_SIDEBANDMANAGER_SENSEIN0_HIGH (NOC_BASE_OFFS + 0x7104)
+#define VCODEC_NOC_SIDEBANDMANAGER_SENSEIN1_HIGH (NOC_BASE_OFFS + 0x710C)
+#define VCODEC_NOC_SIDEBANDMANAGER_SENSEIN2_LOW  (NOC_BASE_OFFS + 0x7110)
 
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_MAINCTL_LOW_IRIS33_2P   (NOC_BASE_OFFS + 0x3508)
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRCLR_LOW_IRIS33_2P    (NOC_BASE_OFFS + 0x3518)
@@ -150,6 +155,12 @@ typedef enum {
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_LOW_IRIS33_2P   (NOC_BASE_OFFS + 0x3538)
 #define NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRLOG3_HIGH_IRIS33_2P  (NOC_BASE_OFFS + 0x353C)
 #define NOC_SIDEBANDMANAGER_MAIN_SIDEBANDMANAGER_FAULTINEN0_LOW_IRIS33_2P (NOC_BASE_OFFS + 0x3240)
+#define VCODEC_NOC_SidebandManager_SenseIn0_Low_2P  (NOC_BASE_OFFS + 0x3300)
+#define VCODEC_NOC_SIDEBANDMANAGER_SENSEIN0_HIGH_2P (NOC_BASE_OFFS + 0x3304)
+#define VCODEC_NOC_SIDEBANDMANAGER_SENSEIN1_HIGH_2P (NOC_BASE_OFFS + 0x330C)
+#define VCODEC_NOC_SIDEBANDMANAGER_SENSEIN2_LOW_2P  (NOC_BASE_OFFS + 0x3310)
+
+#define VCODEC_DMA_SPARE_3 0x87B8
 
 static int __interrupt_init_iris33(struct msm_vidc_core *core)
 {
@@ -286,9 +297,10 @@ static bool is_iris33_hw_power_collapsed(struct msm_vidc_core *core)
 static int __power_off_iris33_hardware(struct msm_vidc_core *core)
 {
 	int rc = 0, i;
-	u32 value = 0;
+	u32 value = 0, count = 0;
 	bool pwr_collapsed = false;
 	bool xo_reset_acquired = false;
+	u32 sense0_low, sense0_high, sense1_high, sense2_low;
 
 	/*
 	 * Incase hw power control is enabled, for any error case
@@ -309,6 +321,10 @@ static int __power_off_iris33_hardware(struct msm_vidc_core *core)
 		}
 	}
 
+	rc = call_res_op(core, gdsc_sw_ctrl, core);
+	if (rc)
+		return rc;
+
 	/*
 	 * check to make sure core clock branch enabled else
 	 * we cannot read vcodec top idle register
@@ -324,6 +340,10 @@ static int __power_off_iris33_hardware(struct msm_vidc_core *core)
 		if (rc)
 			return rc;
 	}
+
+	rc = __write_register_masked(core, VCODEC_DMA_SPARE_3, 0x1, BIT(0));
+	if (rc)
+		return rc;
 
 	/*
 	 * add MNoC idle check before collapsing MVS0 per HPG update
@@ -343,15 +363,84 @@ static int __power_off_iris33_hardware(struct msm_vidc_core *core)
 	if (rc)
 		return rc;
 
-	rc = __read_register_with_poll_timeout(core, AON_WRAPPER_MVP_NOC_LPI_STATUS,
-					0x1, 0x1, 200, 2000);
-	if (rc)
-		d_vpr_e("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL failed\n", __func__);
+	rc = __read_register(core, AON_WRAPPER_MVP_NOC_LPI_STATUS, &value);
+		if (rc)
+			return rc;
 
-	rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
-					0x0, BIT(0));
-	if (rc)
-		return rc;
+	while ((!(value & BIT(0))) && (value & BIT(1) || value & BIT(2))) {
+		rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
+					     0x0, BIT(0));
+		if (rc)
+			return rc;
+
+		usleep_range(10, 20);
+
+		rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
+					     0x1, BIT(0));
+		if (rc)
+			return rc;
+
+		usleep_range(10, 20);
+
+		rc = __read_register(core, AON_WRAPPER_MVP_NOC_LPI_STATUS, &value);
+		if (rc)
+			return rc;
+
+		++count;
+		if (count >= 1000) {
+			d_vpr_e("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL failed\n", __func__);
+			break;
+		}
+	}
+
+	if (count < 1000) {
+		rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
+					     0x0, BIT(0));
+		if (rc)
+			return rc;
+	}
+
+	i = 0;
+	do {
+		value = 0;
+
+		if (core->platform->data.vpu_ver == VPU_VERSION_IRIS33) {
+			__read_register(core,
+					VCODEC_NOC_SidebandManager_SenseIn0_Low,
+					&sense0_low);
+			__read_register(core,
+					VCODEC_NOC_SIDEBANDMANAGER_SENSEIN0_HIGH,
+					&sense0_high);
+			__read_register(core,
+					VCODEC_NOC_SIDEBANDMANAGER_SENSEIN1_HIGH,
+					&sense1_high);
+			__read_register(core,
+					VCODEC_NOC_SIDEBANDMANAGER_SENSEIN2_LOW,
+					&sense2_low);
+		} else if (core->platform->data.vpu_ver == VPU_VERSION_IRIS33_2P) {
+			__read_register(core,
+					VCODEC_NOC_SidebandManager_SenseIn0_Low_2P,
+					&sense0_low);
+			__read_register(core,
+					VCODEC_NOC_SIDEBANDMANAGER_SENSEIN0_HIGH_2P,
+					&sense0_high);
+			__read_register(core,
+					VCODEC_NOC_SIDEBANDMANAGER_SENSEIN1_HIGH_2P,
+					&sense1_high);
+			__read_register(core,
+					VCODEC_NOC_SIDEBANDMANAGER_SENSEIN2_LOW_2P,
+					&sense2_low);
+		}
+
+		value = ((sense0_low & 0x00008000) ||
+			 (sense0_high & 0x00000800) ||
+			 (sense1_high & 0x00800000) ||
+			 (sense2_low & 0x00002000));
+		usleep_range(10, 20);
+		i++;
+	} while ((value) && (i <= 100));
+
+	d_vpr_h("%s: sideband register value = %d\n", __func__, value);
 
 	/*
 	 * Reset both sides of 2 ahb2ahb_bridges (TZ and non-TZ)
@@ -384,20 +473,14 @@ disable_power:
 	if (xo_reset_acquired)
 		call_res_op(core, reset_control_release, core, "video_xo_reset");
 
-	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0_clk");
-	if (rc) {
-		d_vpr_e("%s: disable unprepare video_cc_mvs0_clk failed\n", __func__);
-		rc = 0;
-	}
-
 	return rc;
 }
 
 static int __power_off_iris33_controller(struct msm_vidc_core *core)
 {
-	int rc = 0;
-	int value = 0;
+	int rc = 0, value = 0;
 	bool xo_reset_acquired = false;
+	int noc_lpi_status = 0, count = 0;
 
 	/*
 	 * mask fal10_veto QLPAC error since fal10_veto can go 1
@@ -449,6 +532,11 @@ static int __power_off_iris33_controller(struct msm_vidc_core *core)
 	rc = call_res_op(core, reset_control_assert, core, "video_axi_reset");
 	if (rc)
 		d_vpr_e("%s: assert video_axi_reset failed\n", __func__);
+
+	rc = call_res_op(core, reset_control_assert, core, "video_mvs0_reset");
+	if (rc)
+		d_vpr_e("%s: assert video_mvs0_reset failed\n", __func__);
+
 	/* set retain mem and peripheral before asset mvs0c reset */
 	rc = call_res_op(core, clk_set_flag, core,
 		"video_cc_mvs0c_clk", MSM_VIDC_CLKFLAG_RETAIN_MEM);
@@ -462,6 +550,9 @@ static int __power_off_iris33_controller(struct msm_vidc_core *core)
 	if (rc)
 		d_vpr_e("%s: assert video_mvs0c_reset failed\n", __func__);
 	usleep_range(400, 500);
+	rc = call_res_op(core, reset_control_deassert, core, "video_mvs0_reset");
+	if (rc)
+		d_vpr_e("%s: de-assert video_mvs0_reset failed\n", __func__);
 	rc = call_res_op(core, reset_control_deassert, core, "video_axi_reset");
 	if (rc)
 		d_vpr_e("%s: de-assert video_axi_reset failed\n", __func__);
@@ -538,6 +629,12 @@ skip_video_xo_reset:
 	if (rc)
 		return rc;
 
+	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0_clk");
+	if (rc) {
+		d_vpr_e("%s: disable unprepare video_cc_mvs0_clk failed\n", __func__);
+		rc = 0;
+	}
+
 	/* remove retain mem and retain peripheral */
 	rc = call_res_op(core, clk_set_flag, core,
 		"video_cc_mvs0c_clk", MSM_VIDC_CLKFLAG_NORETAIN_PERIPH);
@@ -556,6 +653,9 @@ skip_video_xo_reset:
 		rc = 0;
 	}
 
+	if (!is_core_state(core, MSM_VIDC_CORE_ERROR))
+		goto power_down;
+
 	rc = call_res_op(core, reset_control_acquire, core, "video_xo_reset");
 	if (rc) {
 		d_vpr_e("%s: failed to acquire video_xo_reset control\n", __func__);
@@ -563,14 +663,188 @@ skip_video_xo_reset:
 	} else {
 		xo_reset_acquired = true;
 	}
-	/* power down process */
+	/* power cycle process to recover from NoC error */
 	rc = call_res_op(core, gdsc_off, core, "iris-ctl");
 	if (rc) {
 		d_vpr_e("%s: disable regulator iris-ctl failed\n", __func__);
 		rc = 0;
 	}
-	if (xo_reset_acquired)
+	if (xo_reset_acquired) {
+		xo_reset_acquired = false;
 		call_res_op(core, reset_control_release, core, "video_xo_reset");
+	}
+
+	rc = call_res_op(core, reset_control_acquire, core, "video_xo_reset");
+	if (rc) {
+		d_vpr_e("%s: failed to acquire video_xo_reset control\n", __func__);
+		rc = 0;
+	} else {
+		xo_reset_acquired = true;
+	}
+	call_res_op(core, gdsc_on, core, "iris-ctl");
+	if (xo_reset_acquired) {
+		xo_reset_acquired = false;
+		call_res_op(core, reset_control_release, core, "video_xo_reset");
+	}
+
+	rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_clk");
+
+	/* assert and deassert axi and mvs0c resets */
+	rc = call_res_op(core, reset_control_assert, core, "video_axi_reset");
+	if (rc)
+		d_vpr_e("%s: assert video_axi_reset failed\n", __func__);
+
+	/* set retain mem and peripheral before asset mvs0c reset */
+	rc = call_res_op(core, clk_set_flag, core,
+			 "video_cc_mvs0c_clk", MSM_VIDC_CLKFLAG_RETAIN_MEM);
+	if (rc)
+		d_vpr_e("%s: set retain mem failed\n", __func__);
+	rc = call_res_op(core, clk_set_flag, core,
+			 "video_cc_mvs0c_clk", MSM_VIDC_CLKFLAG_RETAIN_PERIPH);
+	if (rc)
+		d_vpr_e("%s: set retain peripheral failed\n", __func__);
+	rc = call_res_op(core, reset_control_assert, core, "video_mvs0c_reset");
+	if (rc)
+		d_vpr_e("%s: assert video_mvs0c_reset failed\n", __func__);
+	usleep_range(400, 500);
+
+	rc = call_res_op(core, reset_control_deassert, core, "video_axi_reset");
+	if (rc)
+		d_vpr_e("%s: de-assert video_axi_reset failed\n", __func__);
+	rc = call_res_op(core, reset_control_deassert, core, "video_mvs0c_reset");
+	if (rc)
+		d_vpr_e("%s: de-assert video_mvs0c_reset failed\n", __func__);
+
+	/* When the vcodec GDSC is powered on and then moves into HW control. As it moves into HW
+	 * control, vcodec is initiated with power down sequence then driver requests for migrating
+	 * GDSC into sw control, which implies power up sequence for GDSC. Due to b2b switch of
+	 * power off and on for video hardware, it ends up in transient state and hungs eventually.
+	 * So Writing the register explicitly to avoid power off sequence when HW control is set.
+	 */
+	writel_relaxed(0x0, (u8 *)core->resource->register_base_addr + WRAPPER_CORE_POWER_CONTROL);
+
+	rc = call_res_op(core, reset_control_acquire, core, "video_xo_reset");
+	if (rc) {
+		d_vpr_e("%s: failed to acquire video_xo_reset control\n", __func__);
+		rc = 0;
+	} else {
+		xo_reset_acquired = true;
+	}
+	rc = call_res_op(core, gdsc_on, core, "vcodec");
+	if (xo_reset_acquired) {
+		xo_reset_acquired = false;
+		call_res_op(core, reset_control_release, core, "video_xo_reset");
+	}
+	if (rc)
+		return rc;
+
+	rc = call_res_op(core, clk_enable, core, "video_cc_mvs0_clk");
+	if (rc)
+		return rc;
+
+	rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
+				     0x1, BIT(0));
+	if (rc)
+		return rc;
+
+	usleep_range(10, 20);
+
+	rc = __read_register(core, AON_WRAPPER_MVP_NOC_LPI_STATUS, &noc_lpi_status);
+	if (rc)
+		return rc;
+
+	while ((!(noc_lpi_status & BIT(0))) &&
+	       (noc_lpi_status & BIT(1) || noc_lpi_status & BIT(2))) {
+		rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
+					     0x0, BIT(0));
+		if (rc)
+			return rc;
+
+		usleep_range(10, 20);
+
+		rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
+					     0x1, BIT(0));
+		if (rc)
+			return rc;
+
+		usleep_range(10, 20);
+
+		rc = __read_register(core, AON_WRAPPER_MVP_NOC_LPI_STATUS, &noc_lpi_status);
+		if (rc)
+			return rc;
+
+		++count;
+		if (count >= 1000) {
+			d_vpr_e("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL failed\n", __func__);
+			break;
+		}
+	}
+
+	if (count < 1000) {
+		rc = __write_register_masked(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL,
+					     0x0, BIT(0));
+		if (rc)
+			return rc;
+	}
+
+	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0_clk");
+	if (rc) {
+		d_vpr_e("%s: disable unprepare video_cc_mvs0_clk failed\n", __func__);
+		rc = 0;
+	}
+
+	rc = call_res_op(core, reset_control_acquire, core, "video_xo_reset");
+	if (rc) {
+		d_vpr_e("%s: failed to acquire video_xo_reset control\n", __func__);
+		rc = 0;
+	} else {
+		xo_reset_acquired = true;
+	}
+	rc = call_res_op(core, gdsc_off, core, "vcodec");
+	if (rc) {
+		d_vpr_e("%s: disable regulator vcodec failed\n", __func__);
+		rc = 0;
+	}
+	if (xo_reset_acquired) {
+		xo_reset_acquired = false;
+		call_res_op(core, reset_control_release, core, "video_xo_reset");
+	}
+	/* remove retain mem and retain peripheral */
+	rc = call_res_op(core, clk_set_flag, core,
+			 "video_cc_mvs0c_clk", MSM_VIDC_CLKFLAG_NORETAIN_PERIPH);
+	if (rc)
+		d_vpr_e("%s: set noretain peripheral failed\n", __func__);
+
+	rc = call_res_op(core, clk_set_flag, core,
+			 "video_cc_mvs0c_clk", MSM_VIDC_CLKFLAG_NORETAIN_MEM);
+	if (rc)
+		d_vpr_e("%s: set noretain mem failed\n", __func__);
+
+	/* Turn off MVP MVS0C core clock */
+	rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_clk");
+	if (rc) {
+		d_vpr_e("%s: disable unprepare video_cc_mvs0c_clk failed\n", __func__);
+		rc = 0;
+	}
+
+power_down:
+	/* power down process */
+	rc = call_res_op(core, reset_control_acquire, core, "video_xo_reset");
+	if (rc) {
+		d_vpr_e("%s: failed to acquire video_xo_reset control\n", __func__);
+		rc = 0;
+	} else {
+		xo_reset_acquired = true;
+	}
+	rc = call_res_op(core, gdsc_off, core, "iris-ctl");
+	if (rc) {
+		d_vpr_e("%s: disable regulator iris-ctl failed\n", __func__);
+		rc = 0;
+	}
+	if (xo_reset_acquired) {
+		xo_reset_acquired = false;
+		call_res_op(core, reset_control_release, core, "video_xo_reset");
+	}
 
 	/* Turn off GCC AXI clock */
 	rc = call_res_op(core, clk_disable, core, "gcc_video_axi0_clk");
@@ -699,6 +973,14 @@ static int __power_on_iris33_hardware(struct msm_vidc_core *core)
 		xo_reset_acquired = true;
 	}
 
+	/* When the vcodec GDSC is powered on and then moves into HW control. As it moves into HW
+	 * control, vcodec is initiated with power down sequence then driver requests for migrating
+	 * GDSC into sw control, which implies power up sequence for GDSC. Due to b2b switch of
+	 * power off and on for video hardware, it ends up in transient state and hungs eventually.
+	 * So Writing the register explicitly to avoid power off sequence when HW control is set.
+	 */
+	writel_relaxed(0x0, (u8 *)core->resource->register_base_addr + WRAPPER_CORE_POWER_CONTROL);
+
 	rc = call_res_op(core, gdsc_on, core, "vcodec");
 	if (rc)
 		goto fail_regulator;
@@ -706,9 +988,17 @@ static int __power_on_iris33_hardware(struct msm_vidc_core *core)
 	rc = call_res_op(core, reset_control_release, core, "video_xo_reset");
 	if (rc) {
 		d_vpr_e("%s: failed to release video_xo_reset reset\n", __func__);
-		goto fail_clk_controller;
+		goto fail_power_on_substate;
 	}
 	xo_reset_acquired = false;
+	/* video controller and hardware powered on successfully */
+	rc = msm_vidc_change_core_sub_state(core, 0, CORE_SUBSTATE_POWER_ENABLE, __func__);
+	if (rc)
+		goto fail_power_on_substate;
+
+	rc = call_res_op(core, gdsc_sw_ctrl, core);
+	if (rc)
+		goto fail_sw_ctrl;
 
 	rc = call_res_op(core, clk_enable, core, "video_cc_mvs0_clk");
 	if (rc)
@@ -717,6 +1007,9 @@ static int __power_on_iris33_hardware(struct msm_vidc_core *core)
 	return 0;
 
 fail_clk_controller:
+	call_res_op(core, gdsc_hw_ctrl, core);
+fail_sw_ctrl:
+fail_power_on_substate:
 	call_res_op(core, gdsc_off, core, "vcodec");
 fail_regulator:
 	if (xo_reset_acquired)
@@ -757,10 +1050,6 @@ static int __power_on_iris33(struct msm_vidc_core *core)
 		d_vpr_e("%s: failed to power on iris33 hardware\n", __func__);
 		goto fail_power_on_hardware;
 	}
-	/* video controller and hardware powered on successfully */
-	rc = msm_vidc_change_core_sub_state(core, 0, CORE_SUBSTATE_POWER_ENABLE, __func__);
-	if (rc)
-		goto fail_power_on_substate;
 
 	idx = core->power.clk_freq_idx ? core->power.clk_freq_idx : 0;
 	rc = call_res_op(core, set_clks, core, idx);
@@ -861,8 +1150,6 @@ fail_program_noc_regs:
 	call_res_op(core, reset_control_release, core, "video_xo_reset");
 fail_deassert_xo_reset:
 fail_assert_xo_reset:
-fail_power_on_substate:
-	__power_off_iris33_hardware(core);
 fail_power_on_hardware:
 	__power_off_iris33_controller(core);
 fail_power_on_controller:
@@ -1167,7 +1454,6 @@ static int __noc_error_info_iris33(struct msm_vidc_core *core)
 
 fail_deassert_xo_reset:
 fail_assert_xo_reset:
-	MSM_VIDC_FATAL(true);
 	return rc;
 }
 
@@ -1258,7 +1544,38 @@ static int __boot_firmware_iris33(struct msm_vidc_core *core)
 	return rc;
 }
 
-static int msm_vidc_decide_work_mode_iris33(struct msm_vidc_inst *inst)
+static int __switch_gdsc_mode_iris33(struct msm_vidc_core *core, bool sw_mode)
+{
+	int rc;
+
+	if (sw_mode) {
+		rc = __write_register(core, WRAPPER_CORE_POWER_CONTROL, 0x0);
+		if (rc)
+			return rc;
+		rc = __read_register_with_poll_timeout(core, WRAPPER_CORE_POWER_STATUS,
+						       BIT(1), 0x2, 200, 2000);
+		if (rc) {
+			d_vpr_e("%s: Failed to read WRAPPER_CORE_POWER_STATUS register to 0x1\n",
+				__func__);
+			return rc;
+		}
+	} else {
+		rc = __write_register(core, WRAPPER_CORE_POWER_CONTROL, 0x1);
+		if (rc)
+			return rc;
+		rc = __read_register_with_poll_timeout(core, WRAPPER_CORE_POWER_STATUS,
+						       BIT(1), 0x0, 200, 2000);
+		if (rc) {
+			d_vpr_e("%s: Failed to read WRAPPER_CORE_POWER_STATUS register to 0x0\n",
+				__func__);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+int msm_vidc_decide_work_mode_iris33(struct msm_vidc_inst *inst)
 {
 	u32 work_mode;
 	struct v4l2_format *inp_f;
@@ -1472,6 +1789,7 @@ static struct msm_vidc_venus_ops iris33_ops = {
 	.noc_error_info = __noc_error_info_iris33,
 	.hw_ctrl_gdsc = __hw_ctrl_gdsc_iris33,
 	.sw_ctrl_gdsc = __sw_ctrl_gdsc_iris33,
+	.switch_gdsc_mode = __switch_gdsc_mode_iris33,
 	.scm_mem_protect = msm_vidc_mem_protect_video_regions_v1,
 };
 

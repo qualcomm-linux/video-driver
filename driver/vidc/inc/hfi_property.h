@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __H_HFI_PROPERTY_H__
@@ -730,6 +730,12 @@ enum hfi_codec_mode_type {
 #define HFI_PROP_CODEC_MODE                                     0x030001B2
 
 #define HFI_PROP_HEIF_TILES                                     0x030001B3
+
+enum hfi_log_video_encode_mode {
+	HFI_LOG_VIDEO_TYPE_NONE = 0x0,
+	HFI_LOG_VIDEO           = 0x1,
+};
+#define HFI_PROP_LOG_VIDEO_ENCODE                               0x030001B4
 
 #define HFI_PROP_END                                            0x03FFFFFF
 

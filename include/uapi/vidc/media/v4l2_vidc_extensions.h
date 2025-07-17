@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __V4l2_VIDC_EXTENSIONS_H__
@@ -434,5 +434,8 @@ enum v4l2_mpeg_vidc_apv_level {
  * (number of tile rows) << 16 | (number of tile columns) & 0xffff
  */
 #define V4L2_CID_MPEG_VIDC_HEIF_TILES                        (VIDC_BASE + 0x68)
+
+/* Control to enable or disable LOG video encoding */
+#define V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE                  (VIDC_BASE + 0x69)
 
 #endif

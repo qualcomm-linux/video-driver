@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __HFI_BUFFER_IRIS3__
@@ -702,10 +702,12 @@ typedef HFI_U32 HFI_BOOL;
 #define H265_NUM_TILE (H265_NUM_TILE_ROW * H265_NUM_TILE_COL + 1)
 #define H265_NUM_FRM_INFO (48)
 #define H265_DISPLAY_BUF_SIZE (3072)
+#define SIZE_THREE_DIMENSION_USERDATA 768
 #define HFI_BUFFER_PERSIST_H265D(_size, rpu_enabled) \
 	(_size = HFI_ALIGN((SIZE_SLIST_BUF_H265 * NUM_SLIST_BUF_H265 + \
 	H265_NUM_FRM_INFO * H265_DISPLAY_BUF_SIZE + \
-	H265_NUM_TILE * sizeof(HFI_U32) + NUM_HW_PIC_BUF * SIZE_SEI_USERDATA + \
+	H265_NUM_TILE * sizeof(HFI_U32) + NUM_HW_PIC_BUF * \
+	(SIZE_SEI_USERDATA + SIZE_THREE_DIMENSION_USERDATA) + \
 	rpu_enabled * NUM_HW_PIC_BUF * SIZE_DOLBY_RPU_METADATA),\
 	VENUS_DMA_ALIGNMENT))
 

@@ -320,13 +320,11 @@ static const struct msm_platform_core_capability core_data_canoe[] = {
 	{MAX_NUM_4K_SESSIONS, 8},
 	{MAX_NUM_8K_SESSIONS, 2},
 	{MAX_SECURE_SESSION_COUNT, 3},
-	{MAX_RT_MBPF, 259200},	/* ((7680x4320)/256) * 2)*/
+	{MAX_RT_MBPF, 276480},	/* ((8192x4320)/256) * 2)*/
 	{MAX_MBPF, 278528}, /* ((8192x4352)/256) * 2 */
-	{MAX_MBPS, 7833600},
+	{MAX_MBPS, 8355840},
 	/* max_load
-	 * 7680x4320@60fps or 3840x2176@240fps
-	 * which is greater than 4096x2176@120fps,
-	 * 8192x4320@48fps
+	 * 8192x4320@60fps or 4096x2176@240fps
 	 */
 	{MAX_IMAGE_MBPF, 1048576},  /* (16384x16384)/256 */
 	{MAX_MBPF_HQ, 8160}, /* ((1920x1088)/256) */
@@ -1022,7 +1020,10 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 	{CAVLC_MAX_BITRATE, ENC, H264, 0,
 		220000000, 1, 220000000},
 
-	{ALLINTRA_MAX_BITRATE, ENC, H264 | HEVC, 0,
+	{ALLINTRA_MAX_BITRATE, ENC, H264, 0,
+		245000000, 1, 245000000},
+
+	{ALLINTRA_MAX_BITRATE, ENC, HEVC, 0,
 		400000000, 1, 400000000},
 
 	{LOWLATENCY_MAX_BITRATE, ENC, H264, 0,
@@ -1710,7 +1711,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 		V4L2_MPEG_VIDC_APV_LEVEL_BAND0_5_1,
 		V4L2_CID_MPEG_VIDC_APV_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
+		CAP_FLAG_VOLATILE | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{LEVEL, DEC, H264,
 		V4L2_MPEG_VIDEO_H264_LEVEL_1_0,
@@ -2286,6 +2287,14 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 		HFI_PROP_THREE_DIMENSIONAL_REFERENCE_DISPLAYS_INFO,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
 
+	{META_THREE_DIMENSIONAL_REF_DISP_INFO, DEC, HEVC,
+		MSM_VIDC_META_DISABLE,
+		MSM_VIDC_META_ENABLE | MSM_VIDC_META_RX_OUTPUT,
+		0, MSM_VIDC_META_DISABLE,
+		V4L2_CID_MPEG_VIDC_METADATA_THREE_DIMENSIONAL_REF_DISP_INFO,
+		HFI_PROP_THREE_DIMENSIONAL_REFERENCE_DISPLAYS_INFO,
+		CAP_FLAG_BITMASK | CAP_FLAG_META},
+
 	{META_PICTURE_TYPE, DEC, CODECS_ALL,
 		MSM_VIDC_META_DISABLE,
 		MSM_VIDC_META_ENABLE | MSM_VIDC_META_TX_INPUT |
@@ -2481,7 +2490,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 		HFI_PROP_ENABLE_SLICE_DELIVERY,
 		CAP_FLAG_OUTPUT_PORT},
 
-	{SIGNAL_COLOR_INFO, ENC, H264 | HEVC | HEIC,
+	{SIGNAL_COLOR_INFO, ENC, H264 | HEVC | HEIC | APV,
 		0, INT_MAX, 1, 0,
 		V4L2_CID_MPEG_VIDC_SIGNAL_COLOR_INFO,
 		HFI_PROP_SIGNAL_COLOR_INFO,
@@ -2498,6 +2507,14 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 		V4L2_CID_MPEG_VIDC_HEIF_TILES,
 		HFI_PROP_HEIF_TILES,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
+
+	{LOG_VIDEO_ENCODE, ENC, HEVC | APV,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
+		HFI_PROP_LOG_VIDEO_ENCODE,
+		CAP_FLAG_OUTPUT_PORT},
 };
 
 /*
@@ -2572,6 +2589,14 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v2[] = {
 		V4L2_CID_MPEG_VIDC_METADATA_EVA_STATS,
 		HFI_PROP_EVA_STAT_INFO,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
+
+	{LOG_VIDEO_ENCODE, ENC, HEVC,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
+		HFI_PROP_LOG_VIDEO_ENCODE,
+		CAP_FLAG_OUTPUT_PORT},
 };
 
 /*
@@ -2796,6 +2821,14 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v1[] = {
 		V4L2_CID_MPEG_VIDC_METADATA_EVA_STATS,
 		HFI_PROP_EVA_STAT_INFO,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
+
+	{LOG_VIDEO_ENCODE, ENC, HEVC | APV,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
+		HFI_PROP_LOG_VIDEO_ENCODE,
+		CAP_FLAG_OUTPUT_PORT},
 };
 
 /*
@@ -3018,6 +3051,14 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v3[] = {
 		V4L2_CID_MPEG_VIDC_METADATA_EVA_STATS,
 		HFI_PROP_EVA_STAT_INFO,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
+
+	{LOG_VIDEO_ENCODE, ENC, HEVC,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
+		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
+		HFI_PROP_LOG_VIDEO_ENCODE,
+		CAP_FLAG_OUTPUT_PORT},
 };
 
 static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_canoe[] = {
@@ -3032,7 +3073,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 	{PIX_FMTS, ENC, HEVC,
 		{PROFILE, MIN_FRAME_QP, MAX_FRAME_QP, I_FRAME_QP, P_FRAME_QP,
 			B_FRAME_QP, MIN_QUALITY, BLUR_TYPES, IR_PERIOD,
-			LTR_COUNT, CSC}},
+			LTR_COUNT, CSC, LOG_VIDEO_ENCODE}},
 
 	{PIX_FMTS, ENC, HEIC,
 		{PROFILE, CSC}},
@@ -3043,7 +3084,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 	{CODEC_MODE, ENC, CODECS_ALL,
 		{0}},
 
-	{PIX_FMTS, ENC | DEC, APV,
+	{PIX_FMTS, ENC, APV,
+		{LOG_VIDEO_ENCODE},
+		NULL,
+		NULL},
+
+	{PIX_FMTS, DEC, APV,
 		{0},
 		NULL,
 		NULL},
@@ -3192,7 +3238,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 		msm_vidc_set_bitrate},
 
 	{BIT_RATE, ENC, APV,
-		{PEAK_BITRATE},
+		{PEAK_BITRATE, LEVEL},
 		msm_vidc_adjust_bitrate_apv,
 		msm_vidc_set_bitrate},
 
@@ -3212,12 +3258,14 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 			BIT_RATE, META_ROI_INFO, MIN_QUALITY, BITRATE_BOOST, VBV_DELAY,
 			PEAK_BITRATE, SLICE_MODE, CONTENT_ADAPTIVE_CODING,
 			BLUR_TYPES, LOWLATENCY_MODE, META_EVA_STATS,
-			META_TRANSCODING_STAT_INFO, OPEN_GOP, LOOKAHEAD_ENCODE_ENABLE},
+			META_TRANSCODING_STAT_INFO, OPEN_GOP, LOOKAHEAD_ENCODE_ENABLE,
+			LOG_VIDEO_ENCODE},
 		msm_vidc_adjust_bitrate_mode,
 		msm_vidc_set_u32_enum},
 
 	{BITRATE_MODE, ENC, APV,
-		{BIT_RATE, PEAK_BITRATE, META_EVA_STATS, TIME_DELTA_BASED_RC},
+		{BIT_RATE, PEAK_BITRATE, META_EVA_STATS, TIME_DELTA_BASED_RC,
+			LOG_VIDEO_ENCODE},
 		msm_vidc_adjust_bitrate_mode,
 		msm_vidc_set_u32_enum},
 
@@ -3343,7 +3391,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 
 	{MIN_QUALITY, ENC, H264 | HEVC,
 		{BLUR_TYPES},
-		msm_vidc_adjust_min_quality,
+		msm_vidc_adjust_min_quality_iris4,
 		msm_vidc_set_u32},
 
 	{VBV_DELAY, ENC, H264 | HEVC,
@@ -3516,9 +3564,9 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 		NULL,
 		msm_vidc_set_level},
 
-	{LEVEL, ENC | DEC, APV,
+	{LEVEL, ENC, APV,
 		{0},
-		NULL,
+		msm_vidc_adjust_level_tier,
 		msm_vidc_set_apv_level_band},
 
 	{AV1_TIER, DEC, AV1,
@@ -3553,7 +3601,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 
 	{CHROMA_QP_INDEX_OFFSET, ENC, HEVC | H264,
 		{0},
-		msm_vidc_adjust_chroma_qp_index_offset,
+		msm_vidc_adjust_chroma_qp_index_offset_iris35,
 		msm_vidc_set_chroma_qp_index_offset},
 
 	{DISPLAY_DELAY_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
@@ -3677,7 +3725,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 		NULL},
 
 	{META_ROI_INFO, ENC, H264 | HEVC,
-		{MIN_QUALITY, IR_PERIOD, BLUR_TYPES},
+		{IR_PERIOD, BLUR_TYPES},
 		msm_vidc_adjust_roi_info_iris4,
 		NULL},
 
@@ -3696,7 +3744,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 		NULL,
 		msm_vidc_set_vui_timing_info},
 
-	{SIGNAL_COLOR_INFO, ENC, H264 | HEVC | HEIC,
+	{SIGNAL_COLOR_INFO, ENC, H264 | HEVC | HEIC | APV,
 		{0},
 		NULL,
 		msm_vidc_set_signal_color_info},
@@ -3770,6 +3818,11 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 		{0},
 		NULL,
 		msm_vidc_set_u32},
+
+	{LOG_VIDEO_ENCODE, ENC, HEVC | APV,
+		{0},
+		msm_vidc_adjust_log_mode,
+		msm_vidc_set_u32_enum},
 };
 
 /* Default UBWC config for LPDDR5 */
@@ -3851,7 +3904,7 @@ static const struct clk_table canoe_clk_table_v2[] = {
 	 (u64[]) {630000000, 630000000, 630000000, 533000000, 444000000,
 		  420000000, 338000000, 240000000}, 8},
 	{ "video_cc_mvs0b_clk_src",     VIDEO_CC_MVS0B_CLK_SRC,     1,
-	 (u64[]) {800000000, 630000000, 630000000, 533000000, 444000000,
+	 (u64[]) {850000000, 630000000, 630000000, 533000000, 444000000,
 		  420000000, 338000000, 240000000}, 8},
 	{ "video_cc_mvs0c_clk_src",     VIDEO_CC_MVS0C_CLK_SRC,     1,
 	 (u64[]) {1260000000, 1260000000, 1104000000, 800000000, 666000000,
@@ -3964,6 +4017,7 @@ static const u32 canoe_vdec_psc_apv[] = {
 	HFI_PROP_LUMA_CHROMA_BIT_DEPTH,
 	HFI_PROP_BUFFER_FW_MIN_OUTPUT_COUNT,
 	HFI_PROP_PROFILE,
+	HFI_PROP_SIGNAL_COLOR_INFO,
 	HFI_PROP_LEVEL,
 };
 

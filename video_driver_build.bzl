@@ -70,6 +70,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
             "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build),
             "//soc-repo:{}/drivers/soc/qcom/minidump".format(kernel_build),
             "//soc-repo:{}/drivers/soc/qcom/socinfo".format(kernel_build),
+            "//soc-repo:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             "//msm-kernel:all_headers",
@@ -138,6 +139,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(kernel_build),
             "//soc-repo:{}/drivers/soc/qcom/minidump".format(kernel_build),
             "//soc-repo:{}/drivers/soc/qcom/socinfo".format(kernel_build),
+            "//soc-repo:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
         "//build/kernel/kleaf:socrepo_false": [
             "//msm-kernel:all_headers",

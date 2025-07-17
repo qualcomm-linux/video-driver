@@ -2,7 +2,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
- * All rights reserved.
  */
 
 #ifndef __HFI_BUFFER_IRIS4__
@@ -1036,11 +1035,12 @@ typedef HFI_U32 HFI_BOOL;
 #define H265_NUM_FRM_INFO (48)
 #define H265_DISPLAY_BUF_SIZE (3072)
 #define SIZE_H265D_ARP (9728)
+#define SIZE_THREE_DIMENSION_USERDATA 768
 #define HFI_BUFFER_PERSIST_H265D(_size, rpu_enabled) \
 	(_size = HFI_ALIGN((SIZE_SLIST_BUF_H265 * NUM_SLIST_BUF_H265 + \
 	H265_NUM_FRM_INFO * H265_DISPLAY_BUF_SIZE + \
-	(H265_NUM_TILE * sizeof(HFI_U32)) + \
-	(NUM_HW_PIC_BUF * (SIZE_SEI_USERDATA + SIZE_H265D_ARP)) + \
+	(H265_NUM_TILE * sizeof(HFI_U32)) + (NUM_HW_PIC_BUF * \
+	(SIZE_SEI_USERDATA + SIZE_H265D_ARP + SIZE_THREE_DIMENSION_USERDATA)) + \
 	rpu_enabled * NUM_HW_PIC_BUF * SIZE_DOLBY_RPU_METADATA),\
 	VENUS_DMA_ALIGNMENT))
 

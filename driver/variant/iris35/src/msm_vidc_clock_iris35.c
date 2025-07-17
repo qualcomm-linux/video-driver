@@ -778,8 +778,8 @@ static int calculate_vpp_min_freq(struct api_calculation_input codec_input,
 	return 0;
 }
 
-int msm_vidc_calculate_frequency(struct api_calculation_input codec_input,
-		struct api_calculation_freq_output *codec_output)
+int msm_vidc_calculate_frequency_iris35(struct api_calculation_input codec_input,
+					struct api_calculation_freq_output *codec_output)
 {
 	int rc = 0;
 

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _MSM_VIDC_POWER_H_
@@ -104,6 +104,23 @@ static inline int __bpp(enum msm_vidc_colorformat_type f)
 		d_vpr_e("Unsupported colorformat (%x)", f);
 		return INT_MAX;
 	}
+}
+
+// used for DPB in decode or RPB in encode
+static inline int __format_10bpp(enum msm_vidc_colorformat_type f)
+{
+	switch (f) {
+	case MSM_VIDC_FMT_TP10C:
+		return 0;
+	case MSM_VIDC_FMT_P010:
+		return 1;
+	case MSM_VIDC_FMT_P210C:
+	case MSM_VIDC_FMT_P210:
+		return 3;
+	default:
+		d_vpr_e("Unsupported colorformat (%x)", f);
+	}
+	return 0;
 }
 
 int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses);

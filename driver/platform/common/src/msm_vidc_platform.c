@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <media/v4l2-mem2mem.h>
@@ -27,6 +27,8 @@
 #if defined(CONFIG_MSM_VIDC_SUN)
 #include "msm_vidc_sun.h"
 #include "msm_vidc_iris35.h"
+#include "msm_vidc_tuna.h"
+#include "msm_vidc_iris33.h"
 #endif
 #if defined(CONFIG_MSM_VIDC_PINEAPPLE)
 #include "msm_vidc_pineapple.h"
@@ -122,6 +124,12 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.get_platform_data          = msm_vidc_get_platform_data_sun,
 		.init_platform              = msm_vidc_init_platform_sun,
 		.init_iris                  = msm_vidc_init_iris35,
+	},
+	{
+		.compat                     = "qcom,tuna-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_tuna,
+		.init_platform              = msm_vidc_init_platform_tuna,
+		.init_iris                  = msm_vidc_init_iris33,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_LEMANS)
@@ -545,6 +553,7 @@ int msm_vidc_v4l2_to_hfi_enum(struct msm_vidc_inst *inst,
 	case HEVC_TIER:
 	case AV1_TIER:
 	case BLUR_TYPES:
+	case LOG_VIDEO_ENCODE:
 		*value = inst->capabilities[cap_id].value;
 		return 0;
 	case LAYER_TYPE:
@@ -1057,6 +1066,88 @@ static u32 msm_vidc_apv_level_band_v4l2_to_hfi(s64 v4l2_level)
 	return HFI_LEVEL_NONE;
 }
 
+static s64 msm_vidc_adjust_apv_level(struct msm_vidc_inst *inst,
+					   u64 samples_per_sec, u64 target_bitrate)
+{
+	static struct apv_level_table level_table[] = {
+		/* level, Max luma sample rate, Max coded data rate (kbits/sec) */
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_1_0,    3041280,       7000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_1_1,    6082560,      14000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_2_0,    15667200,     36000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_2_1,    31334400,     71000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_3_0,    66846720,    101000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_3_1,   133693440,    201000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_4_0,   265420800,    401000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_4_1,   530841600,    780000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_5_0,  1061683200,   1560000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_5_1,  2123366400,   3324000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_6_0,  4777574400,   6648000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_6_1,  8493465600,  13296000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_7_0, 16986931200,  26592000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND0_7_1, 33973862400,  53184000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_1_0,     3041280,     11000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_1_1,     6082560,     21000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_2_0,    15667200,     53000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_2_1,    31334400,    106000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_3_0,    66846720,    151000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_3_1,   133693440,    301000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_4_0,   265420800,    602000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_4_1,   530841600,   1170000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_5_0,  1061683200,   2340000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_5_1,  2123366400,   4986000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_6_0,  4777574400,   9972000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_6_1,  8493465600,  19944000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_7_0, 16986931200,  39888000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND1_7_1, 33973862400,  79776000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_1_0,     3041280,     14000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_1_1,     6082560,     28000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_2_0,    15667200,     71000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_2_1,    31334400,    141000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_3_0,    66846720,    201000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_3_1,   133693440,    401000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_4_0,   265420800,    780000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_4_1,   530841600,   1560000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_5_0,  1061683200,   3324000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_5_1,  2123366400,   6648000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_6_0,  4777574400,  13296000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_6_1,  8493465600,  26592000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_7_0, 16986931200,  53184000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND2_7_1, 33973862400, 106368000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_1_0,     3041280,     21000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_1_1,     6082560,     42000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_2_0,    15667200,    106000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_2_1,    31334400,    212000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_3_0,    66846720,    301000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_3_1,   133693440,    602000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_4_0,   265420800,   1170000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_4_1,   530841600,   2340000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_5_0,  1061683200,   4986000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_5_1,  2123366400,   9972000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_6_0,  4777574400,  19944000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_6_1,  8493465600,  39888000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_7_0, 16986931200,  79776000, },
+		{ V4L2_MPEG_VIDC_APV_LEVEL_BAND3_7_1, 33973862400, 159552000, },
+	};
+	s64 level = inst->capabilities[LEVEL].value;
+	int cnt = 0;
+
+	for (cnt = 0; cnt < ARRAY_SIZE(level_table); cnt++) {
+		if (samples_per_sec <= level_table[cnt].max_luma_sample &&
+			target_bitrate <= level_table[cnt].max_coded_rate * 1000) {
+			break;
+		}
+	}
+
+	if (cnt == ARRAY_SIZE(level_table)) {
+		/* Return Max level if there is no match*/
+		i_vpr_h(inst, "%s: level: %llu target_bitrate: %llu\n", __func__,
+						level, target_bitrate);
+		return V4L2_MPEG_VIDC_APV_LEVEL_BAND3_7_1;
+	}
+
+	return level_table[cnt].level;
+}
+
 int msm_vidc_adjust_level_tier(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
@@ -1091,6 +1182,9 @@ int msm_vidc_adjust_level_tier(void *instance, struct v4l2_ctrl *ctrl)
 							  dpb_size, bitrate);
 	} else if (inst->codec == MSM_VIDC_HEVC) {
 		adjust_level = msm_vidc_adjust_h265_level_tier(inst, frame_size, samples_per_sec,
+							       bitrate);
+	} else if (inst->codec == MSM_VIDC_APV) {
+		adjust_level = msm_vidc_adjust_apv_level(inst, samples_per_sec,
 							       bitrate);
 	}
 
@@ -1299,7 +1393,7 @@ int msm_vidc_adjust_input_buf_host_max_count(void *instance, struct v4l2_ctrl *c
 	adjusted_value = ctrl ? ctrl->val :
 		inst->capabilities[INPUT_BUF_HOST_MAX_COUNT].value;
 
-	if (msm_vidc_is_super_buffer(inst) || is_image_session(inst))
+	if (msm_vidc_is_super_buffer(inst))
 		adjusted_value = DEFAULT_MAX_HOST_BURST_BUF_COUNT;
 
 	msm_vidc_update_cap_value(inst, INPUT_BUF_HOST_MAX_COUNT, adjusted_value, __func__);
@@ -1357,12 +1451,31 @@ int msm_vidc_adjust_transform_8x8(void *instance, struct v4l2_ctrl *ctrl)
 int msm_vidc_adjust_chroma_qp_index_offset(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	s32 value, chroma_qp, offset = 12;
+	u32 adjusted_value = 0;
+
+	value = ctrl ? ctrl->val : inst->capabilities[CHROMA_QP_INDEX_OFFSET].value;
+
+	if (value != MIN_CHROMA_QP_OFFSET)
+		value = MAX_CHROMA_QP_OFFSET;
+
+	chroma_qp = value + offset;
+
+	adjusted_value = chroma_qp | chroma_qp << 8;
+
+	msm_vidc_update_cap_value(inst, CHROMA_QP_INDEX_OFFSET, adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_chroma_qp_index_offset_iris35(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
 	s32 chroma_qp, profile = 0;
 	s8 chroma_cr_qp = 0, chroma_cb_qp = 0, offset = 12;
 	u32 adjusted_value = 0;
 
-	chroma_qp = ctrl ? ctrl->val :
-		inst->capabilities[CHROMA_QP_INDEX_OFFSET].value;
+	chroma_qp = ctrl ? ctrl->val : inst->capabilities[CHROMA_QP_INDEX_OFFSET].value;
 
 	if (chroma_qp > MAX_CHROMA_QP_OFFSET) {
 		chroma_cr_qp = chroma_qp & 0xFF;
@@ -1376,9 +1489,6 @@ int msm_vidc_adjust_chroma_qp_index_offset(void *instance, struct v4l2_ctrl *ctr
 		chroma_cr_qp += offset;
 		chroma_cb_qp += offset;
 	} else {
-		if (chroma_qp != MIN_CHROMA_QP_OFFSET)
-			chroma_qp = MAX_CHROMA_QP_OFFSET;
-
 		chroma_cr_qp = chroma_qp + offset;
 		chroma_cb_qp = chroma_cr_qp;
 	}
@@ -1531,10 +1641,17 @@ int msm_vidc_adjust_slice_count(void *instance, struct v4l2_ctrl *ctrl)
 		goto exit;
 	}
 
-	mbpf = NUM_MBS_PER_FRAME(output_height, output_width);
-	mbps = NUM_MBS_PER_SEC(output_height, output_width, fps);
-	max_mbpf = NUM_MBS_PER_FRAME(max_height, max_width);
-	max_mbps = NUM_MBS_PER_SEC(max_height, max_width, MAX_SLICES_FRAME_RATE);
+	if (inst->codec == MSM_VIDC_HEVC) {
+		mbpf = NUM_MBS_PER_FRAME_HEVC(output_height, output_width);
+		mbps = NUM_MBS_PER_SEC_HEVC(output_height, output_width, fps);
+		max_mbpf = NUM_MBS_PER_FRAME_HEVC(max_height, max_width);
+		max_mbps = NUM_MBS_PER_SEC_HEVC(max_height, max_width, MAX_SLICES_FRAME_RATE);
+	} else {
+		mbpf = NUM_MBS_PER_FRAME(output_height, output_width);
+		mbps = NUM_MBS_PER_SEC(output_height, output_width, fps);
+		max_mbpf = NUM_MBS_PER_FRAME(max_height, max_width);
+		max_mbps = NUM_MBS_PER_SEC(max_height, max_width, MAX_SLICES_FRAME_RATE);
+	}
 
 	if (mbpf > max_mbpf || mbps > max_mbps) {
 		adjusted_value = V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_SINGLE;
@@ -3089,6 +3206,39 @@ int msm_vidc_adjust_lookahead_encode_size(void *instance, struct v4l2_ctrl *ctrl
 	return 0;
 }
 
+int msm_vidc_adjust_log_mode(void *instance, struct v4l2_ctrl *ctrl)
+{
+	s32 value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	s64 pix_fmt = -1;
+	s64 hfi_rc_type = -1;
+
+	value = ctrl ? ctrl->val : inst->capabilities[LOG_VIDEO_ENCODE].value;
+	/*
+	 * IRIS4 encoder LOG mode supports for:
+	 *   HEVC/APV encoders 10bit only
+	 *   VBR rate control only
+	 */
+	if (msm_vidc_get_parent_value(inst, LOG_VIDEO_ENCODE, PIX_FMTS,
+		      &pix_fmt, __func__))
+		return -EINVAL;
+	if (!is_10bit_colorformat(pix_fmt))
+		goto disable;
+
+	if (msm_vidc_get_parent_value(inst, LOG_VIDEO_ENCODE, BITRATE_MODE,
+		      &hfi_rc_type, __func__))
+		return -EINVAL;
+	if (hfi_rc_type != HFI_RC_VBR_CFR)
+		goto disable;
+
+	msm_vidc_update_cap_value(inst, LOG_VIDEO_ENCODE, value, __func__);
+	return 0;
+
+disable:
+	msm_vidc_update_cap_value(inst, LOG_VIDEO_ENCODE, MSM_VIDC_LOG_VIDEO_TYPE_NONE, __func__);
+	return 0;
+}
+
 /******************* End of Control Adjust functions *************************/
 
 /************************* Control Set functions *****************************/
@@ -3475,9 +3625,7 @@ int msm_vidc_set_slice_count(void *instance,
 		return 0;
 	}
 	if (slice_mode == V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB) {
-		hfi_value = (inst->codec == MSM_VIDC_HEVC) ?
-			((inst->capabilities[SLICE_MAX_MB].value + 3) / 4) :
-			inst->capabilities[SLICE_MAX_MB].value;
+		hfi_value = inst->capabilities[SLICE_MAX_MB].value;
 		set_cap_id = SLICE_MAX_MB;
 	} else if (slice_mode == V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_BYTES) {
 		hfi_value = inst->capabilities[SLICE_MAX_BYTES].value;

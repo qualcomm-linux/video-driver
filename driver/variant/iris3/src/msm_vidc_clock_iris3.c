@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "perf_static_model.h"
@@ -660,8 +660,8 @@ static int calculate_vpp_min_freq(struct api_calculation_input codec_input,
 	return 0;
 }
 
-int msm_vidc_calculate_frequency(struct api_calculation_input codec_input,
-		struct api_calculation_freq_output *codec_output)
+int msm_vidc_calculate_frequency_iris3(struct api_calculation_input codec_input,
+				       struct api_calculation_freq_output *codec_output)
 {
 	int rc = 0;
 

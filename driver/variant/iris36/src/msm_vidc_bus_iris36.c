@@ -1033,7 +1033,7 @@ static int calculate_bandwidth_encoder_iris36(
 	return 0;
 }
 
-int msm_vidc_calculate_bandwidth(struct api_calculation_input codec_input,
+int msm_vidc_calculate_bandwidth_iris36(struct api_calculation_input codec_input,
 		struct api_calculation_bw_output *codec_output)
 {
 	int rc = 0;

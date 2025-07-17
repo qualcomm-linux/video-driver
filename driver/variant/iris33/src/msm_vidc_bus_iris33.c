@@ -114,10 +114,10 @@ struct compression_factors {
 	u32 dpb_cr_y;
 	u32 ipb_cr_y;
 	u32 ipb_cr;
-} compression_factor;
+} compression_factor_iris33;
 
 static u32 get_compression_factors(struct compression_factors *compression_factor,
-		struct api_calculation_input codec_input)
+				   struct api_calculation_input codec_input)
 {
 	u8 cr_index_entry, cr_index_y, cr_index_c, cr_index_uni;
 	u32 frame_width;
@@ -359,10 +359,10 @@ static int calculate_bandwidth_decoder_iris33(
 		codec_input.frame_rate * 2 + 999) / 1000 + 999) / 1000;
 
 	/* TODO Integrate Compression Ratio returned by FW */
-	get_compression_factors(&compression_factor, codec_input);
-	dpb_compression_factor_y = compression_factor.dpb_cf_y;
-	dpb_compression_factor_cbcr = compression_factor.dpb_cf_cbcr;
-	opb_compression_factor_ycbcr = compression_factor.opb_cf_ycbcr;
+	get_compression_factors(&compression_factor_iris33, codec_input);
+	dpb_compression_factor_y = compression_factor_iris33.dpb_cf_y;
+	dpb_compression_factor_cbcr = compression_factor_iris33.dpb_cf_cbcr;
+	opb_compression_factor_ycbcr = compression_factor_iris33.opb_cf_ycbcr;
 
 	dpb_ubwc_tile_width_pixels = ubwc_tile_w;
 
@@ -751,11 +751,11 @@ static int calculate_bandwidth_encoder_iris33(
 		codec_input.frame_rate * 2 + 999) / 1000 + 999) / 1000;
 
 	/* TODO Integrate Compression Ratio returned by FW */
-	get_compression_factors(&compression_factor, codec_input);
-	dpb_compression_factor_y = compression_factor.dpb_cf_y;
-	dpb_compression_factor_cbcr = compression_factor.dpb_cf_cbcr;
-	ipb_compression_factor_y = compression_factor.ipb_cr_y;
-	ipb_compression_factor = compression_factor.ipb_cr;
+	get_compression_factors(&compression_factor_iris33, codec_input);
+	dpb_compression_factor_y = compression_factor_iris33.dpb_cf_y;
+	dpb_compression_factor_cbcr = compression_factor_iris33.dpb_cf_cbcr;
+	ipb_compression_factor_y = compression_factor_iris33.ipb_cr_y;
+	ipb_compression_factor = compression_factor_iris33.ipb_cr;
 
 	en_tile_number = (frame_width % en_vertical_tiles_width) ?
 		((frame_width / en_vertical_tiles_width) + 1) :
@@ -1033,8 +1033,8 @@ static int calculate_bandwidth_encoder_iris33(
 	return 0;
 }
 
-int msm_vidc_calculate_bandwidth(struct api_calculation_input codec_input,
-		struct api_calculation_bw_output *codec_output)
+int msm_vidc_calculate_bandwidth_iris33(struct api_calculation_input codec_input,
+					struct api_calculation_bw_output *codec_output)
 {
 	int rc = 0;
 

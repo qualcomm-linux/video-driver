@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _PERF_STATIC_MODEL_H_
@@ -252,10 +252,5 @@ struct api_calculation_bw_output {
 	u32 llc_bw_rd;
 	u32 llc_bw_wr;
 };
-
-int msm_vidc_calculate_frequency(struct api_calculation_input codec_input,
-				 struct api_calculation_freq_output *codec_output);
-int msm_vidc_calculate_bandwidth(struct api_calculation_input codec_input,
-				 struct api_calculation_bw_output *codec_output);
 
 #endif /*_PERF_STATIC_MODEL_H_ */

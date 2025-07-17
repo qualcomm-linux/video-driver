@@ -16,6 +16,7 @@
 #include <linux/soc/qcom/msm_mmrm.h>
 #endif
 #include <media/v4l2-mem2mem.h>
+#include <linux/msm_dma_iommu_mapping.h>
 
 #include "msm_vidc_internal.h"
 #include "msm_vidc_driver.h"
@@ -50,6 +51,7 @@ static inline bool is_video_device(struct device *dev)
 		of_device_is_compatible(dev->of_node, "qcom,volcano-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,sm8750-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,sm8750-vidc-v2") ||
+		of_device_is_compatible(dev->of_node, "qcom,tuna-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2") ||
 		of_device_is_compatible(dev->of_node, "qcom,seraph-vidc") ||
@@ -150,6 +152,7 @@ static const struct of_device_id msm_vidc_dt_match[] = {
 	{.compatible = "qcom,cliffs-vidc"},
 	{.compatible = "qcom,volcano-vidc"},
 	{.compatible = "qcom,niobe-vidc"},
+	{.compatible = "qcom,tuna-vidc"},
 	{.compatible = "qcom,vidc,cb-ns-pxl"},
 	{.compatible = "qcom,vidc,cb-ns"},
 	{.compatible = "qcom,vidc,cb-ns-bitstream"},
@@ -603,6 +606,9 @@ static void msm_vidc_component_unbind(struct device *dev,
 	struct device *parent, void *data)
 {
 	d_vpr_h("%s(): %s\n", __func__, dev_name(dev));
+
+	if (is_video_context_bank_device(dev))
+		msm_dma_unmap_all_for_dev(dev);
 }
 
 static int msm_vidc_component_master_bind(struct device *dev)

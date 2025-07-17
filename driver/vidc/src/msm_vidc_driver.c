@@ -5437,6 +5437,24 @@ struct msm_vidc_inst *get_inst_ref(struct msm_vidc_core *core,
 	return inst;
 }
 
+struct msm_vidc_inst *get_inst_using_session_id(struct msm_vidc_core *core,
+		u32 session_id)
+{
+	struct msm_vidc_inst *inst = NULL;
+	bool matches = false;
+
+	mutex_lock(&core->lock);
+	list_for_each_entry(inst, &core->instances, list) {
+		if (inst->session_id == session_id) {
+			matches = true;
+			break;
+		}
+	}
+	inst = matches ? get_inst_ref_locked(inst) : NULL;
+	mutex_unlock(&core->lock);
+	return inst;
+}
+
 void put_inst(struct msm_vidc_inst *inst)
 {
 	kref_put(&inst->kref, msm_vidc_close_helper);

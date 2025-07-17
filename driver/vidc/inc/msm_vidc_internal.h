@@ -80,6 +80,11 @@ enum msm_vidc_metadata_bits {
 	MSM_VIDC_META_MAX              = 0x40,
 };
 
+enum msm_vidc_log_encode_mode {
+	MSM_VIDC_LOG_VIDEO_TYPE_NONE    = 0x0,
+	MSM_VIDC_LOG_VIDEO_TYPE_COMMON  = 0x1,
+};
+
 #define MSM_VIDC_METADATA_SIZE             (4 * 4096) /* 16 KB */
 #define ENCODE_INPUT_METADATA_SIZE         (512 * 4096) /* 2 MB */
 #define DECODE_INPUT_METADATA_SIZE         MSM_VIDC_METADATA_SIZE
@@ -166,6 +171,12 @@ enum msm_vidc_metadata_bits {
 
 #define NUM_MBS_PER_FRAME(__height, __width) \
 	((ALIGN(__height, 16) / 16) * (ALIGN(__width, 16) / 16))
+
+#define NUM_MBS_PER_FRAME_HEVC(__height, __width) \
+	((ALIGN(__height, 32) / 32) * (ALIGN(__width, 32) / 32))
+
+#define NUM_MBS_PER_SEC_HEVC(__height, __width, __fps) \
+	(NUM_MBS_PER_FRAME_HEVC(__height, __width) * __fps)
 
 #ifdef V4L2_CTRL_CLASS_CODEC
 #define IS_PRIV_CTRL(idx) ( \
@@ -439,6 +450,7 @@ enum msm_vidc_metadata_bits {
 	CAP(CAPTURE_DATA_OFFSET)                  \
 	CAP(HEIF_TILES)                           \
 	CAP(CORE_ID_MASK)                         \
+	CAP(LOG_VIDEO_ENCODE)                     \
 	CAP(INST_CAP_MAX)                         \
 }
 

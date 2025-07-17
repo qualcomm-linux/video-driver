@@ -639,6 +639,8 @@ struct msm_vidc_buffer *get_meta_buffer(struct msm_vidc_inst *inst,
 struct msm_vidc_inst *get_inst_ref_locked(struct msm_vidc_inst *inst);
 struct msm_vidc_inst *get_inst_ref(struct msm_vidc_core *core,
 				   struct msm_vidc_inst *instance);
+struct msm_vidc_inst *get_inst_using_session_id(struct msm_vidc_core *core,
+		u32 session_id);
 void put_inst(struct msm_vidc_inst *inst);
 bool msm_vidc_allow_metadata_delivery(struct msm_vidc_inst *inst,
 				      u32 cap_id, u32 port);

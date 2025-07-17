@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __HFI_BUFFER_IRIS3_3__
@@ -1306,10 +1306,7 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		if (ltr_count) \
 			num_ref = num_ref + ltr_count; \
 		if (_total_hb_layers > 1) { \
-			if (codec_standard == HFI_CODEC_ENCODE_HEVC) \
-				num_ref = (_total_hb_layers); \
-			else if (codec_standard == HFI_CODEC_ENCODE_AVC) \
-				num_ref = (1 << (_total_hb_layers - 2)) + 1; \
+			num_ref = _total_hb_layers; \
 		} \
 		num_recon = num_ref + 1; \
 	} while (0)
@@ -1543,11 +1540,27 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 #define SIZE_IR_BUF(num_lcu_in_frame) HFI_ALIGN((((((num_lcu_in_frame) << 1) + 7) &\
 	(~7)) * 3), VENUS_DMA_ALIGNMENT)
 
-#define SIZE_VPSS_LINE_BUF(num_vpp_pipes_enc, frame_height_coded, \
-			frame_width_coded) \
-	(HFI_ALIGN(((((((8192) >> 2) << 5) * (num_vpp_pipes_enc)) + 64) + \
-	(((((MAX((frame_width_coded), (frame_height_coded)) + 3) >> 2) << 5) +\
-	256) * 16)), VENUS_DMA_ALIGNMENT))
+#define SIZE_VPSS_LINE_BUF(_size, num_vpp_pipes_enc, frame_height_coded, \
+			   frame_width_coded) \
+	do { \
+		HFI_U32 vpss_4tap_top = 0, vpss_4tap_left = 0, vpss_div2_top = 0, \
+			vpss_div2_left = 0, vpss_top_lb = 0, vpss_left_lb = 0, \
+			size_left = 0, size_top = 0, color_comp = 2; \
+		vpss_4tap_top = (((((MAX((frame_width_coded), (frame_height_coded)) \
+							* 2) + 3) >> 2) << 4) + 256); \
+		vpss_4tap_left = ((((8192 + 3) >> 2) << 5) + 64);\
+		vpss_div2_top = ((((MAX((frame_width_coded), (frame_height_coded)) \
+							+ 3) >> 2) << 4) + 256); \
+		vpss_div2_left = (((((MAX((frame_width_coded), (frame_height_coded)) \
+							   * 2) + 3) >> 2) << 5) + 64); \
+		vpss_top_lb = (((frame_width_coded) + 1) << 3); \
+		vpss_left_lb = (((frame_height_coded) << 3) * (num_vpp_pipes_enc)); \
+		size_left = (((vpss_4tap_left) + (vpss_div2_left)) * (color_comp) \
+					   * (num_vpp_pipes_enc));                     \
+		size_top = (((vpss_4tap_top) + (vpss_div2_top)) * (color_comp)); \
+		_size = ((size_left) + (size_top) + (vpss_top_lb) + (vpss_left_lb)); \
+		_size = (HFI_ALIGN(_size, VENUS_DMA_ALIGNMENT)); \
+	} while (0)
 
 #define SIZE_TOP_LINE_BUF_FIRST_STG_SAO(frame_width_coded) \
 	HFI_ALIGN((16 * ((frame_width_coded) >> 5)), VENUS_DMA_ALIGNMENT)
@@ -1562,7 +1575,7 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 			top_line_buff_ctrl_fe_size = 0; \
 		HFI_U32 left_line_buff_metadata_recon__y__size = 0, \
 			left_line_buff_metadata_recon__uv__size = 0, \
-			line_buff_recon_pix_size = 0;          \
+			line_buff_recon_pix_size = 0, vpss_line_buff_size = 0; \
 		width_in_lcus = ((frame_width) + (lcu_size)-1) / (lcu_size); \
 		height_in_lcus = ((frame_height) + (lcu_size)-1) / (lcu_size); \
 		frame_width_coded = width_in_lcus * (lcu_size); \
@@ -1583,6 +1596,8 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 			frame_height_coded, is_ten_bit, num_vpp_pipes_enc); \
 		SIZE_LINEBUFF_RECON_PIX(line_buff_recon_pix_size, is_ten_bit,\
 			frame_width_coded); \
+		SIZE_VPSS_LINE_BUF(vpss_line_buff_size, num_vpp_pipes_enc, \
+			frame_height_coded, frame_width_coded); \
 		_size = SIZE_LINE_BUF_CTRL(frame_width_coded) + \
 			SIZE_LINE_BUF_CTRL_ID2(frame_width_coded) + \
 			line_buff_data_size + \
@@ -1592,10 +1607,9 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 			left_line_buff_metadata_recon__y__size + \
 			left_line_buff_metadata_recon__uv__size + \
 			line_buff_recon_pix_size + \
+			vpss_line_buff_size + \
 		SIZE_LEFT_LINEBUFF_CTRL_FE(frame_height_coded, \
 			num_vpp_pipes_enc) + SIZE_LINE_BUF_SDE(frame_width_coded) + \
-		SIZE_VPSS_LINE_BUF(num_vpp_pipes_enc, frame_height_coded, \
-			frame_width_coded) + \
 		SIZE_TOP_LINE_BUF_FIRST_STG_SAO(frame_width_coded); \
 	} while (0)
 

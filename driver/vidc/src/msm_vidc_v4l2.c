@@ -427,6 +427,7 @@ static int msm_v4l2_enum_frameintervals(struct file *filp, void *fh,
 	return msm_vidc_session(instance, msm_vidc_enum_frameintervals, data, false, __func__);
 }
 
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 static int msm_v4l2_queryctrl(struct file *filp, void *fh,
 	struct v4l2_queryctrl *data)
 {
@@ -442,6 +443,7 @@ static int msm_v4l2_querymenu(struct file *filp, void *fh,
 
 	return msm_vidc_session(instance, msm_vidc_query_menu, data, false, __func__);
 }
+#endif
 
 static int msm_v4l2_op_s_ctrl(struct v4l2_ctrl *ctrl)
 {
@@ -549,8 +551,10 @@ static const struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_enc = {
 	.vidioc_dqbuf                   = msm_v4l2_dqbuf,
 	.vidioc_streamon                = msm_v4l2_streamon,
 	.vidioc_streamoff               = msm_v4l2_streamoff,
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 	.vidioc_queryctrl               = msm_v4l2_queryctrl,
 	.vidioc_querymenu               = msm_v4l2_querymenu,
+#endif
 	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
 	.vidioc_unsubscribe_event       = msm_v4l2_unsubscribe_event,
 	.vidioc_try_encoder_cmd         = msm_v4l2_try_encoder_cmd,
@@ -592,8 +596,10 @@ static const struct v4l2_ioctl_ops msm_v4l2_ioctl_ops_dec = {
 	.vidioc_dqbuf                   = msm_v4l2_dqbuf,
 	.vidioc_streamon                = msm_v4l2_streamon,
 	.vidioc_streamoff               = msm_v4l2_streamoff,
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 	.vidioc_queryctrl               = msm_v4l2_queryctrl,
 	.vidioc_querymenu               = msm_v4l2_querymenu,
+#endif
 	.vidioc_subscribe_event         = msm_v4l2_subscribe_event,
 	.vidioc_unsubscribe_event       = msm_v4l2_unsubscribe_event,
 	.vidioc_try_decoder_cmd         = msm_v4l2_try_decoder_cmd,

@@ -12,7 +12,6 @@
 #include "msm_vidc_core.h"
 #include "msm_vidc_platform.h"
 #include "msm_vidc_debug.h"
-#include "perf_static_model.h"
 #include "msm_vidc_power.h"
 #include "resources.h"
 
@@ -126,19 +125,23 @@ static int msm_vidc_init_codec_input_freq(struct msm_vidc_inst *inst, u32 data_s
 	codec_input->hierachical_layer =
 		msm_vidc_get_hier_layer_val(inst);
 
-	if (is_decode_session(inst))
+	if (is_decode_session(inst)) {
 		color_fmt = v4l2_colorformat_to_driver(inst,
 			inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat, __func__);
-	else
-		color_fmt = v4l2_colorformat_to_driver(inst,
-			inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat, __func__);
 
-	codec_input->linear_opb = is_linear_colorformat(color_fmt);
+		codec_input->linear_opb = is_linear_colorformat(color_fmt);
 
-	if (is_decode_session(inst)) {
 		codec_input->bitrate_mbps =
 			(codec_input->frame_rate * data_size * 8) / 1000000;
 	} else {
+		color_fmt = v4l2_colorformat_to_driver(inst,
+			inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat, __func__);
+
+		codec_input->linear_ipb = is_linear_colorformat(color_fmt);
+
+		if (codec_input->bitdepth == CODEC_BITDEPTH_10)
+			codec_input->format_10bpp = __format_10bpp(color_fmt);
+
 		frame_rate = msm_vidc_get_frame_rate(inst);
 		max_rate = inst->max_rate;
 		codec_input->bitrate_mbps =
@@ -153,6 +156,7 @@ static int msm_vidc_init_codec_input_freq(struct msm_vidc_inst *inst, u32 data_s
 		if (frame_rate && max_rate > frame_rate)
 			codec_input->bitrate_mbps =
 				codec_input->bitrate_mbps * max_rate / frame_rate;
+
 	}
 
 	/* av1d commercial tile */
@@ -186,6 +190,9 @@ static int msm_vidc_init_codec_input_freq(struct msm_vidc_inst *inst, u32 data_s
 	codec_input->video_adv_feature = VIDEO_ADV_FEATURE_NONE;
 	if (inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value)
 		codec_input->video_adv_feature = FEATURE_LOOKAHEAD_ENCODE;
+
+	if (inst->capabilities[ROTATION].value && codec_input->codec == CODEC_APV)
+		codec_input->video_adv_feature = FEATURE_APV_ROTATION;
 
 	core = inst->core;
 	codec_input->vpu_ver = core->platform->data.vpu_ver;
@@ -268,7 +275,7 @@ static int msm_vidc_init_codec_input_bus(struct msm_vidc_inst *inst, struct vidc
 	} else {
 		codec_input->bitdepth = CODEC_BITDEPTH_10;
 		codec_input->format_10bpp =
-			!__ubwc(d->color_formats[d->num_formats - 1]) ? 1 : 0;
+			__format_10bpp(d->color_formats[d->num_formats - 1]);
 	}
 
 	if (d->num_formats == 1) {
@@ -450,7 +457,7 @@ msm_vidc_calc_freq_iris4(struct msm_vidc_inst *inst,
 	ret = msm_vidc_init_codec_input_freq(inst, clock_scaling_data->data_size, &codec_input);
 	if (ret)
 		return ret;
-	ret = msm_vidc_calculate_frequency(codec_input, &codec_output);
+	ret = msm_vidc_calculate_frequency_iris4(codec_input, &codec_output);
 	if (ret)
 		return ret;
 
@@ -706,7 +713,7 @@ int msm_vidc_calc_bw_iris4(struct msm_vidc_inst *inst,
 	ret = msm_vidc_init_codec_input_bus(inst, vidc_data, &codec_input);
 	if (ret)
 		return ret;
-	ret = msm_vidc_calculate_bandwidth(codec_input, &codec_output);
+	ret = msm_vidc_calculate_bandwidth_iris4(codec_input, &codec_output);
 	if (ret)
 		return ret;
 
@@ -721,7 +728,7 @@ int msm_vidc_calc_bw_iris4(struct msm_vidc_inst *inst,
 	if (inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value) {
 		codec_input.frame_width /= 2;
 		codec_input.frame_height /= 2;
-		ret = msm_vidc_calculate_bandwidth(codec_input, &codec_output);
+		ret = msm_vidc_calculate_bandwidth_iris4(codec_input, &codec_output);
 		if (ret)
 			return ret;
 		vidc_data->calc_bw_ddr +=
@@ -758,7 +765,7 @@ int msm_vidc_ring_buf_count_iris4(struct msm_vidc_inst *inst, u32 data_size)
 	rc = msm_vidc_init_codec_input_freq(inst, data_size, &codec_input);
 	if (rc)
 		return rc;
-	rc = msm_vidc_calculate_frequency(codec_input, &codec_output);
+	rc = msm_vidc_calculate_frequency_iris4(codec_input, &codec_output);
 	if (rc)
 		return rc;
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/types.h>
@@ -11,7 +11,6 @@
 #include "msm_vidc_inst.h"
 #include "msm_vidc_core.h"
 #include "msm_vidc_debug.h"
-#include "perf_static_model.h"
 #include "msm_vidc_power.h"
 #include "resources.h"
 
@@ -447,7 +446,7 @@ msm_vidc_calc_freq_iris35_new(struct msm_vidc_inst *inst,
 	ret = msm_vidc_init_codec_input_freq(inst, clock_scaling_data->data_size, &codec_input);
 	if (ret)
 		return ret;
-	ret = msm_vidc_calculate_frequency(codec_input, &codec_output);
+	ret = msm_vidc_calculate_frequency_iris35(codec_input, &codec_output);
 	if (ret)
 		return ret;
 
@@ -516,7 +515,7 @@ static int msm_vidc_calc_bw_iris35_new(struct msm_vidc_inst *inst,
 	ret = msm_vidc_init_codec_input_bus(inst, vidc_data, &codec_input);
 	if (ret)
 		return ret;
-	ret = msm_vidc_calculate_bandwidth(codec_input, &codec_output);
+	ret = msm_vidc_calculate_bandwidth_iris35(codec_input, &codec_output);
 	if (ret)
 		return ret;
 
@@ -1473,7 +1472,7 @@ int msm_vidc_ring_buf_count_iris35(struct msm_vidc_inst *inst, u32 data_size)
 	rc = msm_vidc_init_codec_input_freq(inst, data_size, &codec_input);
 	if (rc)
 		return rc;
-	rc = msm_vidc_calculate_frequency(codec_input, &codec_output);
+	rc = msm_vidc_calculate_frequency_iris35(codec_input, &codec_output);
 	if (rc)
 		return rc;
 

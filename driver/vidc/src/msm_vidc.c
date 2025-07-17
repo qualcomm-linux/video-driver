@@ -147,6 +147,7 @@ int msm_vidc_enum_fmt(struct msm_vidc_inst *inst, void *f)
 	return -EINVAL;
 }
 
+#if (KERNEL_VERSION(6, 12, 0) > LINUX_VERSION_CODE)
 int msm_vidc_query_ctrl(struct msm_vidc_inst *inst, void *data)
 {
 	struct v4l2_queryctrl *q_ctrl = data;
@@ -201,6 +202,7 @@ int msm_vidc_query_menu(struct msm_vidc_inst *inst, void *data)
 		rc ? "not supported" : "supported");
 	return rc;
 }
+#endif
 
 int msm_vidc_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 {
