@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/bits.h>
@@ -346,7 +346,7 @@ static int msm_vidc_set_buses(struct msm_vidc_inst *inst)
 	return 0;
 }
 
-static int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
+int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct msm_vidc_core *core;
@@ -543,12 +543,24 @@ exit:
 	return rc;
 }
 
+int msm_vidc_scale_clocks(struct msm_vidc_inst *inst)
+{
+	struct msm_vidc_core *core;
+	u32 idx;
+
+	core = inst->core;
+	idx = call_session_op(core, scale_clocks, inst);
+	if (venus_hfi_scale_clocks(inst, idx))
+		i_vpr_e(inst, "failed to scale clock\n");
+	return 0;
+}
+
 int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 {
 	struct msm_vidc_core *core;
 	struct msm_vidc_buffer *vbuf;
 	u32 data_size = 0;
-	u32 cnt = 0, idx;
+	u32 cnt = 0;
 	u32 fps;
 	u32 frame_rate, operating_rate;
 	u32 timestamp_rate = 0, input_rate = 0;
@@ -646,10 +658,7 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 	}
 	core_unlock(core, __func__);
 
-	idx = call_session_op(core, scale_clocks, inst);
-	if (venus_hfi_scale_clocks(inst, idx))
-		i_vpr_e(inst, "failed to scale clock\n");
-
+	msm_vidc_scale_clocks(inst);
 	if (scale_buses) {
 		if (msm_vidc_scale_buses(inst))
 			i_vpr_e(inst, "failed to scale bus\n");

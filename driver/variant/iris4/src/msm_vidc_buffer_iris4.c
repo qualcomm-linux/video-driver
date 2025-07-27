@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/types.h>
 
@@ -539,6 +539,51 @@ static u32 msm_vidc_encoder_vpss_size_iris4(struct msm_vidc_inst *inst)
 	return size;
 }
 
+int msm_vidc_encoder_decide_slice_max_mb_iris4(struct msm_vidc_inst *inst)
+{
+	struct msm_vidc_core *core = inst->core;
+	struct v4l2_format *f = &inst->fmts[INPUT_PORT];
+	u32 slice_val, mbpf = 0;
+	u32 tile_size_x = 0, tile_count = 0, last_tile_size = 0;
+	u32 tile_mb = 0, num_vpp_pipes = 0;
+	u32 output_height, output_width;
+
+	if (is_decode_session(inst) || inst->capabilities[SLICE_MODE].value !=
+			V4L2_MPEG_VIDEO_MULTI_SLICE_MODE_MAX_MB)
+		return 0;
+
+	/**
+	 * In case of slice mode SLICE_MAX_MB, adjust SLICE_MAX_MB cap
+	 * w.r.to minimum and maximum possible slice MB's based on
+	 * the resolution and codec.
+	 */
+	output_width = f->fmt.pix_mp.width;
+	output_height = f->fmt.pix_mp.height;
+	slice_val = inst->capabilities[SLICE_MAX_MB].value;
+	num_vpp_pipes = core->capabilities[NUM_VPP_PIPE].value;
+
+	if (inst->codec == MSM_VIDC_HEVC) {
+		HFI_IRIS4_ENC_TILE_SIZE_INFO(tile_size_x, tile_count, last_tile_size,
+			output_width, HFI_CODEC_ENCODE_HEVC, num_vpp_pipes);
+		tile_mb = NUM_MBS_PER_FRAME_HEVC(output_height,
+			max(tile_size_x, last_tile_size));
+		mbpf = NUM_MBS_PER_FRAME_HEVC(output_height, output_width);
+	} else {
+		HFI_IRIS4_ENC_TILE_SIZE_INFO(tile_size_x, tile_count, last_tile_size,
+			output_width, HFI_CODEC_ENCODE_AVC, num_vpp_pipes);
+		tile_mb = NUM_MBS_PER_FRAME(output_height,
+			max(tile_size_x, last_tile_size));
+		mbpf = NUM_MBS_PER_FRAME(output_height, output_width);
+	}
+
+	if (slice_val > tile_mb)
+		slice_val = tile_mb;
+	else if (slice_val < (mbpf / MAX_SLICES_PER_FRAME))
+		slice_val = mbpf / MAX_SLICES_PER_FRAME;
+
+	return slice_val;
+}
+
 static u32 msm_vidc_encoder_output_size_iris4(struct msm_vidc_inst *inst)
 {
 	u32 frame_size;
@@ -704,8 +749,9 @@ static int msm_buffer_delivery_mode_based_min_count_iris4(struct msm_vidc_inst *
 	uint32_t count)
 {
 	struct v4l2_format *f;
+	struct msm_vidc_core *core = NULL;
 	u32 width, height, total_num_slices = 1;
-	u32 hfi_codec = 0;
+	u32 hfi_codec = 0, num_vpp_pipes;
 	u32 max_mbs_per_slice = 0;
 	u32 slice_mode = 0;
 	u32 delivery_mode = 0;
@@ -730,8 +776,11 @@ static int msm_buffer_delivery_mode_based_min_count_iris4(struct msm_vidc_inst *
 	else if (inst->codec == MSM_VIDC_APV)
 		hfi_codec = HFI_CODEC_ENCODE_APV;
 
+	core = inst->core;
+	num_vpp_pipes = core->capabilities[NUM_VPP_PIPE].value;
+
 	HFI_IRIS3_ENC_MB_BASED_MULTI_SLICE_COUNT(total_num_slices, width, height,
-			hfi_codec, max_mbs_per_slice);
+			hfi_codec, max_mbs_per_slice, num_vpp_pipes);
 
 	return (total_num_slices * count);
 }

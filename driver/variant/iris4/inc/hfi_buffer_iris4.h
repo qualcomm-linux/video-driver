@@ -1751,11 +1751,25 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 			size = bitstream_size; \
 		} while (0)
 
-#define HFI_IRIS3_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
-				frame_width_coded, codec_standard) \
+#define IRIS_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+			frame_width_coded, codec_standard, num_vpp_pipes, iris_tiling_version) \
 	do { \
-		HFI_U32 without_tile_enc_width; \
-		HFI_U32 min_tile_size = 352, fixed_tile_width = 960; \
+		HFI_U32 without_tile_enc_width, min_tile_size, fixed_tile_width; \
+		if (iris_tiling_version == 1) { /* IRIS 4+ */ \
+			min_tile_size = 256; \
+			fixed_tile_width = 960; \
+		} else { /* IRIS 3.x */ \
+			if (num_vpp_pipes == 4) { \
+				min_tile_size = 352; \
+				fixed_tile_width = 960; \
+			} else if (num_vpp_pipes == 2) { \
+				min_tile_size = 256; \
+				fixed_tile_width = 768; \
+			} else { \
+				min_tile_size = 256; \
+				fixed_tile_width = 672; \
+			} \
+		} \
 		without_tile_enc_width = min_tile_size + fixed_tile_width; \
 		if ((codec_standard == HFI_CODEC_ENCODE_HEVC) && \
 			(frame_width_coded > without_tile_enc_width)) { \
@@ -1773,8 +1787,18 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		} \
 	} while (0)
 
+#define HFI_IRIS4_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+				frame_width_coded, codec_standard, num_vpp_pipes) \
+		IRIS_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+				frame_width_coded, codec_standard, num_vpp_pipes, 1)
+
+#define HFI_IRIS3_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+				frame_width_coded, codec_standard, num_vpp_pipes) \
+		IRIS_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+				frame_width_coded, codec_standard, num_vpp_pipes, 0)
+
 #define HFI_IRIS3_ENC_MB_BASED_MULTI_SLICE_COUNT(total_slice_count, frame_width, frame_height, \
-			codec_standard, multi_slice_max_mb_count) \
+			codec_standard, multi_slice_max_mb_count, num_vpp_pipes) \
 	do { \
 		HFI_U32 tile_size, tile_count, last_tile_size, \
 			slice_count_per_tile, slice_count_in_last_tile; \
@@ -1783,8 +1807,8 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		lcu_size = (codec_standard == HFI_CODEC_ENCODE_HEVC) ? 32 : 16; \
 		frame_width_coded = HFI_ALIGN(frame_width, lcu_size); \
 		frame_height_coded = HFI_ALIGN(frame_height, lcu_size); \
-		HFI_IRIS3_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
-			frame_width_coded, codec_standard); \
+		HFI_IRIS4_ENC_TILE_SIZE_INFO(tile_size, tile_count, last_tile_size, \
+			frame_width_coded, codec_standard, num_vpp_pipes); \
 		mbs_in_one_tile = (tile_size * frame_height_coded) / (lcu_size * lcu_size); \
 		slice_count_per_tile = \
 			(mbs_in_one_tile + multi_slice_max_mb_count - 1) / (multi_slice_max_mb_count); \

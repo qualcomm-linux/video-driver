@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <media/v4l2-event.h>
@@ -287,7 +287,7 @@ static int msm_vdec_set_bit_depth(struct msm_vidc_inst *inst,
 {
 	int rc = 0;
 	u32 pix_fmt;
-	u32 bitdepth = 8 << 16 | 8;
+	u32 bitdepth = BIT_DEPTH_8;
 	enum msm_vidc_colorformat_type colorformat;
 
 	if (port != INPUT_PORT && port != OUTPUT_PORT) {
@@ -298,7 +298,7 @@ static int msm_vdec_set_bit_depth(struct msm_vidc_inst *inst,
 	pix_fmt = inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat;
 	colorformat = v4l2_colorformat_to_driver(inst, pix_fmt, __func__);
 	if (is_10bit_colorformat(colorformat))
-		bitdepth = 10 << 16 | 10;
+		bitdepth = BIT_DEPTH_10;
 
 	inst->subcr_params[port].bit_depth = bitdepth;
 	msm_vidc_update_cap_value(inst, BIT_DEPTH, bitdepth, __func__);

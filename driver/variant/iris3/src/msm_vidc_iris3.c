@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/delay.h>
@@ -1192,6 +1192,7 @@ static struct msm_vidc_session_ops msm_session_ops = {
 	.decide_work_route = msm_vidc_decide_work_route_iris3,
 	.decide_work_mode = msm_vidc_decide_work_mode_iris3,
 	.decide_quality_mode = msm_vidc_decide_quality_mode_iris3,
+	.decide_slice_max_mb = msm_vidc_encoder_decide_slice_max_mb_iris3,
 };
 
 int msm_vidc_init_iris3(struct msm_vidc_core *core)

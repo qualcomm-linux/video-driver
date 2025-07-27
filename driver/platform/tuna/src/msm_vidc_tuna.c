@@ -1698,7 +1698,7 @@ static struct msm_platform_inst_capability instance_cap_data_tuna_v0[] = {
 		HFI_PROP_CODED_FRAMES,
 		CAP_FLAG_VOLATILE},
 
-	{BIT_DEPTH, DEC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
+	{BIT_DEPTH, DEC | ENC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
 		0,
 		HFI_PROP_LUMA_CHROMA_BIT_DEPTH},
 
@@ -2096,18 +2096,22 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_tuna
 	 */
 
 	{PIX_FMTS, ENC, H264,
-		{META_ROI_INFO, IR_PERIOD, CSC}},
+		{META_ROI_INFO, IR_PERIOD, CSC, BIT_DEPTH}},
 
 	{PIX_FMTS, ENC, HEVC,
 		{PROFILE, MIN_FRAME_QP, MAX_FRAME_QP, I_FRAME_QP, P_FRAME_QP,
 			B_FRAME_QP, META_ROI_INFO, MIN_QUALITY, BLUR_TYPES, IR_PERIOD,
-			LTR_COUNT, CSC}},
+			LTR_COUNT, CSC, BIT_DEPTH}},
 
 	{PIX_FMTS, ENC, HEIC,
-		{PROFILE, CSC}},
+		{PROFILE, CSC, BIT_DEPTH}},
 
 	{PIX_FMTS, DEC, HEVC | HEIC,
 		{PROFILE}},
+
+	{BIT_DEPTH, ENC, CODECS_ALL,
+		{0},
+		msm_vidc_adjust_bitdepth},
 
 	{FRAME_RATE, ENC, CODECS_ALL,
 		{LEVEL},
@@ -4014,7 +4018,7 @@ static struct msm_platform_inst_capability instance_cap_data_tuna_v1[] = {
 		HFI_PROP_CODED_FRAMES,
 		CAP_FLAG_VOLATILE},
 
-	{BIT_DEPTH, DEC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
+	{BIT_DEPTH, DEC | ENC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
 		0,
 		HFI_PROP_LUMA_CHROMA_BIT_DEPTH},
 
@@ -4461,8 +4465,8 @@ static const struct subcache_table tuna_subcache_table[] = {
 
 /* name, start, size, secure, dma_coherant, region, dma_mask */
 const struct context_bank_table tuna_context_bank_table[] = {
-	{"qcom,vidc,cb-ns",
-		0x25800000, 0xba800000, 0, 1, MSM_VIDC_NON_SECURE,       0 },
+	{"qcom,vidc,cb-ns", 0x25800000, 0xba800000, 0, 1,
+		MSM_VIDC_NON_SECURE | MSM_VIDC_NON_SECURE_BITSTREAM,     0 },
 	{"qcom,vidc,cb-ns-pxl",
 		0x00100000, 0xdff00000, 0, 1, MSM_VIDC_NON_SECURE_PIXEL, 0 },
 	{"qcom,vidc,cb-sec-pxl",
@@ -4479,7 +4483,7 @@ static const struct reg_preset_table tuna_reg_preset_table[] = {
 	{ 0x10830, 0x33332211, 0xFFFFFFFF},
 	{ 0x10834, 0x44444444, 0xFFFFFFFF},
 	{ 0x10838, 0x1011,     0xFFFFFFFF},
-	{ 0xA0140, 0x99,       0xFFFFFFFF},
+	{ 0xA013C, 0x99,       0xFFFFFFFF},
 
 };
 

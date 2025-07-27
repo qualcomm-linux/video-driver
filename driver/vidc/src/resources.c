@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/sort.h>
@@ -964,18 +964,16 @@ static int __disable_power_domains(struct msm_vidc_core *core, const char *name)
 
 static int __switch_gdsc_to_swmode(struct msm_vidc_core *core, struct power_domain_info *pdinfo)
 {
-	int rc = 0;
+	int rc = -EOPNOTSUPP;
 
-	if (core->venus_ops && core->venus_ops->switch_gdsc_mode) {
-		rc = call_venus_op(core, switch_gdsc_mode, core, true);
-	} else {
 #if (KERNEL_VERSION(6, 11, 0) <= LINUX_VERSION_CODE)
-		rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, false);
-#else
-		d_vpr_e("%s: unexpected %s\n", __func__, pdinfo->name);
-		rc = -EINVAL;
+	rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, false);
 #endif
+	if (rc == -EOPNOTSUPP) {
+		if (core->venus_ops && core->venus_ops->switch_gdsc_mode)
+			rc = call_venus_op(core, switch_gdsc_mode, core, true);
 	}
+
 	if (rc < 0) {
 		d_vpr_e("%s: failed to set sw mode: %s\n",
 			__func__, pdinfo->name);
@@ -1029,18 +1027,16 @@ static int __acquire_power_domains(struct msm_vidc_core *core)
 
 static int __switch_gdsc_to_hwmode(struct msm_vidc_core *core, struct power_domain_info *pdinfo)
 {
-	int rc = 0;
+	int rc = -EOPNOTSUPP;
 
-	if (core->venus_ops && core->venus_ops->switch_gdsc_mode) {
-		rc = call_venus_op(core, switch_gdsc_mode, core, false);
-	} else {
 #if (KERNEL_VERSION(6, 11, 0) <= LINUX_VERSION_CODE)
-		rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, true);
-#else
-		d_vpr_e("%s: unexpected %s\n", __func__, pdinfo->name);
-		rc = -EINVAL;
+	rc = dev_pm_genpd_set_hwmode(pdinfo->genpd_dev, true);
 #endif
+	if (rc == -EOPNOTSUPP) {
+		if (core->venus_ops && core->venus_ops->switch_gdsc_mode)
+			rc = call_venus_op(core, switch_gdsc_mode, core, false);
 	}
+
 	if (rc < 0) {
 		d_vpr_e("%s: failed to set hw mode: %s\n",
 			__func__, pdinfo->name);

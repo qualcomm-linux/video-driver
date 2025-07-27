@@ -964,6 +964,12 @@ int msm_vidc_close(struct msm_vidc_inst *inst)
 	msm_vidc_change_state(inst, MSM_VIDC_CLOSE, __func__);
 	inst->sub_state = MSM_VIDC_SUB_STATE_NONE;
 	strscpy(inst->sub_state_name, "SUB_STATE_NONE", sizeof(inst->sub_state_name));
+	/* reset session data to reduce bandwidth and clock*/
+	inst->active = false;
+	inst->max_rate = 0;
+	inst->max_input_data_size = 0;
+	msm_vidc_scale_clocks(inst);
+	msm_vidc_scale_buses(inst);
 	inst_unlock(inst, __func__);
 	client_unlock(inst, __func__);
 	cancel_stability_work_sync(inst);

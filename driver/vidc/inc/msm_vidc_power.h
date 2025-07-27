@@ -124,6 +124,8 @@ static inline int __format_10bpp(enum msm_vidc_colorformat_type f)
 }
 
 int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses);
+int msm_vidc_scale_clocks(struct msm_vidc_inst *inst);
+int msm_vidc_scale_buses(struct msm_vidc_inst *inst);
 void msm_vidc_power_data_reset(struct msm_vidc_inst *inst);
 int msm_vidc_apply_dcvs(struct msm_vidc_inst *inst);
 

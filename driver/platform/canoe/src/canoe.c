@@ -1244,7 +1244,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 		0,
 		HFI_PROP_CODED_FRAMES},
 
-	{BIT_DEPTH, DEC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
+	{BIT_DEPTH, DEC | ENC, CODECS_ALL, BIT_DEPTH_8, BIT_DEPTH_10, 1, BIT_DEPTH_8,
 		0,
 		HFI_PROP_LUMA_CHROMA_BIT_DEPTH},
 
@@ -1299,13 +1299,19 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 	 *      children,
 	 *      adjust, set}
 	 */
+	{PIX_FMTS, ENC, H264,
+		{BIT_DEPTH}},
 
 	{PIX_FMTS, ENC, HEVC,
 		{PROFILE, MIN_FRAME_QP, MAX_FRAME_QP, I_FRAME_QP, P_FRAME_QP,
-			B_FRAME_QP, MIN_QUALITY, BLUR_TYPES, LTR_COUNT}},
+			B_FRAME_QP, MIN_QUALITY, BLUR_TYPES, LTR_COUNT, BIT_DEPTH}},
 
 	{PIX_FMTS, DEC, HEVC,
 		{PROFILE}},
+
+	{BIT_DEPTH, ENC, CODECS_ALL,
+		{0},
+		msm_vidc_adjust_bitdepth},
 
 	{FRAME_RATE, ENC, CODECS_ALL,
 		{0},
