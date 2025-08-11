@@ -2880,8 +2880,8 @@ int msm_vidc_adjust_eva_stats(void *instance, struct v4l2_ctrl *ctrl)
 				      &rc_type, __func__))
 		return -EINVAL;
 
-	/* disable Eva stats metadata for CQ rate control */
-	if (rc_type == HFI_RC_CQ) {
+	/* disable Eva stats metadata for CQ rate control other than APV*/
+	if (rc_type == HFI_RC_CQ && inst->codec != MSM_VIDC_APV) {
 		i_vpr_h(inst, "%s: unsupported for CQ rate control\n", __func__);
 		adjusted_value = 0;
 	}
@@ -3256,7 +3256,27 @@ int msm_vidc_adjust_bitdepth(void *instance, struct v4l2_ctrl *ctrl)
 		adjusted_value = BIT_DEPTH_10;
 
 	msm_vidc_update_cap_value(inst, BIT_DEPTH, adjusted_value, __func__);
+	return 0;
+}
 
+int msm_vidc_adjust_req_sync_frame(void *instance, struct v4l2_ctrl *ctrl)
+{
+	s32 value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+
+	if (ctrl) {
+		msm_vidc_update_cap_value(inst, REQUEST_I_FRAME, ctrl->val, __func__);
+		return 0;
+	}
+
+	/*
+	 * Switch cap value between 0 and 1
+	 * Ensure cap value is updated each time
+	 * Then set function can be called dynamically
+	 */
+	value = inst->capabilities[REQUEST_I_FRAME].value ? 0 : 1;
+
+	msm_vidc_update_cap_value(inst, REQUEST_I_FRAME, value, __func__);
 	return 0;
 }
 
@@ -3749,6 +3769,13 @@ int msm_vidc_set_bitrate(void *instance,
 	int rc = 0;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
 	u32 hfi_value = 0;
+
+	/*
+	 * for CQ mode, bitrate is not expected to be set instead
+	 * CONSTANT_QUALITY is expected to be set
+	 */
+	if (inst->codec == MSM_VIDC_APV && inst->hfi_rc_type == HFI_RC_CQ)
+		return 0;
 
 	/* set Total Bitrate */
 	if (inst->capabilities[BIT_RATE].flags & CAP_FLAG_CLIENT_SET)

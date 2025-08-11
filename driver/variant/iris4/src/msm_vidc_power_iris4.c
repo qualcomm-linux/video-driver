@@ -552,7 +552,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		 * table rate >= requested rate
 		 */
 		if (vpp_freq && !strcmp(cl->name, "video_cc_mvs0_clk_src")) {
-			for (vpp_idx = cl->freq_count - 1; vpp_idx >= 0; vpp_idx--) {
+			for (vpp_idx = cl->freq_count - 1; vpp_idx > 0; vpp_idx--) {
 				rate = cl->freq[vpp_idx];
 				if (rate >= vpp_freq)
 					break;
@@ -560,7 +560,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		}
 
 		if (apv_freq && !strcmp(cl->name, "video_cc_mvs0a_clk_src")) {
-			for (apv_idx = cl->freq_count - 1; apv_idx >= 0; apv_idx--) {
+			for (apv_idx = cl->freq_count - 1; apv_idx > 0; apv_idx--) {
 				rate = cl->freq[apv_idx];
 				if (rate >= apv_freq)
 					break;
@@ -568,7 +568,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		}
 
 		if (bse_freq && !strcmp(cl->name, "video_cc_mvs0b_clk_src")) {
-			for (bse_idx = cl->freq_count - 1; bse_idx >= 0; bse_idx--) {
+			for (bse_idx = cl->freq_count - 1; bse_idx > 0; bse_idx--) {
 				rate = cl->freq[bse_idx];
 				if (rate >= bse_freq)
 					break;
@@ -576,7 +576,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 vpp_freq, u64 
 		}
 
 		if (tensilica_freq && !strcmp(cl->name, "video_cc_mvs0c_clk_src")) {
-			for (tns_idx = cl->freq_count - 1; tns_idx >= 0; tns_idx--) {
+			for (tns_idx = cl->freq_count - 1; tns_idx > 0; tns_idx--) {
 				rate = cl->freq[tns_idx];
 				if (rate >= tensilica_freq)
 					break;

@@ -453,5 +453,6 @@ int msm_vidc_adjust_lookahead_encode_size(void *instance, struct v4l2_ctrl *ctrl
 int msm_vidc_set_lookahead_encode_size(void *instance, enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_adjust_log_mode(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_bitdepth(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_req_sync_frame(void *instance, struct v4l2_ctrl *ctrl);
 
 #endif // _MSM_VIDC_PLATFORM_H_

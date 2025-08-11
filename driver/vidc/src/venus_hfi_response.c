@@ -891,6 +891,7 @@ static int handle_output_rx_fence(struct msm_vidc_inst *inst,
 			i_vpr_h(inst, "%s: skip release rx fence_id %llu\n",
 				__func__, buf->rx_fences[cnt]);
 			buf->rx_fences[cnt] = 0;
+			fcontext->fences_per_buffer_counter++;
 			continue;
 		}
 		/* fetch fence using fence_id */

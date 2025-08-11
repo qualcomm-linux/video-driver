@@ -398,8 +398,7 @@ static int __set_clk_rate(struct msm_vidc_core *core, struct clock_info *cl,
 }
 #endif
 
-static int
-__set_clocks_ext(struct msm_vidc_core *core, int idx)
+static int __set_clocks_ext(struct msm_vidc_core *core, int idx)
 {
 	int rc = 0;
 	struct clock_info *cl;

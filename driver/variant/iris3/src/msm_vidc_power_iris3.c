@@ -383,7 +383,7 @@ static int get_clock_corner_index(struct msm_vidc_core *core, u64 freq)
 		 * table rate >= requested rate
 		 */
 		if (freq && !strcmp(cl->name, "video_cc_mvs0_clk_src")) {
-			for (idx = cl->freq_count - 1; idx >= 0; idx--) {
+			for (idx = cl->freq_count - 1; idx > 0; idx--) {
 				rate = cl->freq[idx];
 				if (rate >= freq)
 					break;
@@ -433,12 +433,13 @@ static int msm_vidc_get_freq_corner(struct msm_vidc_inst *inst)
 	mutex_unlock(&core->lock);
 
 	idx = get_clock_corner_index(core, freq);
-	if (idx < 0)
-		idx = 0;
-	if (increment)
-		idx -= 1;
-	else if (decrement)
-		idx += 1;
+	if (increment) {
+		if (idx > get_max_clock_index(core))
+			idx -= 1;
+	} else if (decrement) {
+		if (idx < get_min_clock_index(core))
+			idx += 1;
+	}
 
 	i_vpr_p(inst, "%s: requested rate: core %llu, increment %d decrement %d\n",
 		__func__, freq, increment, decrement);

@@ -2285,19 +2285,23 @@ int msm_vdec_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	if (f->type == INPUT_MPLANE) {
 		pix_fmt = v4l2_codec_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported codec, set current params\n", __func__);
+			i_vpr_e(inst, "%s: unsupported codec: 0x%x\n",
+					__func__, f->fmt.pix_mp.pixelformat);
 			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 			f->fmt.pix_mp.pixelformat = inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat;
 			pix_fmt = v4l2_codec_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
+			rc = -EINVAL;
 		}
 	} else if (f->type == OUTPUT_MPLANE) {
 		pix_fmt = v4l2_colorformat_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported format, set current params\n", __func__);
+			i_vpr_e(inst, "%s: unsupported format: 0x%x\n",
+					__func__, f->fmt.pix_mp.pixelformat);
 			f->fmt.pix_mp.pixelformat = inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat;
 			f->fmt.pix_mp.width = inst->fmts[OUTPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[OUTPUT_PORT].fmt.pix_mp.height;
+			rc = -EINVAL;
 		}
 		if (inst->bufq[INPUT_PORT].vb2q->streaming && !is_image_decode_session(inst)) {
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;

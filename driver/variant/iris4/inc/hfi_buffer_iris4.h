@@ -1239,7 +1239,7 @@ typedef HFI_U32 HFI_BOOL;
 	(_size = HFI_ALIGN(VP9_NUM_PROBABILITY_TABLE_BUF * VP9_PROB_TABLE_SIZE, \
 			   VENUS_DMA_ALIGNMENT) + \
 		HFI_ALIGN(HFI_IRIS2_VP9D_COMV_SIZE, \
-			  VENUS_DMA_ALIGNMENT) + \
+			  VENUS_DMA_ALIGNMENT) * 2 + \
 		HFI_ALIGN(MAX_SUPERFRAME_HEADER_LEN, \
 			  VENUS_DMA_ALIGNMENT) + \
 		HFI_ALIGN(VP9_UDC_HEADER_BUF_SIZE, \
@@ -2161,7 +2161,7 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 
 #define SIZE_BSE_SLICE_CMD_BUF ((((8192 << 2) + 7) & (~7)) * 3)
 
-#define SIZE_LAMBDA_LUT (256 * 11)
+#define SIZE_LAMBDA_LUT (256 * 13)
 #define SIZE_OVERRIDE_BUF(num_lcumb) (HFI_ALIGN(((16 * (((num_lcumb) + 7)\
 		>> 3))), VENUS_DMA_ALIGNMENT) * 2)
 #define SIZE_IR_BUF(num_lcu_in_frame) HFI_ALIGN((((((num_lcu_in_frame) << 1) + 7) &\

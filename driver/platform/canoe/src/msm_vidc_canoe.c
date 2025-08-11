@@ -1007,9 +1007,10 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 
 	{BITRATE_MODE, ENC, APV,
 		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
-		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
-		BIT(V4L2_MPEG_VIDEO_BITRATE_MODE_VBR),
-		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
+		V4L2_MPEG_VIDEO_BITRATE_MODE_CQ,
+		BIT(V4L2_MPEG_VIDEO_BITRATE_MODE_VBR) |
+		BIT(V4L2_MPEG_VIDEO_BITRATE_MODE_CQ),
+		V4L2_MPEG_VIDEO_BITRATE_MODE_CQ,
 		V4L2_CID_MPEG_VIDEO_BITRATE_MODE,
 		HFI_PROP_RATE_CONTROL,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
@@ -1063,6 +1064,13 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 
 	{CONSTANT_QUALITY, ENC, HEIC,
 		1, MAX_CONSTANT_QUALITY, 1, 100,
+		V4L2_CID_MPEG_VIDEO_CONSTANT_QUALITY,
+		HFI_PROP_CONSTANT_QUALITY,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_INPUT_PORT |
+			CAP_FLAG_DYNAMIC_ALLOWED},
+
+	{CONSTANT_QUALITY, ENC, APV,
+		1, MAX_CONSTANT_QUALITY, 1, 90,
 		V4L2_CID_MPEG_VIDEO_CONSTANT_QUALITY,
 		HFI_PROP_CONSTANT_QUALITY,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_INPUT_PORT |
@@ -3228,7 +3236,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 
 	{REQUEST_I_FRAME, ENC, H264 | HEVC,
 		{0},
-		NULL,
+		msm_vidc_adjust_req_sync_frame,
 		msm_vidc_set_req_sync_frame},
 
 	{BIT_RATE, ENC, H264,
@@ -3269,7 +3277,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 
 	{BITRATE_MODE, ENC, APV,
 		{BIT_RATE, PEAK_BITRATE, META_EVA_STATS, TIME_DELTA_BASED_RC,
-			LOG_VIDEO_ENCODE},
+			LOG_VIDEO_ENCODE, CONSTANT_QUALITY},
 		msm_vidc_adjust_bitrate_mode,
 		msm_vidc_set_u32_enum},
 
@@ -3278,7 +3286,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 		msm_vidc_adjust_bitrate_mode,
 		msm_vidc_set_u32_enum},
 
-	{CONSTANT_QUALITY, ENC, HEVC | HEIC,
+	{CONSTANT_QUALITY, ENC, HEVC | HEIC | APV,
 		{0},
 		NULL,
 		msm_vidc_set_constant_quality},
@@ -3748,8 +3756,13 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 		NULL,
 		msm_vidc_set_vui_timing_info},
 
-	{SIGNAL_COLOR_INFO, ENC, H264 | HEVC | HEIC | APV,
+	{SIGNAL_COLOR_INFO, ENC, HEIC | APV,
 		{0},
+		NULL,
+		msm_vidc_set_signal_color_info},
+
+	{SIGNAL_COLOR_INFO, ENC, H264 | HEVC,
+		{REQUEST_I_FRAME},
 		NULL,
 		msm_vidc_set_signal_color_info},
 

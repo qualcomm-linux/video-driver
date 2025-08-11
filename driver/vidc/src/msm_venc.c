@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <media/v4l2-event.h>
@@ -1052,20 +1052,24 @@ int msm_venc_try_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 	if (f->type == INPUT_MPLANE) {
 		pix_fmt = v4l2_colorformat_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported format, set current params\n", __func__);
+			i_vpr_e(inst, "%s: unsupported format: 0x%x\n",
+					__func__, f->fmt.pix_mp.pixelformat);
 			f->fmt.pix_mp.pixelformat = inst->fmts[INPUT_PORT].fmt.pix_mp.pixelformat;
 			f->fmt.pix_mp.width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 			pix_fmt = v4l2_colorformat_to_driver(inst,
 				f->fmt.pix_mp.pixelformat, __func__);
+			rc = -EINVAL;
 		}
 	} else if (f->type == OUTPUT_MPLANE) {
 		pix_fmt = v4l2_codec_to_driver(inst, f->fmt.pix_mp.pixelformat, __func__);
 		if (!pix_fmt) {
-			i_vpr_e(inst, "%s: unsupported codec, set current params\n", __func__);
+			i_vpr_e(inst, "%s: unsupported codec: 0x%x\n",
+					__func__, f->fmt.pix_mp.pixelformat);
 			f->fmt.pix_mp.width = inst->fmts[OUTPUT_PORT].fmt.pix_mp.width;
 			f->fmt.pix_mp.height = inst->fmts[OUTPUT_PORT].fmt.pix_mp.height;
 			f->fmt.pix_mp.pixelformat = inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat;
+			rc = -EINVAL;
 		}
 	} else if (f->type == INPUT_META_PLANE) {
 		f->fmt.meta.dataformat = inst->fmts[INPUT_META_PORT].fmt.meta.dataformat;

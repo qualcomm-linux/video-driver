@@ -732,10 +732,10 @@ enum hfi_codec_mode_type {
 #define HFI_PROP_HEIF_TILES                                     0x030001B3
 
 enum hfi_log_video_encode_mode {
-	HFI_LOG_VIDEO_TYPE_NONE = 0x0,
-	HFI_LOG_VIDEO           = 0x1,
+	HFI_LOG_VIDEO_TYPE_NONE    = 0x0,
+	HFI_LOG_VIDEO_TYPE_COMMON  = 0x1,
 };
-#define HFI_PROP_LOG_VIDEO_ENCODE                               0x030001B4
+#define HFI_PROP_LOG_VIDEO_ENCODE                               0x030001C0
 
 #define HFI_PROP_END                                            0x03FFFFFF
 

@@ -516,9 +516,9 @@ static struct msm_platform_inst_capability instance_cap_data_alor[] = {
 	/* (4096 * 2304) / 256 */
 	{BATCH_FPS, DEC, H264 | HEVC | VP9 | AV1, 1, 61, 1, 61},
 
-	{SECURE_MBPF, ENC | DEC, H264 | HEVC | VP9 | AV1, 64, 34560, 1, 34560},
+	{SECURE_MBPF, ENC | DEC, H264 | HEVC | VP9 | AV1, 64, 36864, 1, 36864},
 
-	{SECURE_MBPF, ENC, HEVC, 36, 34560, 1, 34560},
+	{SECURE_MBPF, ENC, HEVC, 36, 36864, 1, 36864},
 
 	{FRAME_RATE, ENC, CODECS_ALL,
 		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),
