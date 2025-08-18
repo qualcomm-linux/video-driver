@@ -1344,6 +1344,9 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 	inst->fmts[INPUT_PORT].fmt.pix_mp.width = width;
 	inst->fmts[INPUT_PORT].fmt.pix_mp.height = height;
 
+	if (subsc_params.bit_depth == BIT_DEPTH_10)
+		inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat = V4L2_PIX_FMT_QC10C;
+
 	output_fmt = v4l2_colorformat_to_driver(inst,
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat, __func__);
 
