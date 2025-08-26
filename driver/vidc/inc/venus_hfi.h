@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _VENUS_HFI_H_
@@ -86,5 +86,12 @@ int __resume(struct msm_vidc_core *core);
 struct device_region_info
 	*venus_hfi_get_device_region_info(struct msm_vidc_core *core,
 					  enum msm_vidc_device_region region);
+struct subcache_info *get_session_level_subcache(
+	struct msm_vidc_core *core, u32 llcc_type);
+int venus_hfi_set_session_subcache(struct msm_vidc_inst *inst,
+	u32 llcc_ucid, u32 dev_addr);
+int venus_hfi_release_session_subcache(struct msm_vidc_inst *inst,
+	u32 llcc_ucid, u32 dev_addr);
+u64 venus_hfi_get_subcache_mask(struct msm_vidc_inst *inst);
 
 #endif // _VENUS_HFI_H_

@@ -705,6 +705,18 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 		HFI_PROP_FENCE_TYPE,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
+	{OUTPUT_SCID, DEC, H264 | HEVC | VP9 | AV1,
+		V4L2_MPEG_VIDSC_NONE, V4L2_MPEG_VIDSC_DEPTH1,
+		BIT(V4L2_MPEG_VIDSC_NONE)   | BIT(V4L2_MPEG_VIDSC_LAYER0) |
+		BIT(V4L2_MPEG_VIDSC_LAYER1) | BIT(V4L2_MPEG_VIDSC_LAYER2) |
+		BIT(V4L2_MPEG_VIDSC_LAYER3) | BIT(V4L2_MPEG_VIDSC_LAYER4) |
+		BIT(V4L2_MPEG_VIDSC_LAYER5) | BIT(V4L2_MPEG_VIDSC_LAYER6) |
+		BIT(V4L2_MPEG_VIDSC_LAYER7) | BIT(V4L2_MPEG_VIDSC_DEPTH0) |
+		BIT(V4L2_MPEG_VIDSC_DEPTH1),
+		V4L2_MPEG_VIDSC_NONE,
+		V4L2_CID_MPEG_VIDC_OUTPUT_SUBCACHE_ID,
+		0, CAP_FLAG_MENU},
+
 	{TS_REORDER, DEC, H264 | HEVC,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_TS_REORDER},
@@ -2265,6 +2277,11 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_sera
 		msm_vidc_adjust_dec_output_rx_fence_type,
 		NULL},
 
+	{OUTPUT_SCID, DEC, H264 | HEVC | VP9 | AV1,
+		{0},
+		msm_vidc_adjust_output_subcache_id,
+		NULL},
+
 	{HFLIP, ENC, CODECS_ALL,
 		{0},
 		NULL,
@@ -2918,6 +2935,17 @@ static const struct clk_rst_table seraph_clk_reset_table[] = {
 	{ "video_mvs0c_freerun_reset",          0  },
 };
 
+/* name, llcc_ucid, llcc_type, level(system/session) */
+static const struct subcache_table seraph_subcache_table[] = {
+	{ "vidsc0",         LLCC_VIDSC0,         V4L2_MPEG_VIDSC_NONE,     0, },
+	{ "vidsc_layer0",   LLCC_VIDSC_LAYER0,   V4L2_MPEG_VIDSC_LAYER0,   1, },
+	{ "vidsc_layer1",   LLCC_VIDSC_LAYER1,   V4L2_MPEG_VIDSC_LAYER1,   1, },
+	{ "vidsc_layer2",   LLCC_VIDSC_LAYER2,   V4L2_MPEG_VIDSC_LAYER2,   1, },
+	{ "vidsc_layer3",   LLCC_VIDSC_LAYER3,   V4L2_MPEG_VIDSC_LAYER3,   1, },
+	{ "vidsc_depth0",   LLCC_VIDSC_DEPTH0,   V4L2_MPEG_VIDSC_DEPTH0,   1, },
+	{ "vidsc_depth1",   LLCC_VIDSC_DEPTH1,   V4L2_MPEG_VIDSC_DEPTH1,   1, },
+};
+
 /* name, start, size, secure, dma_coherant, region, dma_mask */
 const struct context_bank_table seraph_context_bank_table[] = {
 	{"qcom,vidc,cb-sec-non-pxl",   0x01000000, 0x32000000, 1, 0, MSM_VIDC_SECURE_NONPIXEL,  0 },
@@ -2960,6 +2988,12 @@ static const struct device_region_table seraph_device_region_table[] = {
 		0x17421000, 0x1000, 0xFFADE000,
 		MSM_VIDC_QTIMER
 	},
+	{ "vidsc_layer0", 0x25821000, 0x1000, 0xFFADD000, MSM_VIDC_DEV_REGION_LAYER0 },
+	{ "vidsc_layer1", 0x25822000, 0x1000, 0xFFADC000, MSM_VIDC_DEV_REGION_LAYER1 },
+	{ "vidsc_layer2", 0x25823000, 0x1000, 0xFFADB000, MSM_VIDC_DEV_REGION_LAYER2 },
+	{ "vidsc_layer3", 0x25824000, 0x1000, 0xFFADA000, MSM_VIDC_DEV_REGION_LAYER3 },
+	{ "vidsc_depth0", 0x25815000, 0x1000, 0xFFAD9000, MSM_VIDC_DEV_REGION_DEPTH0 },
+	{ "vidsc_depth1", 0x25816000, 0x1000, 0xFFAD8000, MSM_VIDC_DEV_REGION_DEPTH1 },
 };
 
 /* decoder properties */
@@ -3078,6 +3112,8 @@ static const struct msm_vidc_platform_data seraph_data = {
 	.clk_tbl_size = ARRAY_SIZE(seraph_clk_table),
 	.clk_rst_tbl = seraph_clk_reset_table,
 	.clk_rst_tbl_size = ARRAY_SIZE(seraph_clk_reset_table),
+	.subcache_tbl = seraph_subcache_table,
+	.subcache_tbl_size = ARRAY_SIZE(seraph_subcache_table),
 
 	/* populate context bank */
 	.context_bank_tbl = seraph_context_bank_table,

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _MSM_VIDC_RESOURCES_H_
@@ -14,6 +14,7 @@ struct reset_control;
 struct llcc_slice_desc;
 struct iommu_domain;
 struct device;
+struct msm_vidc_inst;
 struct msm_vidc_core;
 
 /*
@@ -191,7 +192,9 @@ struct reset_set {
 struct subcache_info {
 	struct llcc_slice_desc    *subcache;
 	const char                *name;
-	u32                        llcc_id;
+	u32                        llcc_ucid;
+	u32                        llcc_type;
+	bool                       session_level;
 	bool                       isactive;
 };
 
@@ -277,6 +280,9 @@ struct msm_vidc_resources_ops {
 	int (*gdsc_sw_ctrl)(struct msm_vidc_core *core);
 
 	int (*llcc)(struct msm_vidc_core *core, bool enable);
+	int (*session_subcache_enable)(struct msm_vidc_inst *inst, u32 llcc_type);
+	int (*session_subcache_disable)(struct msm_vidc_inst *inst, u32 llcc_type);
+
 	int (*set_bw)(struct msm_vidc_core *core, unsigned long bw_ddr,
 		      unsigned long bw_llcc);
 	int (*set_clks)(struct msm_vidc_core *core, int idx);

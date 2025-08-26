@@ -693,26 +693,25 @@ static int __init_subcaches(struct msm_vidc_core *core)
 
 	/* populate subcache fields from platform data */
 	for (cnt = 0; cnt < caches->count; cnt++) {
-		caches->subcache_tbl[cnt].name = llcc_tbl[cnt].name;
-		caches->subcache_tbl[cnt].llcc_id = llcc_tbl[cnt].llcc_id;
-	}
-
-	/* print subcache fields */
-	venus_hfi_for_each_subcache(core, sinfo) {
-		d_vpr_h("%s: name %s subcache id %d\n",
-			__func__, sinfo->name, sinfo->llcc_id);
+		caches->subcache_tbl[cnt].name          = llcc_tbl[cnt].name;
+		caches->subcache_tbl[cnt].llcc_ucid     = llcc_tbl[cnt].llcc_ucid;
+		caches->subcache_tbl[cnt].llcc_type     = llcc_tbl[cnt].llcc_type;
+		caches->subcache_tbl[cnt].session_level = llcc_tbl[cnt].session_level;
 	}
 
 	/* get subcache/llcc handle */
 	venus_hfi_for_each_subcache(core, sinfo) {
-		sinfo->subcache = devm_llcc_get(&core->pdev->dev, sinfo->llcc_id);
+		sinfo->subcache = devm_llcc_get(&core->pdev->dev, sinfo->llcc_ucid);
 		if (IS_ERR_OR_NULL(sinfo->subcache)) {
-			d_vpr_e("%s: failed to get subcache: %d\n", __func__, sinfo->llcc_id);
-			rc = PTR_ERR(sinfo->subcache) ?
-				PTR_ERR(sinfo->subcache) : -EBADHANDLE;
+			d_vpr_h("%s: not found: name %s ucid %d type %d level %d\n", __func__,
+				sinfo->name, sinfo->llcc_ucid,
+				sinfo->llcc_type, sinfo->session_level);
 			sinfo->subcache = NULL;
-			return rc;
+			continue;
 		}
+		d_vpr_h("%s: name %s ucid %d scid %u type %d level %d\n", __func__,
+			sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+			sinfo->llcc_type, sinfo->session_level);
 	}
 
 	return rc;
@@ -1097,32 +1096,69 @@ static int __hand_off_power_domains(struct msm_vidc_core *core)
 	return rc;
 }
 
-static int __disable_subcaches(struct msm_vidc_core *core)
+static int __deactivate_subcache(struct msm_vidc_core *core, struct subcache_info *sinfo)
+{
+	int rc = 0;
+
+	if (!sinfo->isactive)
+		return 0;
+
+	d_vpr_h("%s: de-activate subcache %s ucid %d scid %u type %d level %d\n",
+		__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+		sinfo->llcc_type, sinfo->session_level);
+
+	rc = llcc_slice_deactivate(sinfo->subcache);
+	if (rc) {
+		d_vpr_h("%s: failed to de-activate %s ucid %d type %d: %d\n",
+			__func__, sinfo->name, sinfo->llcc_ucid, sinfo->llcc_type, rc);
+	}
+	sinfo->isactive = false;
+
+	return rc;
+}
+
+static int __activate_subcache(struct msm_vidc_core *core, struct subcache_info *sinfo)
+{
+	int rc = 0;
+
+	if (sinfo->isactive)
+		return 0;
+
+	rc = llcc_slice_activate(sinfo->subcache);
+	if (rc) {
+		d_vpr_h("%s: failed to activate %s ucid %d type %d: %d\n",
+			__func__, sinfo->name, sinfo->llcc_ucid, sinfo->llcc_type, rc);
+		return rc;
+	}
+	sinfo->isactive = true;
+
+	d_vpr_h("%s: activated subcache %s ucid %d scid %u type %d level %d\n",
+		__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+		sinfo->llcc_type, sinfo->session_level);
+
+	return rc;
+}
+
+static int __disable_system_subcaches(struct msm_vidc_core *core)
 {
 	struct subcache_info *sinfo;
-	int rc = 0;
 
 	if (msm_vidc_syscache_disable || !is_sys_cache_present(core))
 		return 0;
 
 	/* De-activate subcaches */
 	venus_hfi_for_each_subcache_reverse(core, sinfo) {
-		if (!sinfo->isactive)
+		/* skip session level caches */
+		if (sinfo->session_level)
 			continue;
 
-		d_vpr_h("%s: De-activate subcache %s\n", __func__, sinfo->name);
-		rc = llcc_slice_deactivate(sinfo->subcache);
-		if (rc) {
-			d_vpr_e("Failed to de-activate %s: %d\n",
-				sinfo->name, rc);
-		}
-		sinfo->isactive = false;
+		__deactivate_subcache(core, sinfo);
 	}
 
 	return 0;
 }
 
-static int __enable_subcaches(struct msm_vidc_core *core)
+static int __enable_system_subcaches(struct msm_vidc_core *core)
 {
 	int rc = 0;
 	u32 c = 0;
@@ -1133,14 +1169,15 @@ static int __enable_subcaches(struct msm_vidc_core *core)
 
 	/* Activate subcaches */
 	venus_hfi_for_each_subcache(core, sinfo) {
-		rc = llcc_slice_activate(sinfo->subcache);
+		/* skip session level caches */
+		if (sinfo->session_level)
+			continue;
+
+		rc = __activate_subcache(core, sinfo);
 		if (rc) {
-			d_vpr_e("Failed to activate %s: %d\n", sinfo->name, rc);
 			__fatal_error(true);
 			goto err_activate_fail;
 		}
-		sinfo->isactive = true;
-		d_vpr_h("Activated subcache %s\n", sinfo->name);
 		c++;
 	}
 
@@ -1149,7 +1186,7 @@ static int __enable_subcaches(struct msm_vidc_core *core)
 	return 0;
 
 err_activate_fail:
-	__disable_subcaches(core);
+	__disable_system_subcaches(core);
 	return rc;
 }
 
@@ -1158,11 +1195,55 @@ static int llcc_enable(struct msm_vidc_core *core, bool enable)
 	int ret;
 
 	if (enable)
-		ret = __enable_subcaches(core);
+		ret = __enable_system_subcaches(core);
 	else
-		ret = __disable_subcaches(core);
+		ret = __disable_system_subcaches(core);
 
 	return ret;
+}
+
+static int __disable_session_subcache(struct msm_vidc_inst *inst, u32 llcc_type)
+{
+	struct msm_vidc_core *core = inst->core;
+	struct subcache_info *sinfo;
+
+	if (msm_vidc_syscache_disable || !is_sys_cache_present(core))
+		return 0;
+
+	sinfo = get_session_level_subcache(core, llcc_type);
+	if (!sinfo) {
+		i_vpr_e(inst, "%s: subcache not found %d\n", __func__, llcc_type);
+		return -EINVAL;
+	}
+
+	/* De-activate subcaches */
+	__deactivate_subcache(core, sinfo);
+
+	return 0;
+}
+
+static int __enable_session_subcache(struct msm_vidc_inst *inst, u32 llcc_type)
+{
+	struct msm_vidc_core *core = inst->core;
+	struct subcache_info *sinfo;
+	int rc = 0;
+
+	if (msm_vidc_syscache_disable || !is_sys_cache_present(core))
+		return 0;
+
+	sinfo = get_session_level_subcache(core, llcc_type);
+	if (!sinfo) {
+		i_vpr_e(inst, "%s: subcache not found %d\n", __func__, llcc_type);
+		return -EINVAL;
+	}
+
+	rc = __activate_subcache(core, sinfo);
+	if (rc) {
+		__fatal_error(true);
+		return rc;
+	}
+
+	return rc;
 }
 
 static int __vote_bandwidth(struct bus_info *bus, unsigned long bw_kbps)
@@ -1864,6 +1945,8 @@ static const struct msm_vidc_resources_ops res_ops = {
 	.gdsc_hw_ctrl = __hand_off_power_domains,
 	.gdsc_sw_ctrl = __acquire_power_domains,
 	.llcc = llcc_enable,
+	.session_subcache_disable = __disable_session_subcache,
+	.session_subcache_enable = __enable_session_subcache,
 	.set_bw = set_bw,
 	.set_clks = __set_clocks,
 	.clk_enable = __prepare_enable_clock,

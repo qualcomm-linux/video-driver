@@ -13,6 +13,7 @@
 #include <media/videobuf2-core.h>
 #include <media/v4l2-mem2mem.h>
 #include <media/v4l2-event.h>
+#include <media/v4l2_vidc_extensions.h>
 #include <linux/vmalloc.h>
 
 #include "msm_media_info.h"
@@ -5383,9 +5384,8 @@ static void msm_vidc_close_helper(struct kref *kref)
 {
 	struct msm_vidc_inst *inst = container_of(kref,
 		struct msm_vidc_inst, kref);
-	struct msm_vidc_core *core;
-
-	core = inst->core;
+	struct msm_vidc_core *core = inst->core;
+	u32 llcc_type = inst->capabilities[OUTPUT_SCID].value;
 
 	i_vpr_h(inst, "%s()\n", __func__);
 	msm_vidc_debugfs_deinit_inst(inst);
@@ -5406,6 +5406,12 @@ static void msm_vidc_close_helper(struct kref *kref)
 	inst_unlock(inst, __func__);
 	destroy_workqueue(inst->workq);
 	msm_vidc_destroy_buffers(inst);
+	if (llcc_type != V4L2_MPEG_VIDSC_NONE) {
+		/* de-activate session subcache */
+		call_res_op(core, session_subcache_disable, inst, llcc_type);
+		/* unmap session level llcc register */
+		call_mem_op(core, iommu_unmap, core, &inst->llcc_reg.mem);
+	}
 	msm_vidc_remove_session(inst);
 	msm_vidc_remove_dangling_session(inst);
 	mutex_destroy(&inst->client_lock);
@@ -6165,8 +6171,8 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 					       1088 + (1088 >> 1))) {
 			num_4k_sessions += 1;
 			num_1080p_sessions += 2;
-		} else if (res_is_greater_than(width, height, 1280 + (1280 >> 1),
-					       736 + (736 >> 1))) {
+		} else if (res_is_greater_than(width, height, 1280 + (1280 >> 2),
+					       736 + (736 >> 2))) {
 			num_1080p_sessions += 1;
 		}
 	}

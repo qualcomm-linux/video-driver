@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _VENUS_HFI_QUEUE_H_
 #define _VENUS_HFI_QUEUE_H_
+
+#include "msm_vidc_internal.h"
 
 #define HFI_MASK_QHDR_TX_TYPE			0xff000000
 #define HFI_MASK_QHDR_RX_TYPE			0x00ff0000
@@ -88,5 +90,9 @@ int venus_hfi_queue_dbg_read(struct msm_vidc_core *core, void *pkt);
 void venus_hfi_queue_deinit(struct msm_vidc_core *core);
 int venus_hfi_queue_init(struct msm_vidc_core *core);
 int venus_hfi_reset_queue_header(struct msm_vidc_core *core);
+int venus_hfi_iommu_map_registers(struct msm_vidc_core *core,
+	enum msm_vidc_device_region reg_region,
+	enum msm_vidc_buffer_region buf_region,
+	struct msm_vidc_mem_addr *core_mem);
 
 #endif

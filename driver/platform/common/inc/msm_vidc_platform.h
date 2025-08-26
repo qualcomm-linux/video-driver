@@ -86,7 +86,9 @@ struct clk_rst_table {
 
 struct subcache_table {
 	const char      *name;
-	u32              llcc_id;
+	u32              llcc_ucid;
+	u32              llcc_type;
+	bool             session_level;
 };
 
 struct context_bank_table {
@@ -400,6 +402,7 @@ int msm_vidc_adjust_dec_input_rx_fence_type(void *instance, struct v4l2_ctrl *ct
 int msm_vidc_adjust_dec_input_tx_fence_type(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_output_rx_fence_type(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_output_tx_fence_type(void *instance, struct v4l2_ctrl *ctrl);
+int msm_vidc_adjust_output_subcache_id(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_dec_slice_mode(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_early_notify_enable(void *instance, struct v4l2_ctrl *ctrl);
 int msm_vidc_adjust_early_notify_line_count(void *instance, struct v4l2_ctrl *ctrl);

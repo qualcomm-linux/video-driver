@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/v4l2-controls.h>
@@ -12,6 +12,7 @@
 #include "msm_vidc_driver.h"
 #include "msm_vidc.h"
 #include "msm_venc.h"
+#include "venus_hfi.h"
 #include "msm_vidc_platform.h"
 #include "msm_vidc_debug.h"
 #include "msm_vidc_control.h"
@@ -196,6 +197,21 @@ static const char *const mpeg_video_vidc_fence_type[] = {
 	NULL,
 };
 
+static const char *const mpeg_video_output_scid[] = {
+	"Subcache None",
+	"Layer0",
+	"Layer1",
+	"Layer2",
+	"Layer3",
+	"Layer4",
+	"Layer5",
+	"Layer6",
+	"Layer7",
+	"Depth0",
+	"Depth1",
+	NULL,
+};
+
 static const char * const *msm_vidc_get_qmenu_type(
 		struct msm_vidc_inst *inst, u32 cap_id)
 {
@@ -233,11 +249,25 @@ static const char * const *msm_vidc_get_qmenu_type(
 	case OUTPUT_RX_FENCE_TYPE:
 	case OUTPUT_TX_FENCE_TYPE:
 		return mpeg_video_vidc_fence_type;
+	case OUTPUT_SCID:
+		return mpeg_video_output_scid;
 	default:
 		i_vpr_e(inst, "%s: No available qmenu for cap id %d\n",
 			__func__, cap_id);
 		return NULL;
 	}
+}
+
+static int msm_vidc_get_menu_skip_mask(struct msm_vidc_inst *inst, struct msm_vidc_inst_cap *cap)
+{
+	u64 menu_skip_mask = 0;
+
+	if (cap->cap_id == OUTPUT_SCID)
+		menu_skip_mask = venus_hfi_get_subcache_mask(inst);
+	else
+		menu_skip_mask = cap->step_or_mask;
+
+	return ~menu_skip_mask;
 }
 
 static inline bool has_children(struct msm_vidc_inst_cap *cap)
@@ -726,7 +756,7 @@ int msm_vidc_ctrl_handler_init(struct msm_vidc_inst *inst, bool init)
 			}
 			if (ctrl_cfg.type == V4L2_CTRL_TYPE_MENU) {
 				ctrl_cfg.menu_skip_mask =
-					~(cap[idx].step_or_mask);
+					msm_vidc_get_menu_skip_mask(inst, &cap[idx]);
 				ctrl_cfg.qmenu = msm_vidc_get_qmenu_type(inst,
 					cap[idx].cap_id);
 			} else {

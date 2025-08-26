@@ -132,6 +132,7 @@ struct msm_vidc_inst {
 	struct msm_vidc_statistics         stats;
 	struct msm_vidc_inst_cap           capabilities[INST_CAP_MAX + 1];
 	struct completion                  completions[MAX_SIGNAL];
+	struct msm_vidc_mem_addr           llcc_reg;
 	struct msm_vidc_fence_context      input_rx_f_context;
 	struct msm_vidc_fence_context      input_tx_f_context;
 	struct msm_vidc_fence_context      output_rx_f_context;

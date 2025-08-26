@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/types.h>
@@ -485,7 +485,7 @@ int venus_hfi_reset_queue_header(struct msm_vidc_core *core)
 	return rc;
 }
 
-static int venus_hfi_iommu_map_registers(struct msm_vidc_core *core,
+int venus_hfi_iommu_map_registers(struct msm_vidc_core *core,
 	enum msm_vidc_device_region reg_region,
 	enum msm_vidc_buffer_region buf_region,
 	struct msm_vidc_mem_addr *core_mem)

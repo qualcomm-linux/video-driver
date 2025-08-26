@@ -438,4 +438,23 @@ enum v4l2_mpeg_vidc_apv_level {
 /* Control to enable or disable LOG video encoding */
 #define V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE                  (VIDC_BASE + 0x69)
 
+/* Control to set input subcache id */
+#define V4L2_CID_MPEG_VIDC_INPUT_SUBCACHE_ID                 (VIDC_BASE + 0x6A)
+
+/* Control to set output subcache id */
+#define V4L2_CID_MPEG_VIDC_OUTPUT_SUBCACHE_ID                (VIDC_BASE + 0x6B)
+enum v4l2_mpeg_vidc_subcache_type {
+	V4L2_MPEG_VIDSC_NONE        = 0,
+	V4L2_MPEG_VIDSC_LAYER0      = 1,
+	V4L2_MPEG_VIDSC_LAYER1      = 2,
+	V4L2_MPEG_VIDSC_LAYER2      = 3,
+	V4L2_MPEG_VIDSC_LAYER3      = 4,
+	V4L2_MPEG_VIDSC_LAYER4      = 5,
+	V4L2_MPEG_VIDSC_LAYER5      = 6,
+	V4L2_MPEG_VIDSC_LAYER6      = 7,
+	V4L2_MPEG_VIDSC_LAYER7      = 8,
+	V4L2_MPEG_VIDSC_DEPTH0      = 9,
+	V4L2_MPEG_VIDSC_DEPTH1      = 10,
+};
+
 #endif

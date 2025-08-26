@@ -9,6 +9,7 @@
 #include <linux/iosys-map.h>
 #include <linux/dma-direction.h>
 #include <media/videobuf2-core.h>
+#include <media/v4l2_vidc_extensions.h>
 #include <linux/vmalloc.h>
 
 #include "msm_vidc_internal.h"
@@ -306,11 +307,11 @@ skip_power_off:
 	return -EAGAIN;
 }
 
-static u32 __get_hfi_subcache_type(u32 llcc_id)
+static u32 __get_hfi_system_subcache_type(u32 llcc_ucid)
 {
 	u32 subcache_type = HFI_BUF_SUBCACHE_NONE;
 
-	switch (llcc_id) {
+	switch (llcc_ucid) {
 	case LLCC_VIDSC0:
 		subcache_type = HFI_BUF_SUBCACHE_VIDSC0;
 		break;
@@ -326,13 +327,37 @@ static u32 __get_hfi_subcache_type(u32 llcc_id)
 		break;
 #endif
 	default:
-		d_vpr_e("%s: Invalid llcc_id %u\n", __func__, llcc_id);
+		d_vpr_e("%s: Invalid ucid %u\n", __func__, llcc_ucid);
 	}
 
 	return subcache_type;
 }
 
-static int __release_subcaches(struct msm_vidc_core *core)
+static u32 __get_hfi_session_subcache_type(u32 llcc_type)
+{
+	u32 subcache_type = HFI_BUF_SUBCACHE_NONE;
+
+	switch (llcc_type) {
+	case V4L2_MPEG_VIDSC_LAYER0:
+	case V4L2_MPEG_VIDSC_LAYER1:
+	case V4L2_MPEG_VIDSC_LAYER2:
+	case V4L2_MPEG_VIDSC_LAYER3:
+	case V4L2_MPEG_VIDSC_LAYER4:
+	case V4L2_MPEG_VIDSC_LAYER5:
+	case V4L2_MPEG_VIDSC_LAYER6:
+	case V4L2_MPEG_VIDSC_LAYER7:
+	case V4L2_MPEG_VIDSC_DEPTH0:
+	case V4L2_MPEG_VIDSC_DEPTH1:
+		subcache_type = HFI_BUF_SUBCACHE_DPB;
+		break;
+	default:
+		d_vpr_e("%s: Invalid type %u\n", __func__, llcc_type);
+	}
+
+	return subcache_type;
+}
+
+static int __release_system_subcaches(struct msm_vidc_core *core)
 {
 	int rc = 0;
 	struct subcache_info *sinfo;
@@ -356,12 +381,21 @@ static int __release_subcaches(struct msm_vidc_core *core)
 	buf.flags = HFI_BUF_HOST_FLAG_RELEASE;
 
 	venus_hfi_for_each_subcache_reverse(core, sinfo) {
+		/* skip session level caches */
+		if (sinfo->session_level)
+			continue;
+
+		/* skip inactive caches */
 		if (!sinfo->isactive)
 			continue;
 
 		buf.index = sinfo->subcache->slice_id;
-		buf.u.subtype = __get_hfi_subcache_type(sinfo->llcc_id);
+		buf.u.subtype = __get_hfi_system_subcache_type(sinfo->llcc_ucid);
 		buf.buffer_size = sinfo->subcache->slice_size;
+
+		d_vpr_h("%s: release subcache %s ucid %d scid %u type %d level %d\n",
+			__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+			sinfo->llcc_type, sinfo->session_level);
 
 		rc = hfi_create_packet(core->packet,
 			core->packet_size,
@@ -381,20 +415,12 @@ static int __release_subcaches(struct msm_vidc_core *core)
 	if (rc)
 		return rc;
 
-	venus_hfi_for_each_subcache_reverse(core, sinfo) {
-		if (!sinfo->isactive)
-			continue;
-
-		d_vpr_h("%s: release Subcache id %d size %lu done\n",
-			__func__, sinfo->subcache->slice_id,
-			sinfo->subcache->slice_size);
-	}
 	core->resource->subcache_set.set_to_fw = false;
 
 	return 0;
 }
 
-static int __set_subcaches(struct msm_vidc_core *core)
+static int __set_system_subcaches(struct msm_vidc_core *core)
 {
 	int rc = 0;
 	struct subcache_info *sinfo;
@@ -420,11 +446,21 @@ static int __set_subcaches(struct msm_vidc_core *core)
 	buf.flags = HFI_BUF_HOST_FLAG_NONE;
 
 	venus_hfi_for_each_subcache(core, sinfo) {
+		/* skip session level caches */
+		if (sinfo->session_level)
+			continue;
+
+		/* skip inactive caches */
 		if (!sinfo->isactive)
 			continue;
+
+		d_vpr_h("%s: set subcache %s ucid %d scid %u type %d level %d\n",
+			__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+			sinfo->llcc_type, sinfo->session_level);
+
 		buf.index = sinfo->subcache->slice_id;
 		buf.buffer_size = sinfo->subcache->slice_size;
-		buf.u.subtype = __get_hfi_subcache_type(sinfo->llcc_id);
+		buf.u.subtype = __get_hfi_system_subcache_type(sinfo->llcc_ucid);
 
 		rc = hfi_create_packet(core->packet,
 			core->packet_size,
@@ -444,13 +480,6 @@ static int __set_subcaches(struct msm_vidc_core *core)
 	if (rc)
 		goto err_fail_set_subacaches;
 
-	venus_hfi_for_each_subcache(core, sinfo) {
-		if (!sinfo->isactive)
-			continue;
-		d_vpr_h("%s: set Subcache id %d size %lu done\n",
-			__func__, sinfo->subcache->slice_id,
-			sinfo->subcache->slice_size);
-	}
 	core->resource->subcache_set.set_to_fw = true;
 
 	return 0;
@@ -458,6 +487,148 @@ static int __set_subcaches(struct msm_vidc_core *core)
 err_fail_set_subacaches:
 	call_res_op(core, llcc, core, false);
 	return rc;
+}
+
+struct subcache_info *get_session_level_subcache(struct msm_vidc_core *core, u32 llcc_type)
+{
+	struct subcache_info *sinfo = NULL;
+	bool found = false;
+
+	venus_hfi_for_each_subcache_reverse(core, sinfo) {
+		/* skip invalid(unavailable subcache) */
+		if (!sinfo->subcache)
+			continue;
+
+		/* skip system level caches */
+		if (!sinfo->session_level)
+			continue;
+
+		/* skip non-matched entries */
+		if (sinfo->llcc_type != llcc_type)
+			continue;
+
+		found = true;
+		break;
+	}
+
+	return found ? sinfo : NULL;
+}
+
+int venus_hfi_release_session_subcache(struct msm_vidc_inst *inst,
+	u32 llcc_type, u32 dev_addr)
+{
+	struct msm_vidc_core *core = inst->core;
+	struct subcache_info *sinfo;
+	struct hfi_buffer buf;
+	int rc = 0;
+
+	if (msm_vidc_syscache_disable || !is_sys_cache_present(core))
+		return 0;
+
+	sinfo = get_session_level_subcache(core, llcc_type);
+	if (!sinfo) {
+		i_vpr_e(inst, "%s: subcache not found %d\n", __func__, llcc_type);
+		return -EINVAL;
+	}
+
+	if (!sinfo->isactive) {
+		i_vpr_e(inst, "%s: subcache not active %s ucid %d scid %u type %d level %d\n",
+			__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+			sinfo->llcc_type, sinfo->session_level);
+		return -EINVAL;
+	}
+
+	memset(&buf, 0, sizeof(struct hfi_buffer));
+	buf.type         = HFI_BUFFER_SUBCACHE;
+	buf.flags        = HFI_BUF_HOST_FLAG_RELEASE;
+	buf.index        = sinfo->subcache->slice_id;
+	buf.buffer_size  = sinfo->subcache->slice_size;
+	buf.base_address = dev_addr;
+	buf.u.subtype    = __get_hfi_session_subcache_type(sinfo->llcc_type);
+	rc = venus_hfi_session_command(inst,
+				HFI_CMD_BUFFER,
+				HFI_BUF_HOST_FLAG_NONE,
+				HFI_PORT_NONE,
+				inst->session_id,
+				HFI_PAYLOAD_STRUCTURE,
+				&buf,
+				sizeof(buf),
+				__func__);
+	if (rc)
+		return rc;
+
+	i_vpr_h(inst, "%s: release subcache %s ucid %d scid %u type %d level %d done\n",
+		__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+		sinfo->llcc_type, sinfo->session_level);
+
+	return rc;
+}
+
+int venus_hfi_set_session_subcache(struct msm_vidc_inst *inst,
+	u32 llcc_type, u32 dev_addr)
+{
+	struct msm_vidc_core *core = inst->core;
+	struct subcache_info *sinfo;
+	struct hfi_buffer buf;
+	int rc = 0;
+
+	if (msm_vidc_syscache_disable || !is_sys_cache_present(core))
+		return 0;
+
+	sinfo = get_session_level_subcache(core, llcc_type);
+	if (!sinfo) {
+		i_vpr_e(inst, "%s: subcache not found %d\n", __func__, llcc_type);
+		return -EINVAL;
+	}
+
+	if (!sinfo->isactive) {
+		i_vpr_e(inst, "%s: subcache not active %s ucid %d scid %u type %d level %d\n",
+			__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+			sinfo->llcc_type, sinfo->session_level);
+		return -EINVAL;
+	}
+
+	memset(&buf, 0, sizeof(struct hfi_buffer));
+	buf.type         = HFI_BUFFER_SUBCACHE;
+	buf.flags        = HFI_BUF_HOST_FLAG_NONE;
+	buf.index        = sinfo->subcache->slice_id;
+	buf.buffer_size  = sinfo->subcache->slice_size;
+	buf.base_address = dev_addr;
+	buf.u.subtype    = __get_hfi_session_subcache_type(sinfo->llcc_type);
+	rc = venus_hfi_session_command(inst,
+				HFI_CMD_BUFFER,
+				HFI_BUF_HOST_FLAG_NONE,
+				HFI_PORT_NONE,
+				inst->session_id,
+				HFI_PAYLOAD_STRUCTURE,
+				&buf,
+				sizeof(buf),
+				__func__);
+	if (rc)
+		return rc;
+
+	i_vpr_h(inst, "%s: set subcache %s ucid %d scid %u type %d level %d done\n",
+		__func__, sinfo->name, sinfo->llcc_ucid, sinfo->subcache->slice_id,
+		sinfo->llcc_type, sinfo->session_level);
+
+	return rc;
+}
+
+u64 venus_hfi_get_subcache_mask(struct msm_vidc_inst *inst)
+{
+	struct msm_vidc_core *core = inst->core;
+	struct subcache_info *sinfo;
+	u64 scid_mask = 0;
+
+	venus_hfi_for_each_subcache(core, sinfo) {
+		if (!sinfo->subcache)
+			continue;
+
+		scid_mask |= BIT(sinfo->llcc_type);
+	}
+	i_vpr_h(inst, "%s: %#llx\n", __func__, scid_mask);
+
+	return scid_mask;
 }
 
 static int __venus_power_off(struct msm_vidc_core *core)
@@ -615,7 +786,7 @@ int __resume(struct msm_vidc_core *core)
 		d_vpr_e("Failed to activate subcache\n");
 		goto err_reset_core;
 	}
-	__set_subcaches(core);
+	__set_system_subcaches(core);
 
 	rc = __sys_set_power_control(core, true);
 	if (rc) {
@@ -1024,7 +1195,7 @@ int venus_hfi_core_init(struct msm_vidc_core *core)
 	if (rc)
 		goto error;
 
-	rc = __set_subcaches(core);
+	rc = __set_system_subcaches(core);
 	if (rc)
 		goto error;
 
@@ -1083,7 +1254,7 @@ int venus_hfi_core_deinit(struct msm_vidc_core *core, bool force)
 
 	__resume(core);
 	__flush_debug_queue(core, (!force ? core->packet : NULL), core->packet_size);
-	__release_subcaches(core);
+	__release_system_subcaches(core);
 	call_res_op(core, llcc, core, false);
 	__unload_fw(core);
 	/**

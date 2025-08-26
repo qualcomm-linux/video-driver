@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _MSM_VIDC_CORE_H_
@@ -53,13 +53,6 @@ struct msm_vidc_synx_fence_data {
 	void                           *session;
 	u32                             client_flags; /* not used */
 	struct msm_vidc_mem             queue;
-};
-
-struct msm_vidc_mem_addr {
-	u32 align_device_addr;
-	u8 *align_virtual_addr;
-	u32 mem_size;
-	struct msm_vidc_mem mem;
 };
 
 struct msm_vidc_iface_q_info {
