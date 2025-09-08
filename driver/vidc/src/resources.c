@@ -416,7 +416,6 @@ static int __init_power_domains(struct msm_vidc_core *core)
 #else
 	/* populate opp power domains(for rails) */
 	rc = devm_pm_opp_attach_genpd(&core->pdev->dev, opp_tbl, &opp_vdevs);
-	rc = -EINVAL;
 	if (rc)
 		return rc;
 

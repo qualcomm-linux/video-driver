@@ -7,6 +7,7 @@
 #include "perf_static_model.h"
 #include "msm_vidc_debug.h"
 #include "msm_vidc_platform.h"
+#include "msm_vidc_power_iris4.h"
 
 /* 100x */
 static u32 dpbopb_ubwc30_cr_table_cratio_iris4[7][18] = {

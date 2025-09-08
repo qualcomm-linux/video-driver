@@ -35,8 +35,13 @@
 #include "msm_vidc_pineapple.h"
 #include "msm_vidc_iris33.h"
 #endif
+#if defined(CONFIG_MSM_VIDC_X1E80100)
+#include "msm_vidc_x1e80100.h"
+#include "msm_vidc_iris3.h"
+#endif
 #if defined(CONFIG_MSM_VIDC_LEMANS)
 #include "msm_vidc_lemans.h"
+#include "msm_vidc_iris3.h"
 #endif
 #if defined(CONFIG_MSM_VIDC_NIOBE)
 #include "msm_vidc_niobe.h"
@@ -54,6 +59,10 @@
 #if defined(CONFIG_MSM_VIDC_NORDAU)
 #include "msm_vidc_nordau.h"
 #include "msm_vidc_iris36.h"
+#endif
+#if defined(CONFIG_MSM_VIDC_ART)
+#include "msm_vidc_art.h"
+#include "msm_vidc_iris5.h"
 #endif
 
 #define CAP_TO_8BIT_QP(a) {          \
@@ -98,6 +107,83 @@ u32 vpe_csc_custom_limit_coeff[MAX_LIMIT_COEFFS] = {
 	16, 235, 16, 240, 16, 240
 };
 
+u64 apv_bitrate_tbl[8][6][4] = {
+	{
+		/* qHD 960x540 */
+		/* LQ,        SQ,        HQ,        UQ */
+		{  29000000,  41000000,  58000000,  86000000 },/* 24 fps */
+		{  31000000,  43000000,  60000000,  90000000 },/* 25 fps */
+		{  37000000,  51000000,  72000000, 108000000 },/* 30 fps */
+		{  61000000,  86000000, 120000000, 180000000 },/* 50 fps */
+		{  73000000, 103000000, 144000000, 216000000 },/* 60 fps */
+		{ 147000000, 206000000, 288000000, 432000000 } /* 120 fps */
+	},
+	{
+		/* HD 1280x720 */
+		{  40000000,  56000000,  78000000, 118000000 },
+		{  42000000,  58000000,  82000000, 123000000 },
+		{  50000000,  70000000,  98000000, 147000000 },
+		{  83000000, 117000000, 163000000, 245000000 },
+		{ 100000000, 140000000, 196000000, 294000000 },
+		{ 200000000, 280000000, 392000000, 588000000 }
+	},
+	{
+		/* FHD 1920x1080 */
+		{  81000000, 113000000, 158000000, 238000000 },
+		{  84000000, 118000000, 165000000, 248000000 },
+		{ 101000000, 141000000, 198000000, 297000000 },
+		{ 168000000, 236000000, 330000000, 495000000 },
+		{ 202000000, 283000000, 396000000, 594000000 },
+		{ 404000000, 566000000, 792000000, 1188000000 }
+	},
+	{
+		/* 2K 2048x1080 */
+		{  86000000, 121000000, 169000000, 253000000 },
+		{  90000000, 126000000, 176000000, 264000000 },
+		{ 108000000, 151000000, 211000000, 317000000 },
+		{ 180000000, 251000000, 352000000, 528000000 },
+		{ 216000000, 302000000, 422000000, 634000000 },
+		{ 431000000, 603000000, 845000000, 1267000000 }
+	},
+	{
+		/* UHD 4K 3840x2160 */
+		{  325000000,  455000000,  637000000,  955000000 },
+		{  338000000,  474000000,  663000000,  995000000 },
+		{  406000000,  569000000,  796000000, 1194000000 },
+		{  677000000,  948000000, 1327000000, 1990000000 },
+		{  812000000, 1137000000, 1592000000, 2388000000 },
+		{ 1624000000, 2274000000, 3184000000, 4776000000 }
+	},
+	{
+		/* 4K 4096x2160 */
+		{  347000000,  485000000,  679000000, 1019000000 },
+		{  361000000,  505000000,  708000000, 1061000000 },
+		{  433000000,  606000000,  849000000, 1274000000 },
+		{  722000000, 1011000000, 1415000000, 2123000000 },
+		{  866000000, 1213000000, 1698000000, 2547000000 },
+		{ 1733000000, 2426000000, 3396000000, 5094000000 }
+	},
+	{
+		/* UHD 8K 7680x4320 */
+		{ 1300000000, 1819000000, 2547000000, 3821000000 },
+		{ 1354000000, 1895000000, 2653000000, 3980000000 },
+		{ 1624000000, 2274000000, 3184000000, 4776000000 },
+		{ 2707000000, 3790000000, 5307000000, 7960000000 },
+		{ 3249000000, 4549000000, 6368000000, 9552000000 },
+		{ 6498000000, 9097000000, 12736000000, 19104000000 }
+	},
+	{
+		/* 8K 8192x4320 */
+		{ 1386000000, 1941000000, 2717000000, 4076000000 },
+		{ 1444000000, 2022000000, 2830000000, 4245000000 },
+		{ 1733000000, 2426000000, 3396000000, 5094000000 },
+		{ 2888000000, 4043000000, 5660000000, 8491000000 },
+		{ 3466000000, 4852000000, 6793000000, 10189000000 },
+		{ 6931000000, 9704000000, 13585000000, 20378000000 }
+	}
+
+};
+
 static const struct msm_vidc_compat_handle compat_handle[] = {
 #if defined(CONFIG_MSM_VIDC_PINEAPPLE)
 	{
@@ -133,9 +219,23 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.init_iris                  = msm_vidc_init_iris33,
 	},
 #endif
+#if defined(CONFIG_MSM_VIDC_X1E80100)
+	{
+		.compat                     = "qcom,x1e80100-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_x1e80100,
+		.init_platform              = msm_vidc_init_platform_x1e80100,
+		.init_iris                  = msm_vidc_init_iris3,
+	},
+#endif
 #if defined(CONFIG_MSM_VIDC_LEMANS)
 	{
 		.compat                     = "qcom,sa8255-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_lemans,
+		.init_platform              = msm_vidc_init_platform_lemans,
+		.init_iris                  = msm_vidc_init_iris3,
+	},
+	{
+		.compat                     = "qcom,sa8775p-iris",
 		.get_platform_data          = msm_vidc_get_platform_data_lemans,
 		.init_platform              = msm_vidc_init_platform_lemans,
 		.init_iris                  = msm_vidc_init_iris3,
@@ -169,6 +269,14 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.init_iris                  = msm_vidc_init_iris4,
 	},
 #endif
+#if defined(CONFIG_MSM_VIDC_ART)
+	{
+		.compat                     = "qcom,art-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_art,
+		.init_platform              = msm_vidc_init_platform_art,
+		.init_iris                  = msm_vidc_init_iris5,
+	},
+#endif
 #if defined(CONFIG_MSM_VIDC_SERAPH)
 	{
 		.compat                     = "qcom,seraph-vidc",
@@ -185,6 +293,265 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.init_iris                  = msm_vidc_init_iris36,
 	},
 #endif
+};
+
+static struct codec_info codec_data_common[] = {
+	{
+		.v4l2_codec  = V4L2_PIX_FMT_H264,
+		.vidc_codec  = MSM_VIDC_H264,
+		.pixfmt_name = "AVC",
+	},
+	{
+		.v4l2_codec  = V4L2_PIX_FMT_HEVC,
+		.vidc_codec  = MSM_VIDC_HEVC,
+		.pixfmt_name = "HEVC",
+	},
+	{
+		.v4l2_codec  = V4L2_PIX_FMT_VP9,
+		.vidc_codec  = MSM_VIDC_VP9,
+		.pixfmt_name = "VP9",
+	},
+	{
+		.v4l2_codec  = V4L2_PIX_FMT_AV1,
+		.vidc_codec  = MSM_VIDC_AV1,
+		.pixfmt_name = "AV1",
+	},
+	{
+		.v4l2_codec  = V4L2_PIX_FMT_VIDC_HEIC,
+		.vidc_codec  = MSM_VIDC_HEIC,
+		.pixfmt_name = "HEIC",
+	},
+	{
+		.v4l2_codec  = V4L2_PIX_FMT_VIDC_APV,
+		.vidc_codec  = MSM_VIDC_APV,
+		.pixfmt_name = "APV",
+	},
+};
+
+static struct color_format_info color_format_data_common[] = {
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_NV12,
+		.vidc_color_format = MSM_VIDC_FMT_NV12,
+		.pixfmt_name       = "NV12",
+	},
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_NV21,
+		.vidc_color_format = MSM_VIDC_FMT_NV21,
+		.pixfmt_name       = "NV21",
+	},
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_QC08C,
+		.vidc_color_format = MSM_VIDC_FMT_NV12C,
+		.pixfmt_name       = "NV12C",
+	},
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_QC10C,
+		.vidc_color_format = MSM_VIDC_FMT_TP10C,
+		.pixfmt_name       = "TP10C",
+	},
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_RGBA32,
+		.vidc_color_format = MSM_VIDC_FMT_RGBA8888,
+		.pixfmt_name       = "RGBA",
+	},
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_P010,
+		.vidc_color_format = MSM_VIDC_FMT_P010,
+		.pixfmt_name       = "P010",
+	},
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_VIDC_P210,
+		.vidc_color_format = MSM_VIDC_FMT_P210,
+		.pixfmt_name       = "P210",
+	},
+	{
+		.v4l2_color_format = V4L2_PIX_FMT_VIDC_P210C,
+		.vidc_color_format = MSM_VIDC_FMT_P210C,
+		.pixfmt_name       = "P210C",
+	},
+	{
+		.v4l2_color_format = V4L2_META_FMT_VIDC,
+		.vidc_color_format = MSM_VIDC_FMT_META,
+		.pixfmt_name       = "META",
+	},
+};
+
+static struct color_primaries_info color_primaries_data_common[] = {
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_DEFAULT,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_UNSPECIFIED,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_DEFAULT,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_RESERVED,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_REC709,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_BT709,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_470_SYSTEM_M,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_BT470_SYSTEM_M,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_470_SYSTEM_BG,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_BT470_SYSTEM_BG,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_SMPTE170M,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_BT601_525,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_SMPTE240M,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_SMPTE_ST240M,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_VIDC_GENERIC_FILM,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_GENERIC_FILM,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_BT2020,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_BT2020,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_DCI_P3,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_SMPTE_RP431_2,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_VIDC_EG431,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_SMPTE_EG431_1,
+	},
+	{
+		.v4l2_color_primaries  = V4L2_COLORSPACE_VIDC_EBU_TECH,
+		.vidc_color_primaries  = MSM_VIDC_PRIMARIES_SMPTE_EBU_TECH,
+	},
+};
+
+static struct transfer_char_info transfer_char_data_common[] = {
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_DEFAULT,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_UNSPECIFIED,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_DEFAULT,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_RESERVED,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_709,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_BT709,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_BT470_SYSTEM_M,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_BT470_SYSTEM_M,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_BT470_SYSTEM_BG,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_BT470_SYSTEM_BG,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_BT601_525_OR_625,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_BT601_525_OR_625,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_SMPTE240M,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_SMPTE_ST240M,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_LINEAR,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_LINEAR,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_XVYCC,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_XVYCC,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_BT1361,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_BT1361_0,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_SRGB,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_SRGB_SYCC,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_BT2020,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_BT2020_14,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_SMPTE2084,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_SMPTE_ST2084_PQ,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_ST428,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_SMPTE_ST428_1,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_HLG,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_BT2100_2_HLG,
+	},
+	{
+		.v4l2_transfer_char  = V4L2_XFER_FUNC_VIDC_CUSTLOG,
+		.vidc_transfer_char  = MSM_VIDC_TRANSFER_CUSTLOG,
+	},
+};
+
+static struct matrix_coeff_info matrix_coeff_data_common[] = {
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_DEFAULT,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_UNSPECIFIED,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_DEFAULT,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_RESERVED,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_VIDC_SRGB_OR_SMPTE_ST428,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_SRGB_SMPTE_ST428_1,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_709,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_BT709,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_XV709,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_BT709,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_VIDC_FCC47_73_682,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_FCC_TITLE_47,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_XV601,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_BT470_SYS_BG_OR_BT601_625,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_601,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_BT601_525_BT1358_525_OR_625,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_SMPTE240M,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_SMPTE_ST240,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_BT2020,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_BT2020_NON_CONSTANT,
+	},
+	{
+		.v4l2_matrix_coeff  = V4L2_YCBCR_ENC_BT2020_CONST_LUM,
+		.vidc_matrix_coeff  = MSM_VIDC_MATRIX_COEFF_BT2020_CONSTANT,
+	},
+};
+
+struct msm_vidc_format_capability format_data_common = {
+	.codec_info = codec_data_common,
+	.codec_info_size = ARRAY_SIZE(codec_data_common),
+	.color_format_info = color_format_data_common,
+	.color_format_info_size = ARRAY_SIZE(color_format_data_common),
+	.color_prim_info = color_primaries_data_common,
+	.color_prim_info_size = ARRAY_SIZE(color_primaries_data_common),
+	.transfer_char_info = transfer_char_data_common,
+	.transfer_char_info_size = ARRAY_SIZE(transfer_char_data_common),
+	.matrix_coeff_info = matrix_coeff_data_common,
+	.matrix_coeff_info_size = ARRAY_SIZE(matrix_coeff_data_common),
 };
 
 static int msm_vidc_init_ops(struct msm_vidc_core *core)
@@ -759,6 +1126,118 @@ int msm_vidc_adjust_session_core_id(void *instance, struct v4l2_ctrl *ctrl)
 	return rc;
 }
 
+int msm_vidc_adjust_bitrate_apv(void *instance, struct v4l2_ctrl *ctrl)
+{
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	s64 adjusted_value = 0, resolution = 0;
+	struct v4l2_format *output_fmt;
+	u32 frame_rate, quality_level;
+	u32 res_index = 0, fps_index = 0, quality_index = 0, multiplier = 1;
+
+	adjusted_value =  ctrl ? ctrl->val : inst->capabilities[BIT_RATE].value;
+	output_fmt = &inst->fmts[OUTPUT_PORT];
+	resolution = output_fmt->fmt.pix_mp.width * output_fmt->fmt.pix_mp.height;
+	frame_rate = inst->capabilities[FRAME_RATE].value >> 16;
+	quality_level = inst->capabilities[CONSTANT_QUALITY].value;
+
+	/* Set user input bitrate for 8k session if input bitrate >= 2gpbs */
+	if (resolution >= 7680 * 4320 && msm_vidc_apv_bitrate >= 2000000000) {
+		/* Max bitrate allowed is 3.3gbps */
+		if (msm_vidc_apv_bitrate > 3.3 * 1000 * 1000 * 1000) {
+			i_vpr_h(inst, "%s:  limit APV bitrate to 3.3Gbps\n", __func__);
+			msm_vidc_apv_bitrate = 3.3 * 1000 * 1000 * 1000;
+		}
+		i_vpr_h(inst, "%s: update bitrate to %u for 8k resolution\n",
+			__func__, msm_vidc_apv_bitrate);
+		adjusted_value = msm_vidc_apv_bitrate;
+	}
+
+	if (inst->hfi_rc_type != HFI_RC_CQ)
+		goto update_bitrate;
+
+	/* update the bitrate based on constant quality level */
+	if (resolution < ALIGN(960, 16) * ALIGN(540, 16))
+		res_index = 0;
+	else if (resolution <= ALIGN(1280, 16) * ALIGN(720, 16))
+		res_index = 1;
+	else if (resolution <= ALIGN(1920, 16) * ALIGN(1080, 16))
+		res_index = 2;
+	else if (resolution <= ALIGN(2048, 16) * ALIGN(1080, 16))
+		res_index = 3;
+	else if (resolution <= ALIGN(3840, 16) * ALIGN(2160, 16))
+		res_index = 4;
+	else if (resolution <= ALIGN(4096, 16) * ALIGN(2160, 16))
+		res_index = 5;
+	else if (resolution <= ALIGN(7680, 16) * ALIGN(4320, 16))
+		res_index = 6;
+	else /* if (resolution <= ALIGN(8192, 16) * ALIGN(4320, 16)) */
+		res_index = 7;
+
+	if (frame_rate <= 24) {
+		fps_index = 0;
+	} else if (frame_rate <= 25) {
+		fps_index = 1;
+	} else if (frame_rate <= 30) {
+		fps_index = 2;
+	} else if (frame_rate <= 50) {
+		fps_index = 3;
+	} else if (frame_rate <= 60) {
+		fps_index = 4;
+	} else if (frame_rate <= 120) {
+		fps_index = 5;
+	} else {
+		fps_index = 5;
+		multiplier = 1;
+		if (frame_rate <= 240)
+			multiplier = 2;
+		else if (frame_rate <= 480)
+			multiplier = 4;
+		else
+			multiplier = 8;
+	}
+
+	if (quality_level <= 70)
+		quality_index = 0;
+	else if (quality_level <= 80)
+		quality_index = 1;
+	else
+		quality_index = 2;
+
+	adjusted_value =
+		apv_bitrate_tbl[res_index][fps_index][quality_index] * multiplier;
+	/* limit apv bitrate to 3.333gbps (maximum) */
+	if (adjusted_value > 3333000000)
+		adjusted_value = 3333000000;
+
+update_bitrate:
+	msm_vidc_update_cap_value(inst, BIT_RATE, adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_constant_quality(void *instance, struct v4l2_ctrl *ctrl)
+{
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+
+	adjusted_value = ctrl ? ctrl->val :
+		inst->capabilities[CONSTANT_QUALITY].value;
+
+	if (inst->codec == MSM_VIDC_APV) {
+		/* recommended quality levels are 70 (LQ), 80 (SQ), 90 (HQ) */
+		if (adjusted_value <= 70)
+			adjusted_value = 70;
+		else if (adjusted_value <= 80)
+			adjusted_value = 80;
+		else
+			adjusted_value = 90;
+	}
+
+	msm_vidc_update_cap_value(inst, CONSTANT_QUALITY, adjusted_value, __func__);
+
+	return 0;
+}
+
 int msm_vidc_adjust_bitrate_mode(void *instance, struct v4l2_ctrl *ctrl)
 {
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
@@ -792,6 +1271,30 @@ int msm_vidc_adjust_bitrate_mode(void *instance, struct v4l2_ctrl *ctrl)
 		hfi_value = HFI_RC_CQ;
 	}
 
+	if (inst->codec == MSM_VIDC_APV) {
+		/*
+		 * for apv, use bitrate only for VBR, client set BITRATE and
+		 *          client did not set CONSTANT_QUALITY, in all other
+		 *          cases, default to CONSTANT_QUALITY.
+		 */
+		bool const_quality_set =
+			!!(inst->capabilities[CONSTANT_QUALITY].flags &
+			   CAP_FLAG_CLIENT_SET);
+		bool bitrate_set =
+			!!(inst->capabilities[BIT_RATE].flags &
+			   CAP_FLAG_CLIENT_SET);
+
+		if (bitrate_mode == V4L2_MPEG_VIDEO_BITRATE_MODE_VBR &&
+		    bitrate_set && !const_quality_set) {
+			hfi_value = HFI_RC_VBR_CFR;
+		} else {
+			hfi_value = HFI_RC_CQ;
+			i_vpr_h(inst,
+				"%s: APV default to CQ (constant quality %s, bitrate %s)\n",
+				__func__, const_quality_set ? "set" : "not set",
+				bitrate_set ? "set" : "not set");
+		}
+	}
 update:
 	inst->hfi_rc_type = hfi_value;
 	i_vpr_h(inst, "%s: hfi rc type: %#x\n",
@@ -3314,6 +3817,163 @@ int msm_vidc_adjust_req_sync_frame(void *instance, struct v4l2_ctrl *ctrl)
 	return 0;
 }
 
+int msm_vidc_adjust_min_quality_iris5p(void *instance, struct v4l2_ctrl *ctrl)
+{
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	s64 rc_type = -1, enh_layer_count = -1, pix_fmts = -1;
+	u32 width, height, frame_rate;
+	struct v4l2_format *f;
+
+	adjusted_value = ctrl ? ctrl->val : inst->capabilities[MIN_QUALITY].value;
+
+	/*
+	 * Although MIN_QUALITY is static, one of its parents,
+	 * ENH_LAYER_COUNT is dynamic cap. Hence, dynamic call
+	 * may be made for MIN_QUALITY via ENH_LAYER_COUNT.
+	 * Therefore, below streaming check is required to avoid
+	 * runtime modification of MIN_QUALITY.
+	 */
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
+		return 0;
+
+	if (msm_vidc_get_parent_value(inst, MIN_QUALITY,
+				      BITRATE_MODE, &rc_type, __func__) ||
+	    msm_vidc_get_parent_value(inst, MIN_QUALITY,
+				      ENH_LAYER_COUNT, &enh_layer_count, __func__))
+		return -EINVAL;
+
+	/*
+	 * Min Quality is supported only for VBR rc type.
+	 * Hence, do not adjust or set to firmware for non VBR rc's
+	 */
+	if (rc_type != HFI_RC_VBR_CFR) {
+		adjusted_value = 0;
+		goto update_and_exit;
+	}
+
+	frame_rate = inst->capabilities[FRAME_RATE].value >> 16;
+	f = &inst->fmts[OUTPUT_PORT];
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+
+	/*
+	 * Min Quality not supported for:
+	 * - HEVC 10bit
+	 * - HP encoding
+	 * - External Blur
+	 * - Resolution beyond 1080P
+	 * (It will fall back to CQCAC 25% or 0% (CAC) or CQCAC-OFF)
+	 */
+	if (inst->codec == MSM_VIDC_HEVC) {
+		if (msm_vidc_get_parent_value(inst, MIN_QUALITY,
+					      PIX_FMTS, &pix_fmts, __func__))
+			return -EINVAL;
+
+		if (is_10bit_colorformat(pix_fmts)) {
+			i_vpr_h(inst,
+				"%s: min quality is supported only for 8 bit\n",
+				__func__);
+			adjusted_value = 0;
+			goto update_and_exit;
+		}
+	}
+
+	if (res_is_greater_than(width, height, 1920, 1080)) {
+		i_vpr_h(inst, "%s: unsupported res, wxh %ux%u\n",
+			__func__, width, height);
+		adjusted_value = 0;
+		goto update_and_exit;
+	}
+
+	if (frame_rate > 60) {
+		i_vpr_h(inst, "%s: unsupported fps %u\n",
+			__func__, frame_rate);
+		adjusted_value = 0;
+		goto update_and_exit;
+	}
+
+	if (enh_layer_count > 0 && inst->hfi_layer_type != HFI_HIER_B) {
+		i_vpr_h(inst,
+			"%s: min quality not supported for HP encoding\n",
+			__func__);
+		adjusted_value = 0;
+		goto update_and_exit;
+	}
+
+	/* Above conditions are met. Hence enable min quality */
+	adjusted_value = MAX_SUPPORTED_MIN_QUALITY;
+
+update_and_exit:
+	msm_vidc_update_cap_value(inst, MIN_QUALITY, adjusted_value, __func__);
+
+	return 0;
+}
+
+int msm_vidc_adjust_bitrate_boost_iris5p(void *instance, struct v4l2_ctrl *ctrl)
+{
+	s32 adjusted_value;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	s64 rc_type = -1;
+	u32 width, height, frame_rate;
+	struct v4l2_format *f;
+	u32 max_bitrate = 0, bitrate = 0;
+
+	adjusted_value = ctrl ? ctrl->val :
+		inst->capabilities[BITRATE_BOOST].value;
+
+	if (inst->bufq[OUTPUT_PORT].vb2q->streaming)
+		return 0;
+
+	if (msm_vidc_get_parent_value(inst, BITRATE_BOOST,
+		BITRATE_MODE, &rc_type, __func__))
+		return -EINVAL;
+
+	/*
+	 * Bitrate Boost are supported only for VBR rc type.
+	 * Hence, do not adjust or set to firmware for non VBR rc's
+	 */
+	if (rc_type != HFI_RC_VBR_CFR) {
+		adjusted_value = 0;
+		goto adjust;
+	}
+
+	frame_rate = inst->capabilities[FRAME_RATE].value >> 16;
+	f = &inst->fmts[OUTPUT_PORT];
+	width = f->fmt.pix_mp.width;
+	height = f->fmt.pix_mp.height;
+
+	/*
+	 * honor client set bitrate boost
+	 * if client did not set, keep max bitrate boost up to 4k@60fps
+	 * and remove bitrate boost after 4k@60fps
+	 */
+	if (inst->capabilities[BITRATE_BOOST].flags & CAP_FLAG_CLIENT_SET) {
+		/* accept client set bitrate boost value as is */
+	} else {
+		if (res_is_less_than_or_equal_to(width, height, 4096, 2176) &&
+			frame_rate <= 60)
+			adjusted_value = MAX_BITRATE_BOOST;
+		else
+			adjusted_value = 0;
+	}
+
+	max_bitrate = msm_vidc_get_max_bitrate(inst);
+	bitrate = inst->capabilities[BIT_RATE].value;
+	if (adjusted_value) {
+		if ((bitrate + bitrate / (100 / adjusted_value)) > max_bitrate) {
+			i_vpr_h(inst,
+				"%s: bitrate %d is beyond max bitrate %d, remove bitrate boost\n",
+				__func__, max_bitrate, bitrate);
+			adjusted_value = 0;
+		}
+	}
+adjust:
+	msm_vidc_update_cap_value(inst, BITRATE_BOOST, adjusted_value, __func__);
+
+	return 0;
+}
+
 /******************* End of Control Adjust functions *************************/
 
 /************************* Control Set functions *****************************/
@@ -3380,8 +4040,7 @@ int msm_vidc_set_constant_quality(void *instance,
 				      BITRATE_MODE, &rc_type, __func__))
 		return -EINVAL;
 
-	/* Quality level can be set for APV encoder for all rate controls */
-	if (inst->codec != MSM_VIDC_APV && rc_type != HFI_RC_CQ)
+	if (rc_type != HFI_RC_CQ)
 		return 0;
 
 	hfi_value = inst->capabilities[cap_id].value;
@@ -4350,6 +5009,70 @@ int msm_vidc_set_lookahead_encode_size(void *instance,
 	hfi_value = inst->capabilities[LOOKAHEAD_ENCODE_SIZE].value;
 	rc = msm_vidc_packetize_control(inst, cap_id, HFI_PAYLOAD_U32,
 			&hfi_value, sizeof(u32), __func__);
+
+	return rc;
+}
+
+int msm_vidc_set_ring_buffer_count(void *instance,
+	enum msm_vidc_inst_capability_type cap_id)
+{
+	int rc = 0;
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	struct v4l2_format *output_fmt, *input_fmt;
+	struct msm_vidc_core *core;
+	u32 count = 0, data_size = 0, pixel_count = 0, fps = 0;
+	u32 frame_rate = 0, operating_rate = 0;
+
+	core = inst->core;
+	output_fmt = &inst->fmts[OUTPUT_PORT];
+	input_fmt = &inst->fmts[INPUT_PORT];
+
+	frame_rate = inst->capabilities[FRAME_RATE].value >> 16;
+	operating_rate = inst->capabilities[OPERATING_RATE].value >> 16;
+	fps = max(frame_rate, operating_rate);
+	pixel_count = output_fmt->fmt.pix_mp.width *
+		output_fmt->fmt.pix_mp.height;
+
+	/*
+	 * try to enable ring buffer feature if
+	 * resolution >= 8k and fps >= 30fps and
+	 * resolution >= 4k and fps >= 120fps and
+	 * resolution >= 1080p and fps >= 480fps and
+	 * resolution >= 720p and fps >= 960fps
+	 */
+	if ((pixel_count >= 7680 * 4320 && fps >= 30) ||
+	    (pixel_count >= 3840 * 2160 && fps >= 120) ||
+	    (pixel_count >= 1920 * 1080 && fps >= 480) ||
+	    (pixel_count >= 1280 * 720 && fps >= 960)) {
+		data_size = input_fmt->fmt.pix_mp.plane_fmt[0].sizeimage;
+		i_vpr_h(inst, "%s: calculate ring buffer count\n", __func__);
+		rc = call_session_op(core, ring_buf_count, inst, data_size);
+		if (rc) {
+			i_vpr_e(inst, "%s: failed to calculate ring buffer count\n",
+				__func__);
+			/* ignore error */
+			rc = 0;
+			inst->capabilities[cap_id].value = 0;
+		}
+	} else {
+		i_vpr_h(inst,
+			"%s: session %ux%u@%u fps does not support ring buffer\n",
+			__func__, output_fmt->fmt.pix_mp.width,
+			output_fmt->fmt.pix_mp.height, fps);
+		inst->capabilities[cap_id].value = 0;
+	}
+
+	count = inst->capabilities[cap_id].value;
+	i_vpr_h(inst, "%s: ring buffer count: %u\n", __func__, count);
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_ENC_RING_BIN_BUF,
+			HFI_HOST_FLAGS_NONE,
+			HFI_PORT_BITSTREAM,
+			HFI_PAYLOAD_U32,
+			&count,
+			sizeof(u32));
+	if (rc)
+		return rc;
 
 	return rc;
 }

@@ -60,7 +60,7 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
 
     deps = []
     all_module_deps = select({
-        "//build/kernel/kleaf:socrepo_true": [
+        "//build/qcom_build_extensions:qtisocrepo_true": [
             "//soc-repo:all_headers",
             "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build),
             "//soc-repo:{}/drivers/clk/qcom/clk-qcom".format(kernel_build),
@@ -72,13 +72,13 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
             "//soc-repo:{}/drivers/soc/qcom/socinfo".format(kernel_build),
             "//soc-repo:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
-        "//build/kernel/kleaf:socrepo_false": [
+        "//build/qcom_build_extensions:qtisocrepo_false": [
             "//msm-kernel:all_headers",
         ],
     })
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/qcom_build_extensions:qtisocrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
+        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build),
     })
 
     modules = [registry.get(module_name) for module_name in modules]
@@ -129,7 +129,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
 
     deps = []
     all_module_deps = select({
-        "//build/kernel/kleaf:socrepo_true": [
+        "//build/qcom_build_extensions:qtisocrepo_true": [
             "//soc-repo:all_headers",
             "//soc-repo:{}/drivers/firmware/qcom/qcom-scm".format(kernel_build),
             "//soc-repo:{}/drivers/clk/qcom/clk-qcom".format(kernel_build),
@@ -141,13 +141,13 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "//soc-repo:{}/drivers/soc/qcom/socinfo".format(kernel_build),
             "//soc-repo:{}/drivers/iommu/msm_dma_iommu_mapping".format(kernel_build),
         ],
-        "//build/kernel/kleaf:socrepo_false": [
+        "//build/qcom_build_extensions:qtisocrepo_false": [
             "//msm-kernel:all_headers",
         ],
     })
     kernel_build_label = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(kernel_build),
+        "//build/qcom_build_extensions:qtisocrepo_true": "//soc-repo:{}_base_kernel".format(kernel_build),
+        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build),
     })
 
     if lunch_target != None:
@@ -156,6 +156,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
         dist_target_name = "{}_video_driver_modules_dist".format(kernel_build)
         config_options = [
             "CONFIG_MSM_MMRM",
+            "CONFIG_MSM_VIDC_LLCC",
             "CONFIG_MSM_VIDC_ANDROID",
             "CONFIG_MSM_VIDC_MINIDUMP",
             "CONFIG_MSM_VIDC_{}".format(lunch_target.upper()),
@@ -165,6 +166,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
         print("dist_target_name: " + dist_target_name)
         config_options = [
             "CONFIG_MSM_MMRM",
+            "CONFIG_MSM_VIDC_LLCC",
             "CONFIG_MSM_VIDC_ANDROID",
             "CONFIG_MSM_VIDC_MINIDUMP",
             "CONFIG_MSM_VIDC_{}".format(target.upper()),

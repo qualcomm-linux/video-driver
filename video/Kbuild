@@ -31,6 +31,21 @@ LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/nordau_video.h
 endif
 endif
 
+ifeq ($(CONFIG_QLI_VIDC_SA8775P), y)
+include $(VIDEO_ROOT)/config/lemans_video.conf
+LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/lemans_video.h
+endif
+
+ifeq ($(CONFIG_ARCH_X1E80100), y)
+include $(VIDEO_ROOT)/config/x1e80100_video.conf
+LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/x1e80100_video.h
+endif
+
+ifeq ($(CONFIG_MSM_VIDC_LEMANS), y)
+LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/lemans/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris3/inc
+endif
+
 ifeq ($(CONFIG_MSM_VIDC_NIOBE), y)
 LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/niobe/inc \
                   -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris3/inc
@@ -58,6 +73,11 @@ LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/nordau/inc \
                   -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris36/inc
 endif
 
+ifeq ($(CONFIG_MSM_VIDC_X1E80100), y)
+LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/x1e80100/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris3/inc
+endif
+
 LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/common/inc \
                   -I$(VIDEO_DRIVER_ABS_PATH)/variant/common/inc \
                   -I$(VIDEO_DRIVER_ABS_PATH)/vidc/inc \
@@ -71,6 +91,15 @@ ccflags-y += -Wmissing-prototypes
 ccflags-y += -Werror
 ccflags-y += -Wno-enum-conversion
 obj-m += video.o
+
+ifeq ($(CONFIG_MSM_VIDC_LEMANS), y)
+video-objs +=     $(VIDEO_DRIVER_REL_PATH)/platform/lemans/src/lemans.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_buffer_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_power_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_bus_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_clock_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_iris3.o
+endif
 
 ifeq ($(CONFIG_MSM_VIDC_NIOBE), y)
 video-objs +=     $(VIDEO_DRIVER_REL_PATH)/platform/niobe/src/niobe.o \
@@ -120,6 +149,15 @@ video-objs +=     $(VIDEO_DRIVER_REL_PATH)/platform/nordau/src/nordau.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris36/src/msm_vidc_bus_iris36.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris36/src/msm_vidc_clock_iris36.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris36/src/msm_vidc_iris36.o
+endif
+
+ifeq ($(CONFIG_MSM_VIDC_X1E80100), y)
+video-objs +=     $(VIDEO_DRIVER_REL_PATH)/platform/x1e80100/src/x1e80100.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_buffer_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_power_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_bus_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_clock_iris3.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris3/src/msm_vidc_iris3.o
 endif
 
 video-objs +=     $(VIDEO_DRIVER_REL_PATH)/platform/common/src/msm_vidc_platform.o \

@@ -18,6 +18,7 @@ ifeq ($(TARGET_VIDC_ENABLE),true)
 VIDEO_BLD_DIR := $(shell pwd)/vendor/qcom/opensource/video-driver
 VIDEO_SELECT := CONFIG_MSM_VIDC_V4L2=m
 VIDEO_SELECT += CONFIG_MSM_VIDC_ANDROID=m
+VIDEO_SELECT += CONFIG_MSM_VIDC_LLCC=m
 
 # Build msm_video.ko
 ###########################################################

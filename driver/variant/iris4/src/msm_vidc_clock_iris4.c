@@ -7,6 +7,7 @@
 #include "perf_static_model.h"
 #include "msm_vidc_debug.h"
 #include "msm_vidc_platform.h"
+#include "msm_vidc_power_iris4.h"
 
 #define ENABLE_FINEBITRATE_SUBUHD60 0
 
@@ -387,8 +388,6 @@ static u32 get_vpp_cycles(struct api_calculation_input codec_input)
 			i = 0;
 		else if (codec_input.lcu_size <= 32)
 			i = 1;
-		else if (codec_input.lcu_size <= 64)
-			i = 3;
 		else
 			i = 2;
 	}

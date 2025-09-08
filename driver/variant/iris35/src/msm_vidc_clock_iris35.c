@@ -5,6 +5,7 @@
 
 #include "perf_static_model.h"
 #include "msm_vidc_debug.h"
+#include "msm_vidc_power_iris35.h"
 
 #define ENABLE_FINEBITRATE_SUBUHD60 0
 

@@ -330,8 +330,60 @@ static bool is_iris3_hw_power_collapsed(struct msm_vidc_core *core)
 	return pwr_status ? false : true;
 }
 
+static int __switch_gdsc_mode_iris3(struct msm_vidc_core *core, bool sw_mode)
+{
+	int rc;
+
+	if (sw_mode) {
+		rc = __write_register(core, WRAPPER_CORE_POWER_CONTROL, 0x0);
+		if (rc)
+			return rc;
+		rc = __read_register_with_poll_timeout(core, WRAPPER_CORE_POWER_STATUS,
+						       BIT(1), 0x2, 200, 2000);
+		if (rc) {
+			d_vpr_e("%s: Failed to read WRAPPER_CORE_POWER_STATUS register to 0x1\n",
+				__func__);
+			return rc;
+		}
+	} else {
+		rc = __write_register(core, WRAPPER_CORE_POWER_CONTROL, 0x1);
+		if (rc)
+			return rc;
+		rc = __read_register_with_poll_timeout(core, WRAPPER_CORE_POWER_STATUS,
+						       BIT(1), 0x0, 200, 2000);
+		if (rc) {
+			d_vpr_e("%s: Failed to read WRAPPER_CORE_POWER_STATUS register to 0x0\n",
+				__func__);
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+static int __hw_ctrl_gdsc_iris3(struct msm_vidc_core *core)
+{
+	unsigned int gdsc_hw_ctrl_flag = core->platform->data.gdsc_hw_ctrl_by_default;
+
+	if (gdsc_hw_ctrl_flag)
+		return __switch_gdsc_mode_iris3(core, false);
+
+	return call_res_op(core, gdsc_hw_ctrl, core);
+}
+
+static int __sw_ctrl_gdsc_iris3(struct msm_vidc_core *core)
+{
+	unsigned int gdsc_hw_ctrl_flag = core->platform->data.gdsc_hw_ctrl_by_default;
+
+	if (gdsc_hw_ctrl_flag)
+		return __switch_gdsc_mode_iris3(core, true);
+
+	return call_res_op(core, gdsc_sw_ctrl, core);
+}
+
 static int __power_off_iris3_hardware(struct msm_vidc_core *core)
 {
+	unsigned int gdsc_hw_ctrl_flag = core->platform->data.gdsc_hw_ctrl_by_default;
 	int rc = 0, i;
 	u32 value = 0;
 	bool pwr_collapsed = false;
@@ -345,22 +397,13 @@ static int __power_off_iris3_hardware(struct msm_vidc_core *core)
 	 */
 	if (is_core_sub_state(core, CORE_SUBSTATE_FW_PWR_CTRL)) {
 		pwr_collapsed = is_iris3_hw_power_collapsed(core);
-		if (is_core_sub_state(core, CORE_SUBSTATE_CPU_WATCHDOG) ||
-			is_core_sub_state(core, CORE_SUBSTATE_VIDEO_UNRESPONSIVE)) {
-			if (pwr_collapsed) {
-				d_vpr_e("%s: video hw power collapsed %s\n",
-					__func__, core->sub_state_name);
-				goto disable_power;
-			} else {
-				d_vpr_e("%s: video hw is power ON %s\n",
-					__func__, core->sub_state_name);
-			}
-		} else {
-			if (!pwr_collapsed)
-				d_vpr_e("%s: video hw is not power collapsed\n", __func__);
-
-			d_vpr_h("%s: disabling hw power\n", __func__);
+		if (pwr_collapsed) {
+			d_vpr_h("%s: video hw power collapsed %s\n",
+				__func__, core->sub_state_name);
 			goto disable_power;
+		} else {
+			d_vpr_e("%s: video hw is power ON %s\n",
+				__func__, core->sub_state_name);
 		}
 	}
 
@@ -427,16 +470,30 @@ static int __power_off_iris3_hardware(struct msm_vidc_core *core)
 		return rc;
 
 disable_power:
-	/* power down process */
-	rc = call_res_op(core, gdsc_off, core, "vcodec");
+	rc = __sw_ctrl_gdsc_iris3(core);
 	if (rc) {
-		d_vpr_e("%s: disable regulator vcodec failed\n", __func__);
+		d_vpr_e("%s: failed to gdsc_sw_ctrl\n", __func__);
 		rc = 0;
 	}
 
-	rc = call_res_op(core, clk_disable, core, "vcodec_clk");
+	rc = call_res_op(core, clk_disable, core, "vcodec0_core");
 	if (rc) {
 		d_vpr_e("%s: disable unprepare vcodec_clk failed\n", __func__);
+		rc = 0;
+	}
+
+	if (gdsc_hw_ctrl_flag) {
+		rc = __hw_ctrl_gdsc_iris3(core);
+		if (rc) {
+			d_vpr_e("%s: failed to gdsc_hw_ctrl\n", __func__);
+			rc = 0;
+		}
+	}
+
+	/* power down process */
+	rc = call_res_op(core, gdsc_off, core, "vcodec0");
+	if (rc) {
+		d_vpr_e("%s: disable regulator vcodec0 failed\n", __func__);
 		rc = 0;
 	}
 
@@ -505,23 +562,23 @@ static int __power_off_iris3_controller(struct msm_vidc_core *core)
 		return rc;
 
 	/* Turn off MVP MVS0C core clock */
-	rc = call_res_op(core, clk_disable, core, "core_clk");
+	rc = call_res_op(core, clk_disable, core, "core");
 	if (rc) {
-		d_vpr_e("%s: disable unprepare core_clk failed\n", __func__);
+		d_vpr_e("%s: disable unprepare core failed\n", __func__);
 		rc = 0;
 	}
 
 	/* Turn off GCC AXI clock */
-	rc = call_res_op(core, clk_disable, core, "gcc_video_axi0");
+	rc = call_res_op(core, clk_disable, core, "iface");
 	if (rc) {
-		d_vpr_e("%s: disable unprepare gcc_video_axi0 failed\n", __func__);
+		d_vpr_e("%s: disable unprepare iface failed\n", __func__);
 		rc = 0;
 	}
 
 	/* power down process */
-	rc = call_res_op(core, gdsc_off, core, "iris-ctl");
+	rc = call_res_op(core, gdsc_off, core, "venus");
 	if (rc) {
-		d_vpr_e("%s: disable regulator iris-ctl failed\n", __func__);
+		d_vpr_e("%s: disable regulator venus failed\n", __func__);
 		rc = 0;
 	}
 
@@ -569,7 +626,7 @@ static int __power_on_iris3_controller(struct msm_vidc_core *core)
 {
 	int rc = 0;
 
-	rc = call_res_op(core, gdsc_on, core, "iris-ctl");
+	rc = call_res_op(core, gdsc_on, core, "venus");
 	if (rc)
 		goto fail_regulator;
 
@@ -577,38 +634,44 @@ static int __power_on_iris3_controller(struct msm_vidc_core *core)
 	if (rc)
 		goto fail_reset_ahb2axi;
 
-	rc = call_res_op(core, clk_enable, core, "gcc_video_axi0");
+	rc = call_res_op(core, clk_enable, core, "iface");
 	if (rc)
 		goto fail_clk_axi;
 
-	rc = call_res_op(core, clk_enable, core, "core_clk");
+	rc = call_res_op(core, clk_enable, core, "core");
 	if (rc)
 		goto fail_clk_controller;
 
 	return 0;
 
 fail_clk_controller:
-	call_res_op(core, clk_disable, core, "gcc_video_axi0");
+	call_res_op(core, clk_disable, core, "iface");
 fail_clk_axi:
 fail_reset_ahb2axi:
-	call_res_op(core, gdsc_off, core, "iris-ctl");
+	call_res_op(core, gdsc_off, core, "venus");
 fail_regulator:
 	return rc;
 }
 
 static int __power_on_iris3_hardware(struct msm_vidc_core *core)
 {
+	unsigned int gdsc_hw_ctrl_flag = core->platform->data.gdsc_hw_ctrl_by_default;
 	int rc = 0;
 
-	/* When the vcodec GDSC is powered on, it moves into HW control. As it moves into HW control,
-	 * vcodec is initiated with power down sequence. Driver then requests for migrating GDSC into
-	 * sw control, which implies power up sequence for vcodec. Due to b2b switch of power off and
-	 * on for video hardware, it ends up in transient state and hungs eventually.
-	 * Writing the register explicitly to avoid power off sequence when HW control is set.
+	/*
+	 * When the vcodec GDSC is powered on and then moves into HW control. As it moves into HW
+	 * control, vcodec is initiated with power down sequence then driver requests for migrating
+	 * GDSC into sw control, which implies power up sequence for GDSC. Due to b2b switch of
+	 * power off and on for video hardware, it ends up in transient state and hungs eventually.
+	 * So Writing the register explicitly to avoid power off sequence when HW control is set.
 	 */
-	writel_relaxed(0x0, (u8 *)core->resource->register_base_addr + WRAPPER_CORE_POWER_CONTROL);
+	if (gdsc_hw_ctrl_flag) {
+		rc = __sw_ctrl_gdsc_iris3(core);
+		if (rc)
+			goto fail_regulator;
+	}
 
-	rc = call_res_op(core, gdsc_on, core, "vcodec");
+	rc = call_res_op(core, gdsc_on, core, "vcodec0");
 	if (rc)
 		goto fail_regulator;
 
@@ -617,11 +680,11 @@ static int __power_on_iris3_hardware(struct msm_vidc_core *core)
 	if (rc)
 		goto fail_power_on_substate;
 
-	rc = call_res_op(core, gdsc_sw_ctrl, core);
+	rc = __sw_ctrl_gdsc_iris3(core);
 	if (rc)
 		goto fail_sw_ctrl;
 
-	rc = call_res_op(core, clk_enable, core, "vcodec_clk");
+	rc = call_res_op(core, clk_enable, core, "vcodec0_core");
 	if (rc)
 		goto fail_clk_controller;
 
@@ -631,7 +694,7 @@ fail_clk_controller:
 	call_res_op(core, gdsc_hw_ctrl, core);
 fail_sw_ctrl:
 fail_power_on_substate:
-	call_res_op(core, gdsc_off, core, "vcodec");
+	call_res_op(core, gdsc_off, core, "vcodec0");
 fail_regulator:
 	return rc;
 }
@@ -786,47 +849,6 @@ static int __watchdog_iris3(struct msm_vidc_core *core, u32 intr_status)
 	}
 
 	return rc;
-}
-
-static int __switch_gdsc_mode_iris3(struct msm_vidc_core *core, bool sw_mode)
-{
-	int rc;
-
-	if (sw_mode) {
-		rc = __write_register(core, WRAPPER_CORE_POWER_CONTROL, 0x0);
-		if (rc)
-			return rc;
-		rc = __read_register_with_poll_timeout(core, WRAPPER_CORE_POWER_STATUS,
-						       BIT(1), 0x2, 200, 2000);
-		if (rc) {
-			d_vpr_e("%s: Failed to read WRAPPER_CORE_POWER_STATUS register to 0x1\n",
-				__func__);
-			return rc;
-		}
-	} else {
-		rc = __write_register(core, WRAPPER_CORE_POWER_CONTROL, 0x1);
-		if (rc)
-			return rc;
-		rc = __read_register_with_poll_timeout(core, WRAPPER_CORE_POWER_STATUS,
-						       BIT(1), 0x0, 200, 2000);
-		if (rc) {
-			d_vpr_e("%s: Failed to read WRAPPER_CORE_POWER_STATUS register to 0x0\n",
-				__func__);
-			return rc;
-		}
-	}
-
-	return 0;
-}
-
-static int __hw_ctrl_gdsc_iris3(struct msm_vidc_core *core)
-{
-	return call_res_op(core, gdsc_hw_ctrl, core);
-}
-
-static int __sw_ctrl_gdsc_iris3(struct msm_vidc_core *core)
-{
-	return call_res_op(core, gdsc_sw_ctrl, core);
 }
 
 static int __noc_error_info_iris3(struct msm_vidc_core *core)

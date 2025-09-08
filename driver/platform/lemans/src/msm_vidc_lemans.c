@@ -2596,29 +2596,29 @@ static struct msm_vidc_format_capability format_data_lemans = {
 
 /* name, min_kbps, max_kbps */
 static const struct bw_table lemans_bw_table[] = {
-	{ "venus-cnoc",  1000, 1000     },
-	{ "venus-ddr",   1000, 15000000 },
+	{ "cpu-cfg",     1000, 1000     },
+	{ "video-mem",   1000, 15000000 },
 	{ "venus-llcc",  1000, 15000000 },
 };
 
 /* name, hw_trigger, hw_enable */
 static struct pd_table lemans_pd_table[] = {
-	{ "iris-ctl", 0, 1 },
-	{ "vcodec",   1, 1 },
+	{ "venus",     0, 1 },
+	{ "vcodec0",   1, 1 },
 };
 
 /* name, clock id, scaling */
 static const struct clk_table lemans_clk_table[] = {
-	{ "gcc_video_axi0",         GCC_VIDEO_AXI0_CLK,     0},
-	{ "core_clk",               VIDEO_CC_MVS0C_CLK,     0},
-	{ "vcodec_clk",             VIDEO_CC_MVS0_CLK,      0},
-	{ "video_cc_mvs0_clk_src",  VIDEO_CC_MVS0_CLK_SRC,  1,
+	{ "iface",                   GCC_VIDEO_AXI0_CLK,           0},
+	{ "core",                    VIDEO_CC_MVS0C_CLK,           0},
+	{ "vcodec0_core"             VIDEO_CC_MVS0_CLK,            0},
+	{ "video_cc_mvs0_clk_src",   VIDEO_CC_MVS0_CLK_SRC,        1,
 	 (u64[]) {560000000, 533000000, 444000000, 366000000, 338000000, 240000000}, 6},
 };
 
 /* name, exclusive_release */
 static const struct clk_rst_table lemans_clk_reset_table[] = {
-	{ "video_axi_reset", 0 },
+	{ "bus", 0 },
 };
 
 /* name, llcc_id */
@@ -2777,6 +2777,7 @@ static const struct msm_vidc_platform_data lemans_data = {
 	.bw_tbl_size = ARRAY_SIZE(lemans_bw_table),
 	.pd_tbl = lemans_pd_table,
 	.pd_tbl_size = ARRAY_SIZE(lemans_pd_table),
+	.gdsc_hw_ctrl_by_default = 1,
 	.clk_tbl = lemans_clk_table,
 	.clk_tbl_size = ARRAY_SIZE(lemans_clk_table),
 	.clk_rst_tbl = lemans_clk_reset_table,
