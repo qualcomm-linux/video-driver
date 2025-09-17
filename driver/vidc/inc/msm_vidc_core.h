@@ -72,6 +72,11 @@ struct msm_vidc_core_power {
 	u64 bw_llcc;
 };
 
+enum msm_vidc_hw_version {
+	MSM_VIDC_HW_VERSION_V1 = 1, // chipset versions v1
+	MSM_VIDC_HW_VERSION_V2 = 2, // chipset versions v2
+};
+
 struct msm_vidc_core {
 	struct platform_device                *pdev;
 	struct msm_video_device                vdev[2];
@@ -140,6 +145,8 @@ struct msm_vidc_core {
 	u32                                    packet_id;
 	u32                                    sys_init_id;
 	struct msm_vidc_synx_fence_data        synx_fence_data;
+	/* hw_version: distinguish chip versions: v1, v2 */
+	enum msm_vidc_hw_version               hw_version;
 };
 
 #endif // _MSM_VIDC_CORE_H_

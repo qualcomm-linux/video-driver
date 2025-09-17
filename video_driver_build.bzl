@@ -159,6 +159,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "CONFIG_MSM_VIDC_LLCC",
             "CONFIG_MSM_VIDC_ANDROID",
             "CONFIG_MSM_VIDC_MINIDUMP",
+            "CONFIG_MSM_VIDC_DMA_IOMMU_MAPPING",
             "CONFIG_MSM_VIDC_{}".format(lunch_target.upper()),
         ]
     else:
@@ -169,6 +170,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "CONFIG_MSM_VIDC_LLCC",
             "CONFIG_MSM_VIDC_ANDROID",
             "CONFIG_MSM_VIDC_MINIDUMP",
+            "CONFIG_MSM_VIDC_DMA_IOMMU_MAPPING",
             "CONFIG_MSM_VIDC_{}".format(target.upper()),
         ]
 

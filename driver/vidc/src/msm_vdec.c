@@ -1586,7 +1586,7 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst);
+	rc = msm_vidc_set_v4l2_properties(inst, PORT_NONE);
 	if (rc)
 		goto error;
 
@@ -1893,6 +1893,10 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 		goto error;
 
 	rc = msm_vdec_set_output_properties(inst);
+	if (rc)
+		goto error;
+
+	rc = msm_vidc_set_v4l2_properties(inst, OUTPUT_PORT);
 	if (rc)
 		goto error;
 

@@ -511,7 +511,7 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 
 	{SECURE_MBPF, DEC, H264 | HEVC | VP9 | AV1, 36, 32640, 1, 32640},
 
-	{SECURE_MBPF, ENC, HEVC, 64, 32640, 1, 32640},
+	{SECURE_MBPF, ENC, CODECS_ALL, 64, 32640, 1, 32640},
 
 	{FRAME_RATE, ENC, CODECS_ALL,
 		(MINIMUM_FPS << 16), (MAXIMUM_FPS << 16),

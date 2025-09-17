@@ -3909,7 +3909,7 @@ static const struct clk_table canoe_clk_table_v2[] = {
 	 (u64[]) {850000000, 630000000, 630000000, 533000000, 444000000,
 		  420000000, 338000000, 240000000}, 8},
 	{ "video_cc_mvs0c_clk_src",     VIDEO_CC_MVS0C_CLK_SRC,     1,
-	 (u64[]) {1260000000, 1260000000, 1104000000, 800000000, 666000000,
+	 (u64[]) {1360000000, 1360000000, 1260000000, 800000000, 666000000,
 		  630000000,  507000000,  360000000}, 8},
 };
 
@@ -4345,6 +4345,7 @@ int msm_vidc_get_platform_data_canoe(struct msm_vidc_core *core)
 		core->platform->data.clk_tbl_size = ARRAY_SIZE(canoe_clk_table_v2);
 		core->platform->data.clk_corner_idx_tbl = canoe_corner_idx_tbl_v2;
 		core->platform->data.fwname = "vpu40_2v";
+		core->hw_version = MSM_VIDC_HW_VERSION_V2;
 
 		platform_cap_data = core->platform->data.inst_cap_data;
 		for (i = 0; i < core->platform->data.inst_cap_data_size; i++) {

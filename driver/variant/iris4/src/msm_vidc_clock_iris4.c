@@ -18,10 +18,19 @@ static u32 input_bitrate_fp;
  * Chipset Generation Technology: SW/FW overhead profiling
  * need update with new numbers
  */
-static u32 frequency_table_iris4[2][7] = {
-	/* //make lowsvs_D1 as invalid; */
-	{ 800, 630, 533, 444, 420, 338, 240 }, //core clk
-	{ 1360, 1260, 800, 666, 630, 507, 360 }, //Tensilica clk
+static u32 frequency_table_iris4_v1[4][7] = {
+	{  800, 630, 533, 444, 420, 338, 240 }, //VPP clk
+	{  630, 630, 533, 444, 420, 338, 240 }, //VSP clk
+	{  630, 630, 533, 444, 420, 338, 240 }, //APV clk
+	{ 1260, 1104, 800, 666, 630, 507, 360 }, //Tensilica clk
+};
+
+
+static u32 frequency_table_iris4_v2[4][8] = {
+	{  1000, 800, 630, 533, 444, 420, 338, 240 }, //VPP clk
+	{  850, 630, 630, 533, 444, 420, 338, 240 }, //VSP clk
+	{  630, 630, 630, 533, 444, 420, 338, 240 }, //APV clk
+	{ 1360, 1360, 1260, 800, 666, 630, 507, 360 }, //Tensilica clk
 };
 
 static u32 apv_encoder_ppc[2][4] = {
@@ -31,7 +40,10 @@ static u32 apv_encoder_ppc[2][4] = {
 	{800, 800, 604, 341 },
 };
 
-static u32 sw_overhead_iris4[7] = {47200, 37170, 31447, 26196, 24780, 19942, 14160 };
+static u32 sw_overhead_iris4_v1[7] = {47200, 37170, 31447, 26196, 24780, 19942, 14160 };
+
+static u32 sw_overhead_iris4_v2[8] = {59000, 47200, 37170, 31447, 26196, 24780, 19942, 14160 };
+//TurboL1, TL0, Tur, Nom, SVSL1, SVS, LowSVS, LowSVSD1
 
 #define TENSILICA_CORE_RATIO_IRIS4                                                 (15)
 
@@ -450,6 +462,11 @@ static int calculate_vsp_min_freq(struct api_calculation_input codec_input,
 	u32 allintra_bitrate_533 = 343; //@533MHz  max UHD30 or UHD60 HDR10; HEVC ONLY
 	u32 lossless_bitrate_533 = 720; //@533MHz  max 720p30 HDR10; HEVC only
 
+	//bitrate was profiled at 444MHz for legacy codec
+	//bitrate was profiled at 533 for av1
+	u32 freq_topcorner0_4bitrate = 533;
+	u32 freq_topcorner1_4bitrate = 444;
+
 	if (codec_input.codec == CODEC_APV) {
 		codec_output->vsp_min_freq = 0;
 		return 0;
@@ -467,19 +484,14 @@ static int calculate_vsp_min_freq(struct api_calculation_input codec_input,
 		codec_input.frame_height * codec_input.frame_rate;
 
 	u8 bitrate_entry = get_bitrate_entry(pixle_count); /* TODO EXTRACT */
-	u32 freq_4bitrate = (codec_input.decoder_or_encoder == CODEC_DECODER) ?
-					frequency_table_iris4[0][3] : frequency_table_iris4[0][5];
+	freq_topcorner1_4bitrate = (codec_input.decoder_or_encoder == CODEC_DECODER) ? 444 : 338;
 
 	input_bitrate_fp = ((u32)(codec_input.bitrate_mbps * 100 + 99)) / 100;
 
-	/*
-	 * bitrate was profiled at 444MHz for legacy codec
-	 * bitrate was profiled at 533MHz for av1
-	 */
-	vsp_hw_min_frequency = freq_4bitrate * input_bitrate_fp * 1000;
+	vsp_hw_min_frequency = freq_topcorner1_4bitrate * input_bitrate_fp * 1000;
 
 	if (codec_input.codec == CODEC_AV1 && bitrate_entry == 1)
-		vsp_hw_min_frequency = frequency_table_iris4[0][2] *
+		vsp_hw_min_frequency = freq_topcorner0_4bitrate *
 			input_bitrate_fp * 1000;
 
 	if (codec_input.vsp_vpp_mode == CODEC_VSPVPP_MODE_2S) {
@@ -487,11 +499,11 @@ static int calculate_vsp_min_freq(struct api_calculation_input codec_input,
 
 		if (codec_input.codec == CODEC_HEVC) {
 			if (codec_input.hierachical_layer == CODEC_GOP_LOSSLESS) {
-				vsp_hw_min_frequency = frequency_table_iris4[0][2] *
+				vsp_hw_min_frequency = freq_topcorner0_4bitrate *
 					input_bitrate_fp * 1000;
 				corner_bitrate = lossless_bitrate_533;
 			} else if (codec_input.hierachical_layer == CODEC_GOP_IONLY) {
-				vsp_hw_min_frequency = frequency_table_iris4[0][2] *
+				vsp_hw_min_frequency = freq_topcorner0_4bitrate *
 					input_bitrate_fp * 1000;
 				corner_bitrate = allintra_bitrate_533;
 			}
@@ -581,13 +593,25 @@ static int calculate_apv_freq(struct api_calculation_input codec_input,
 		fmin = worker_Fmin;
 
 	temp = fmin / 1000 / 1000;
-	len = ARRAY_SIZE(frequency_table_iris4[0]);
-	while (index < len - 1) {
-		if (temp >= frequency_table_iris4[0][index])
-			break;
-		index++;
+	if (msm_vidc_get_hw_version() == MSM_VIDC_HW_VERSION_V1) {
+		len = ARRAY_SIZE(frequency_table_iris4_v1[0]);
+		while (index < len - 1) {
+			if (temp >= frequency_table_iris4_v1[0][index])
+				break;
+			index++;
+		}
+		fmin += sw_overhead_iris4_v1[index] * codec_input.frame_rate;
 	}
-	fmin += sw_overhead_iris4[index] * codec_input.frame_rate;
+
+	if (msm_vidc_get_hw_version() == MSM_VIDC_HW_VERSION_V2) {
+		len = ARRAY_SIZE(frequency_table_iris4_v2[0]);
+		while (index < len - 2) {
+			if (temp >= frequency_table_iris4_v2[0][index])
+				break;
+			index++;
+		}
+		fmin += sw_overhead_iris4_v2[index] * codec_input.frame_rate;
+	}
 
 	fmin = (fmin + 99999) / 1000 / 1000;
 
@@ -704,13 +728,26 @@ static int calculate_vpp_min_freq(struct api_calculation_input codec_input,
 		fmin = worker_Fmin;
 
 	temp = fmin / 1000 / 1000;
-	len = ARRAY_SIZE(frequency_table_iris4[0]);
-	while (index < len - 1) {
-		if (temp >= frequency_table_iris4[0][index])
-			break;
-		index++;
+
+	if (msm_vidc_get_hw_version() == MSM_VIDC_HW_VERSION_V1) {
+		len = ARRAY_SIZE(frequency_table_iris4_v1[0]);
+		while (index < len - 1) {
+			if (temp >= frequency_table_iris4_v1[0][index])
+				break;
+			index++;
+		}
+		fmin += sw_overhead_iris4_v1[index] * codec_input.frame_rate;
 	}
-	fmin += sw_overhead_iris4[index] * codec_input.frame_rate;
+
+	if (msm_vidc_get_hw_version() == MSM_VIDC_HW_VERSION_V2) {
+		len = ARRAY_SIZE(frequency_table_iris4_v2[0]);
+		while (index < len - 2) {
+			if (temp >= frequency_table_iris4_v2[0][index])
+				break;
+			index++;
+		}
+		fmin += sw_overhead_iris4_v2[index] * codec_input.frame_rate;
+	}
 
 	fmin = (fmin + 99999) / 1000 / 1000;
 
