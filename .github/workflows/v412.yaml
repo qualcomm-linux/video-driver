@@ -9,7 +9,7 @@ on:
 
 jobs:
   iris_test:
-     runs-on:
+    runs-on:
       group: GHA-Video-Stg-SelfHosted-RG
       labels: [self-hosted, video-stg-u2404-arm64-xlrg-od-ephem]
     steps:
