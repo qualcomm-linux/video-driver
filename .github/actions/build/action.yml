@@ -40,13 +40,12 @@ runs:
           --rm \
           --user ${USER_ID}:${GROUP_ID} \
           -v ${WORKSPACE}:${USER_HOME}/workspace \
-          -v ${{ github.workspace }}/sources:${USER_HOME}/workspace/sources \
           -w ${USER_HOME}/workspace \
           --privileged \
           ${{ inputs.docker_image }} \
           bash -c "
             set -e
-
+            cd video-driver
             echo '🔄 Cloning meta-qcom...'
             rm -rf meta-qcom
             git clone https://github.com/qualcomm-linux/meta-qcom.git
@@ -57,7 +56,7 @@ runs:
               ${{ inputs.build_command }}
             '; then
               echo '❌ Initial build failed. Checking for krb5 fetch error...'
-              ERROR_LOG=\$(find build/tmp/work -name \"log.do_fetch.*\" | grep krb5 || true)
+              ERROR_LOG=\$(find ${{ github.workspace }}/build/tmp/work -name \"log.do_fetch.*\" | grep krb5 || true)
               if [[ -n \"\$ERROR_LOG\" ]]; then
                 echo '⚠️ krb5 fetch error detected. Injecting sources...'
                 mkdir -p build/downloads
@@ -81,8 +80,5 @@ runs:
 
             echo '📁 Listing built image files...'
             ls -lh build/tmp/deploy/images || echo '⚠️ No images found.'
-            echo '📦 Copying built images to host workspace...'
-            cp -r build/tmp/deploy/images $USER_HOME/workspace/meta-qcom/build/tmp/deploy/
-
           "
         echo "::endgroup::"

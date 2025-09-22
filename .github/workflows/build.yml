@@ -17,7 +17,7 @@ jobs:
   build:
     runs-on:
       group: GHA-Video-Stg-SelfHosted-RG
-      labels: [self-hosted, video-stg-u2404-x64-large-od-ephem]
+      labels: [self-hosted, video-stg-u2204-x64-large-od-ephem]
     strategy:
       fail-fast: false
       matrix:
@@ -26,19 +26,13 @@ jobs:
     steps:
       - name: Build docker image
         id: docker_build
-        uses: qualcomm-linux-stg/video-driver/.github/actions/build_docker_image@test-workflow
+        uses: qualcomm-linux-stg/video-driver/.github/actions/build_docker_image@video.qclinux.0.0
 
       - uses: actions/checkout@v4
 
       - name: Build ${{ matrix.build_matrix.machine }}
-        uses: ./.github/actions/build
+        uses: qualcomm-linux-stg/video-driver/.github/actions/build@video.qclinux.0.0
         with:
           docker_image: ${{ steps.docker_build.outputs.image_name }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: "bitbake qcom-multimedia-proprietary-image"
-
-      # - name: Upload built image as artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: built-${{ matrix.build_matrix.machine }}
-      #     path: build/tmp/deploy/images/${{ matrix.build_matrix.machine }}

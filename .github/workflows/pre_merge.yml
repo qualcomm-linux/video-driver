@@ -3,18 +3,18 @@ name: pre_merge
 run-name: Pre Merge Workflow
 on:
   workflow_dispatch:
-  push:
+  pull_request_target:
     branches:
-      - test-workflow
+      - video.qclinux.0.0
 
 jobs:
   loading:
-    uses: qualcomm-linux-stg/video-driver/.github/workflows/loading.yml@test-workflow
+    uses: qualcomm-linux-stg/video-driver/.github/workflows/loading.yml@video.qclinux.0.0
     secrets: inherit
 
   build:
     needs: loading
-    uses: qualcomm-linux-stg/video-driver/.github/workflows/build.yml@test-workflow
+    uses: qualcomm-linux-stg/video-driver/.github/workflows/build.yml@video.qclinux.0.0
     secrets: inherit
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
