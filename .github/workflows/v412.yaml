@@ -1,0 +1,52 @@
+---
+name: test_App generation
+
+on:
+  push:
+    branches:
+      - test-workflow
+  workflow_dispatch:
+
+jobs:
+  iris_test:
+     runs-on:
+      group: GHA-Video-Stg-SelfHosted-RG
+      labels: [self-hosted, video-stg-u2404-arm64-xlrg-od-ephem]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies and build iris_v4l2_test
+        run: |
+          set -x
+          rm -rf v4l-video-test-app
+          git clone https://github.com/quic/v4l-video-test-app.git
+          cd v4l-video-test-app
+          sudo apt update
+          sudo apt upgrade -y
+          sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y
+          sudo apt install -y autoconf automake build-essential cmake git wget yasm gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          aarch64-linux-gnu-gcc --version
+          aarch64-linux-gnu-g++ --version
+          which aarch64-linux-gnu-gcc
+          which aarch64-linux-gnu-g++
+
+          sed -i -e 's|set(CMAKE_C_COMPILER .*aarch64.*gcc)|set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)|' \
+                 -e 's|set(CMAKE_CXX_COMPILER .*aarch64.*g++)|set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)|' \
+                 CMakeLists.txt
+
+          cd third-parties
+          sed -i -e 's|set(CMAKE_C_COMPILER .*aarch64.*gcc)|set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)|' \
+                 -e 's|set(CMAKE_CXX_COMPILER .*aarch64.*g++)|set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)|' \
+                 aarch64_toolchain.cmake
+
+          chmod +x prepare_3p_module.sh
+          ./prepare_3p_module.sh
+
+          cd ..
+          chmod +x build.sh
+          ./build.sh
+
+          cd build/
+          chmod +x iris_v4l2_test
+          du -h iris_v4l2_test

@@ -1,0 +1,62 @@
+name: Inject IRIS App
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - test-workflow
+
+jobs:
+  inject:
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        machines: [qcs9100-ride-sx, qcs8300-ride-sx, qcs6490-rb3gen2-core-kit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download built image
+        uses: actions/download-artifact@v3
+        with:
+          name: built-${{ matrix.machines }}
+          path: ${{ github.workspace }}/images/${{ matrix.machines }}
+
+      - name: Inject IRIS app into rootfs image
+        run: |
+          ROOTFS_IMG=${{ github.workspace }}/images/${{ matrix.machines }}/rootfs.img
+          IRIS_BINARY=${{ github.workspace }}/sources/iris_v4l2_test
+
+          echo "🔧 Injecting IRIS into $ROOTFS_IMG..."
+
+          if [[ ! -f "$ROOTFS_IMG" ]]; then
+            echo "❌ rootfs.img not found at: $ROOTFS_IMG"
+            exit 1
+          fi
+
+          if [[ ! -f "$IRIS_BINARY" ]]; then
+            echo "❌ iris_v4l2_test binary not found at: $IRIS_BINARY"
+            exit 1
+          fi
+
+          mkdir -p ~/system_mount
+          if ! sudo mount -o loop "$ROOTFS_IMG" ~/system_mount; then
+            echo "⚠️ Mount failed, attempting journal recovery..."
+            sudo e2fsck -f "$ROOTFS_IMG"
+            sudo mount -o loop "$ROOTFS_IMG" ~/system_mount
+          fi
+
+          sudo mkdir -p ~/system_mount/data/vendor/iris_test_app/input
+          sudo mkdir -p ~/system_mount/data/vendor/iris_test_app/output
+          sudo cp "$IRIS_BINARY" ~/system_mount/data/vendor/iris_test_app/
+          sudo chmod +x ~/system_mount/data/vendor/iris_test_app/iris_v4l2_test
+
+          sudo umount ~/system_mount
+          rm -rf ~/system_mount
+
+      - name: Upload injected image
+        uses: actions/upload-artifact@v4
+        with:
+          name: injected-${{ matrix.machines }}
+          path: ${{ github.workspace }}/images/${{ matrix.machines }}/rootfs.img

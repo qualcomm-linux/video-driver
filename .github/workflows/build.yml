@@ -1,32 +1,44 @@
 ---
-name: Environment setup and build
+name: _build
+
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: Docker image
+        type: string
+        required: true
+      build_matrix:
+        description: Build matrix for multi target builds
+        type: string
+        required: true
 
 jobs:
-  setup-environment:
-    runs-on: self-hosted
-    steps:
-      - name: Checkout current repo
-        uses: actions/checkout@v3
-      - name: Install kas
-        run: pip3 install kas
+  build:
+    runs-on:
+      group: GHA-Video-Stg-SelfHosted-RG
+      labels: [self-hosted, video-stg-u2404-x64-large-od-ephem]
+    strategy:
+      fail-fast: false
+      matrix:
+        build_matrix: ${{ fromJson(inputs.build_matrix) }}
 
-  clone_meta_qcom:
-    needs: setup-environment
-    runs-on: self-hosted
     steps:
-      - name: Clone meta-qcom repo
-        run: |
-          git clone --depth 1 https://github.com/qualcomm-linux/meta-qcom.git -b master
-          cd meta-qcom/ci
-      - name: Install kas in meta-qcom/ci
-        run: sudo pip3 install kas
-      - name: Run kas shell and bitbake
-        run: |
-          cd meta-qcom/ci
-          kas shell qcs9100-ride-sx.yml:qcom-distro.yml
-          bitbake qcom-multimedia-proprietary-image
+      - name: Build docker image
+        id: docker_build
+        uses: qualcomm-linux-stg/video-driver/.github/actions/build_docker_image@test-workflow
+
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.build_matrix.machine }}
+        uses: ./.github/actions/build
+        with:
+          docker_image: ${{ steps.docker_build.outputs.image_name }}
+          kas_file: ${{ matrix.build_matrix.kas_file }}
+          build_command: "bitbake qcom-multimedia-proprietary-image"
+
+      # - name: Upload built image as artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: built-${{ matrix.build_matrix.machine }}
+      #     path: build/tmp/deploy/images/${{ matrix.build_matrix.machine }}

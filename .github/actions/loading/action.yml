@@ -1,0 +1,34 @@
+---
+name: Load Parameters
+description: Load parameters for the build job
+
+outputs:
+  build_matrix:
+    description: Build matrix
+    value: ${{ steps.set-matrix.outputs.build_matrix }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set build matrix
+      id: set-matrix
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const machine = path.join(process.env.GITHUB_WORKSPACE, 'ci', 'MACHINES.json');
+          let ubuntuConfig;
+          try {
+            if (!fs.existsSync(machine)) {
+              core.setFailed(`MACHINES.json not found at ${machine}`);
+              return;
+            }
+            ubuntuConfig = JSON.parse(fs.readFileSync(machine, 'utf-8'));
+          } catch (err) {
+            core.setFailed(`Failed to load or parse MACHINES.json: ${err.message}`);
+            return;
+          }
+          const build_matrix = Object.values(ubuntuConfig).map(obj => Object.fromEntries(Object.entries(obj)));
+          core.setOutput('build_matrix', JSON.stringify(build_matrix));
+          console.log("Build Matrix:", build_matrix); 
