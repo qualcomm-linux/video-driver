@@ -15,7 +15,8 @@ jobs:
 
   build:
     needs: loading
-    uses: qualcomm-linux-stg/video-driver/.github/workflows/build.yml@video.qclinux.0.0
+    uses: qualcomm-linux/video-driver/.github/workflows/build.yml@video.qclinux.0.0
+
     secrets: inherit
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
