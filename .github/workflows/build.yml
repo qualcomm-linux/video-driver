@@ -26,7 +26,7 @@ jobs:
     steps:
       - name: Build docker image
         id: docker_build
-        uses: qualcomm-linux-stg/video-driver/.github/actions/build_docker_image@video.qclinux.0.0
+        uses: qualcomm-linux/video-driver/.github/actions/build_docker_image@video.qclinux.0.0
 
       - uses: actions/checkout@v4
 
