@@ -20,4 +20,5 @@ jobs:
 
       - name: Load Parameters
         id: loading
-        uses: qualcomm-linux-stg/video-driver/.github/actions/loading@video.qclinux.0.0
+        uses: qualcomm-linux/video-driver/.github/actions/loading@video.qclinux.0.0
+
