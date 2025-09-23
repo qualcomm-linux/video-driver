@@ -9,7 +9,8 @@ on:
 
 jobs:
   loading:
-    uses: qualcomm-linux-stg/video-driver/.github/workflows/loading.yml@video.qclinux.0.0
+    uses: qualcomm-linux/video-driver/.github/workflows/loading.yml@video.qclinux.0.0
+
     secrets: inherit
 
   build:
