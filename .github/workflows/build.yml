@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build ${{ matrix.build_matrix.machine }}
-        uses: qualcomm-linux-stg/video-driver/.github/actions/build@video.qclinux.0.0
+        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.0.0
         with:
           docker_image: ${{ steps.docker_build.outputs.image_name }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
