@@ -30,6 +30,8 @@ runs:
             echo '🔄 Cloning meta-qcom...'
             rm -rf meta-qcom
             git clone https://github.com/qualcomm-linux/meta-qcom.git
+            #updating the SRCREV=auto that fetch the latest tip of the video-driver
+            sed -i 's/^SRCREV\s*=.*$/SRCREV  = "${AUTOREV}"/' meta-qcom/recipes-kernel/iris-video-module/iris-video-dlkm_git.bb
 
             echo '🚀 Running initial BitBake build...'
             if ! kas shell ${{ inputs.kas_file }} -c '
