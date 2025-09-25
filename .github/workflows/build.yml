@@ -16,8 +16,8 @@ on:
 jobs:
   build:
     runs-on:
-      group: GHA-Video-Stg-SelfHosted-RG
-      labels: [self-hosted, video-stg-u2204-x64-large-od-ephem]
+      group: GHA-video-Prd-SelfHosted-RG
+      labels: [self-hosted, video-prd-u2204-x64-large-od-ephem]
     strategy:
       fail-fast: false
       matrix:
