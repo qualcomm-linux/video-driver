@@ -10,8 +10,8 @@ on:
 jobs:
   iris_test:
     runs-on:
-      group: GHA-Video-Stg-SelfHosted-RG
-      labels: [self-hosted, video-stg-u2204-arm64-xlrg-od-ephem]
+      group: GHA-video-Prd-SelfHosted-RG
+      labels: [self-hosted, video-prd-u2204-arm64-xlrg-od-ephem]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
