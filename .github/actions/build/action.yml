@@ -1,10 +1,24 @@
 name: Build
 description: Build the project using a Docker container
 
+inputs:
+  docker_image:
+    description: Docker image to use for the build job
+    required: true
+
+  kas_file:
+    description: KAS file to use for the build job
+    required: true
+
+  build_command:
+    description: Command to run for the build
+    required: false
+    default: "bitbake core-image-base"
+
 runs:
   using: "composite"
   steps:
-    - name: Build ${{ inputs.build_type }}
+    - name: patch and Build ${{ env.machine }}
       shell: bash
       run: |
         set -e
@@ -30,9 +44,7 @@ runs:
             echo '🔄 Cloning meta-qcom...'
             rm -rf meta-qcom
             git clone https://github.com/qualcomm-linux/meta-qcom.git
-            #updating the SRCREV=auto that fetch the latest tip of the video-driver
-            sed -i 's/^SRCREV\s*=.*$/SRCREV  = "${AUTOREV}"/' meta-qcom/recipes-kernel/iris-video-module/iris-video-dlkm_git.bb
-
+            bash ci/patch_screv.sh
             echo '🚀 Running initial BitBake build...'
             if ! kas shell ${{ inputs.kas_file }} -c '
               umask 022
@@ -49,7 +61,7 @@ runs:
                   echo '🔁 Retrying BitBake build...'
                   kas shell ${{ inputs.kas_file }} -c '
                     umask 022
-                    bitbake qcom-multimedia-proprietary-image
+                    ${{ inputs.build_command }}
                   '
                 else
                   echo '❌ krb5 source files not found in sources/. Exiting.'
@@ -60,6 +72,8 @@ runs:
                 exit 1
               fi
             fi
+            echo '📍 Current working directory:'
+            pwd
 
             echo '📁 Listing built image files...'
             ls -lh build/tmp/deploy/images || echo '⚠️ No images found.'

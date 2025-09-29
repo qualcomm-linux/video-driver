@@ -5,8 +5,8 @@ inputs:
   machine:
     description: Target machine name
     required: true
-  image_dir:
-    description: Path to the built image directory
+  docker_image:
+    description: Docker image name
     required: true
 
 runs:
@@ -22,49 +22,36 @@ runs:
       run: |
         docker run --rm \
           -v ${{ github.workspace }}:/workspace \
-          -v /local/mnt/workspace/manigurr:/mnt \
           -w /workspace \
           --privileged \
-          kas_dependencies \
+          ${{ inputs.docker_image }} \
           bash -c "
             set -e
-
-            IMAGE_DIR=/workspace/${{ inputs.image_dir }}
+            workspace=${{ github.workspace }}
+            machine="${{ matrix.build_matrix.machine }}"
+            IMAGE_DIR="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
             TARGET_DIR=/workspace/images/${{ inputs.machine }}
-            ROOTFS_NAME=\$(ls \$IMAGE_DIR | grep 'qcom-multimedia-proprietary-image-${{ inputs.machine }}.*rootfs.qcomflash' | head -n 1)
-            ROOTFS_PATH=\$IMAGE_DIR/\$ROOTFS_NAME
-
-            if [[ ! -f \"\$ROOTFS_PATH\" ]]; then
-              echo '❌ Rootfs image not found: \$ROOTFS_PATH'
-              exit 1
-            fi
-
-            echo '📦 Copying image to injection workspace...'
-            mkdir -p \$TARGET_DIR
-            cp \$ROOTFS_PATH \$TARGET_DIR/rootfs.img
 
             echo '🔍 Mounting rootfs.img...'
-            mkdir -p /mnt/system_mount
-            if ! sudo mount -o loop \$TARGET_DIR/rootfs.img /mnt/system_mount; then
+            mkdir -p /tmp/rootfs
+            if ! sudo mount -o loop $TARGET_DIR/rootfs.img /tmp/rootfs; then
               echo '⚠️ Mount failed, attempting journal recovery...'
-              sudo e2fsck -f \$TARGET_DIR/rootfs.img
-              sudo mount -o loop \$TARGET_DIR/rootfs.img /mnt/system_mount
             fi
 
             echo '📁 Creating IRIS app directories...'
-            sudo mkdir -p /mnt/system_mount/data/vendor/iris_test_app/input
-            sudo mkdir -p /mnt/system_mount/data/vendor/iris_test_app/output
+            sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
+            sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/output
 
             echo '📥 Copying iris_v4l2_test binary...'
-            sudo cp /mnt/iris_v4l2_test /mnt/system_mount/data/vendor/iris_test_app/
-            sudo chmod +x /mnt/system_mount/data/vendor/iris_test_app/iris_v4l2_test
-
+            sudo cp ${{ github.workspace }}/v4l-video-test-app/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
+            sudo chmod +x /tmp/rootfs/data/vendor/iris_test_app/iris_v4l2_test
+            sync
             echo '🔍 Verifying contents...'
-            ls -l /mnt/system_mount/data/vendor/iris_test_app
+            ls -l /tmp/rootfs/data/vendor/iris_test_app
 
             echo '📤 Unmounting image...'
-            sudo umount /mnt/system_mount
-            rm -rf /mnt/system_mount
+            sudo umount /tmp/rootfs
+            rm -rf /tmp/rootfs
 
             echo '✅ IRIS injection completed for ${{ inputs.machine }}.'
           "

@@ -1,0 +1,49 @@
+---
+name: Sync Action
+description: Checks out the correct code depending on event and repo context.
+
+inputs:
+  event_name:
+    description: Event type that triggered the workflow (e.g., pull_request_target, push, workflow_call)
+    required: true
+  pr_ref:
+    description: PR branch ref (e.g., feature/my-feature)
+    required: false
+  pr_repo:
+    description: PR repo full name (e.g., org/repo or user/repo)
+    required: false
+  base_ref:
+    description: Base branch ref (e.g., master)
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout PR code (pull_request_target)
+      if: ${{ (inputs.event_name == 'pull_request_target' || inputs.event_name == 'workflow_call') && inputs.pr_ref != '' && inputs.pr_repo != '' }}
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.pr_ref }}
+        repository: ${{ inputs.pr_repo }}
+
+    - name: Checkout master (push)
+      if: ${{ (inputs.event_name == 'push' || inputs.event_name == 'workflow_call') && inputs.base_ref != '' }}
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.base_ref }}
+
+    - name: Checkout current repo and ref (Fallback)
+      if: ${{ (inputs.event_name == 'push' || inputs.event_name == 'workflow_call') && (inputs.base_ref == '' || inputs.pr_repo == '') }}
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.ref }}
+
+    - name: Checkout for workflow_dispatch
+      if: ${{ inputs.event_name == 'workflow_dispatch' }}
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.base_ref }}
