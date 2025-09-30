@@ -1,0 +1,28 @@
+---
+name: _loading
+description: Load required parameters for the subsequent jobs
+
+on:
+  workflow_call:
+    outputs:
+      build_matrix:
+        description: Build matrix
+        value: ${{ jobs.loading.outputs.build_matrix }}
+
+jobs:
+  loading:
+    runs-on: ubuntu-latest
+    outputs:
+      build_matrix: ${{ steps.loading.outputs.build_matrix }}
+    steps:
+      - name: Sync codebase
+        uses: qualcomm-linux/video-driver/.github/actions/sync@video.qclinux.0.0
+        with:
+          event_name: ${{ github.event_name }}
+          pr_ref: ${{ github.event.pull_request.head.ref }}
+          pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
+          base_ref: ${{ github.ref_name }}
+
+      - name: Load Parameters
+        id: loading
+        uses: qualcomm-linux/video-driver/.github/actions/loading@video.qclinux.0.0

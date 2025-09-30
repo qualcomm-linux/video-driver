@@ -1,0 +1,99 @@
+name: _build
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: Docker image
+        type: string
+        required: true
+      build_matrix:
+        description: Build matrix for multi target builds
+        type: string
+        required: true
+
+jobs:
+  build:
+    runs-on:
+      group: GHA-video-Prd-SelfHosted-RG
+      labels: [self-hosted, video-prd-u2204-x64-large-od-ephem]
+    strategy:
+      fail-fast: false
+      matrix:
+        build_matrix: ${{ fromJson(inputs.build_matrix) }}
+
+    steps:
+      - name: Build docker image
+        id: docker_build
+        uses: qualcomm-linux/video-driver/.github/actions/build_docker_image@video.qclinux.0.0
+
+      - name: Sync codebase
+        uses: qualcomm-linux/video-driver/.github/actions/sync@video.qclinux.0.0
+        with:
+          event_name: ${{ github.event_name }}
+          pr_ref: ${{ github.event.pull_request.head.ref }}
+          pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
+          base_ref: ${{ github.ref_name }}
+
+      - name: Build ${{ matrix.build_matrix.machine }}
+        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.0.0
+        with:
+          docker_image: ${{ steps.docker_build.outputs.image_name }}
+          kas_file: ${{ matrix.build_matrix.kas_file }}
+          build_command: "bitbake qcom-multimedia-proprietary-image"
+        env:
+          machine: ${{ matrix.build_matrix.amchine }}
+
+      - name: Generate Iris test app
+        uses: qualcomm-linux/video-driver/.github/actions/generate_iris_test_app@video.qclinux.0.0
+        with:
+          docker_image: ${{ steps.docker_build.outputs.image_name }}
+
+      - name: Inject Iris test app to rootfs
+        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.0.0
+        with:
+          docker_image: ${{ steps.docker_build.outputs.image_name }}
+          machine: ${{ matrix.build_matrix.machine }}
+
+      - name: Prepare .qcomflash files for S3 upload
+        run: |
+          set -e
+          workspace=${{ github.workspace }}
+          machine="${{ matrix.build_matrix.machine }}"
+          symlink_path="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
+          mkdir -p "$workspace/artifacts"
+          touch "$workspace/artifacts/tar_list.txt"
+          touch "$workspace/artifacts/file_list.txt"
+          find "$symlink_path" -type f -exec realpath {} \; >> "$workspace/artifacts/tar_list.txt"
+          echo "🔍 Listing files in resolved directory: $symlink_path"
+          tar -cJf "$workspace/artifacts/${machine}_qcomflash_payload.tar.gz" -T "$workspace/artifacts/tar_list.txt"
+          echo "$workspace/artifacts/${machine}_qcomflash_payload.tar.gz" >> "$workspace/artifacts/file_list.txt"
+          echo "✅ Files prepared for upload:"
+          cat "$workspace/artifacts/tar_list.txt"
+
+      - name: Upload artifacts to S3
+        id: upload-artifacts
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.0.0
+        with:
+          s3_bucket: qli-prd-video-gh-artifacts
+          local_file: ${{ github.workspace }}/artifacts/file_list.txt
+          mode: multi-upload
+        env:
+          machine: ${{ matrix.build_matrix.machine }}
+
+      - name: Clean up
+        run: |
+          rm -rf ${{ github.workspace }}/artifacts
+          rm -rf ${{ github.workspace }}/build
+          rm -f ${{ github.workspace }}/modules.tar.xz
+
+      - name: Update summary
+        if: success() || failure()
+        shell: bash
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            summary=":heavy_check_mark: Build Success for ${{ matrix.build_matrix.machine }}"
+          else
+            summary=":x: Build Failed for ${{ matrix.build_matrix.machine }}"
+          fi
+          echo -e "<details><summary><i>Build Summary</i></summary>\n${summary}\n</details>" >> $GITHUB_STEP_SUMMARY

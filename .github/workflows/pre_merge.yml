@@ -1,0 +1,22 @@
+---
+name: pre_merge
+run-name: Pre Merge Workflow
+on:
+  workflow_dispatch:
+  pull_request_target: # requiring access to base repo
+    types: [opened, synchronize, reopened]
+    branches:
+      - video.qclinux.0.0
+
+jobs:
+  loading:
+    uses: qualcomm-linux/video-driver/.github/workflows/loading.yml@video.qclinux.0.0
+    secrets: inherit
+
+  build:
+    needs: loading
+    uses: qualcomm-linux/video-driver/.github/workflows/build.yml@video.qclinux.0.0
+    secrets: inherit
+    with:
+      build_matrix: ${{ needs.loading.outputs.build_matrix }}
+      docker_image: video-image:ver.1.0

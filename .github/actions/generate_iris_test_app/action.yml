@@ -1,0 +1,75 @@
+---
+name: Build
+description: Build the project using a Docker container
+
+inputs:
+  docker_image:
+    description: Docker image name
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install tools and build iris_v4l2_test inside Docker
+      shell: bash
+      run: |
+        set -e
+        USER_ID=$(id -u)
+        GROUP_ID=$(id -g)
+        docker run \
+          --rm \
+          --user ${USER_ID}:${GROUP_ID} \
+          -v $PWD:/workspace \
+          -w /workspace \
+          --privileged \
+          ${{ inputs.docker_image }} \
+          bash -c '
+            set -e
+            echo "🔧 Installing missing build tools..."
+            sudo apt-get update
+            sudo apt-get install -y \
+              cmake \
+              gcc-aarch64-linux-gnu \
+              g++-aarch64-linux-gnu \
+              libc6-dev-arm64-cross \
+              binutils-aarch64-linux-gnu \
+              make \
+              pkg-config \
+              libtool \
+              autoconf \
+              automake \
+              libssl-dev \
+              libcurl4-openssl-dev \
+              git
+            echo "✅ Tools installed successfully."
+            echo "📦 Cloning v4l-video-test-app..."
+            rm -rf v4l-video-test-app
+            git clone https://github.com/quic/v4l-video-test-app.git
+            cd v4l-video-test-app
+            echo "🔧 Patching compiler paths..."
+            sed -i -e "s|set(CMAKE_C_COMPILER .*aarch64.*gcc)|set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)|" \
+                    -e "s|set(CMAKE_CXX_COMPILER .*aarch64.*g++)|set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)|" \
+                    CMakeLists.txt
+            cd third-parties
+            sed -i -e "s|set(CMAKE_C_COMPILER .*aarch64.*gcc)|set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)|" \
+                    -e "s|set(CMAKE_CXX_COMPILER .*aarch64.*g++)|set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)|" \
+                    aarch64_toolchain.cmake
+            echo "📦 Preparing third-party modules..."
+            chmod +x prepare_3p_module.sh
+            bash -xe ./prepare_3p_module.sh
+            cd ..
+            echo "🔨 Building iris_v4l2_test..."
+            chmod +x build.sh
+            bash -xe ./build.sh
+            echo "✅ Build completed."
+            build_path="$(pwd)/build"
+            ls -la "$build_path"
+            echo "📁 Build directory path: $build_path"
+            if [ -d "$build_path" ]; then
+              echo "📊 Disk usage for build directory:"
+              df -h "$build_path"
+            else
+              echo "❌ Build directory not found for disk usage check."
+              exit 1
+            fi
+          '
