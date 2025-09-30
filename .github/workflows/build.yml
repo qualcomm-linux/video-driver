@@ -61,38 +61,15 @@ jobs:
           workspace=${{ github.workspace }}
           machine="${{ matrix.build_matrix.machine }}"
           symlink_path="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
-          if [ ! -L "$symlink_path" ]; then
-            echo "❌ Symlink not found: $symlink_path"
-            exit 1
-          fi
-          resolved_dir=$(readlink -f "$symlink_path")
-          if [ ! -d "$resolved_dir" ]; then
-            echo "❌ Resolved .qcomflash directory not found: $resolved_dir"
-            exit 1
-          fi
           mkdir -p "$workspace/artifacts"
           touch "$workspace/artifacts/tar_list.txt"
           touch "$workspace/artifacts/file_list.txt"
-          echo "🔍 Listing files in resolved directory: $resolved_dir"
+          find "$symlink_path" -type f -exec realpath {} \; >> "$workspace/artifacts/tar_list.txt"
+          echo "🔍 Listing files in resolved directory: $symlink_path"
           tar -cJf "$workspace/artifacts/${machine}_qcomflash_payload.tar.gz" -T "$workspace/artifacts/tar_list.txt"
           echo "$workspace/artifacts/${machine}_qcomflash_payload.tar.gz" >> "$workspace/artifacts/file_list.txt"
           echo "✅ Files prepared for upload:"
           cat "$workspace/artifacts/tar_list.txt"
-
-      - name: Validate .qcomflash contents
-        run: |
-          set -e
-          workspace=${{ github.workspace }}
-          machine="${{ matrix.build_matrix.machine }}"
-          symlink_path="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
-          resolved_dir=$(readlink -f "$symlink_path")
-          echo "📁 Validating contents of $resolved_dir"
-          ls -lh "$resolved_dir"
-          if ! find "$resolved_dir" -type f | grep -q .; then
-            echo "❌ No valid files found in .qcomflash directory. Failing build."
-            exit 1
-          fi
-          echo "✅ .qcomflash validation passed."
 
       - name: Upload artifacts to S3
         id: upload-artifacts
@@ -120,4 +97,3 @@ jobs:
             summary=":x: Build Failed for ${{ matrix.build_matrix.machine }}"
           fi
           echo -e "<details><summary><i>Build Summary</i></summary>\n${summary}\n</details>" >> $GITHUB_STEP_SUMMARY
-

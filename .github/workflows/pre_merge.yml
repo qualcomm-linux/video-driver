@@ -20,4 +20,3 @@ jobs:
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
       docker_image: video-image:ver.1.0
-

@@ -1,6 +1,6 @@
 name: IRIS Injection
 description: Inject IRIS app into rootfs image
-
+ 
 inputs:
   machine:
     description: Target machine name
@@ -8,7 +8,7 @@ inputs:
   docker_image:
     description: Docker image name
     required: true
-
+ 
 runs:
   using: "composite"
   steps:
@@ -16,42 +16,47 @@ runs:
       shell: bash
       run: |
         mkdir -p ${{ github.workspace }}/images
-
+ 
     - name: Run IRIS injection in Docker
       shell: bash
       run: |
+        USER_ID=$(id -u)
+        GROUP_ID=$(id -g)
+        MACHINE="${{ inputs.machine }}"
+        image_dir="build/tmp/deploy/images/${MACHINE}/qcom-multimedia-proprietary-image-${MACHINE}.rootfs.qcomflash"
+        echo "$image_dir"
+
         docker run --rm \
-          -v ${{ github.workspace }}:/workspace \
+          --user ${USER_ID}:${GROUP_ID} \
+          -v $PWD:/workspace \
           -w /workspace \
+          -e "IMAGE_DIR=$image_dir" \
           --privileged \
           ${{ inputs.docker_image }} \
-          bash -c "
-            set -e
-            workspace=${{ github.workspace }}
-            machine="${{ matrix.build_matrix.machine }}"
-            IMAGE_DIR="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
-            TARGET_DIR=/workspace/images/${{ inputs.machine }}
-
-            echo '🔍 Mounting rootfs.img...'
+          bash -c '
+            set -eux
+ 
+            echo '📦 Checking for rootfs.img...'
+            cd $IMAGE_DIR
+            ls -larth
             mkdir -p /tmp/rootfs
-            if ! sudo mount -o loop $TARGET_DIR/rootfs.img /tmp/rootfs; then
-              echo '⚠️ Mount failed, attempting journal recovery...'
-            fi
 
+            sudo mount rootfs.img /tmp/rootfs
+ 
             echo '📁 Creating IRIS app directories...'
             sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
             sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/output
-
+ 
             echo '📥 Copying iris_v4l2_test binary...'
-            sudo cp ${{ github.workspace }}/v4l-video-test-app/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
+            sudo cp "$WORKSPACE/v4l-video-test-app/build/iris_v4l2_test" /tmp/rootfs/data/vendor/iris_test_app/
             sudo chmod +x /tmp/rootfs/data/vendor/iris_test_app/iris_v4l2_test
             sync
+ 
             echo '🔍 Verifying contents...'
             ls -l /tmp/rootfs/data/vendor/iris_test_app
-
-            echo '📤 Unmounting image...'
+ 
+            echo '📤 Unmounting image and releasing loop device...'
             sudo umount /tmp/rootfs
-            rm -rf /tmp/rootfs
-
-            echo '✅ IRIS injection completed for ${{ inputs.machine }}.'
-          "
+ 
+            echo \"✅ IRIS injection completed for \$MACHINE.\"
+          '
