@@ -24,7 +24,7 @@ inputs:
   upload_location:
     description: Upload location
     required: false
-    default: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}
+    default: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ env.machine }}/${{ github.run_id }}-${{ github.run_attempt }}
 
 outputs:
   presigned_url:
