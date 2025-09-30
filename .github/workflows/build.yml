@@ -42,7 +42,7 @@ jobs:
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: "bitbake qcom-multimedia-proprietary-image"
         env:
-          machine: ${{ matrix.build_matrix.amchine }}
+          machine: ${{ matrix.build_matrix.machine }}
 
       - name: Generate Iris test app
         uses: qualcomm-linux/video-driver/.github/actions/generate_iris_test_app@video.qclinux.0.0
@@ -78,6 +78,7 @@ jobs:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
           mode: multi-upload
+          upload_location: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}
         env:
           machine: ${{ matrix.build_matrix.machine }}
 
