@@ -44,7 +44,7 @@ runs:
             echo '🔄 Cloning meta-qcom...'
             rm -rf meta-qcom
             git clone https://github.com/qualcomm-linux/meta-qcom.git
-            bash ci/patch_screv.sh
+            bash ci/patch_srcrev.sh
             echo '🚀 Running initial BitBake build...'
             if ! kas shell ${{ inputs.kas_file }} -c '
               umask 022
