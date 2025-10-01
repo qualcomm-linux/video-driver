@@ -61,15 +61,38 @@ jobs:
           workspace=${{ github.workspace }}
           machine="${{ matrix.build_matrix.machine }}"
           symlink_path="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
+
+          if [ ! -L "$symlink_path" ]; then
+            echo "❌ Symlink not found: $symlink_path"
+            exit 1
+          fi
+
+          resolved_dir=$(readlink -f "$symlink_path")
+
+          if [ ! -d "$resolved_dir" ]; then
+            echo "❌ Resolved .qcomflash directory not found: $resolved_dir"
+            exit 1
+          fi
+          cd $resolved_dir
+          ls -larth
           mkdir -p "$workspace/artifacts"
-          touch "$workspace/artifacts/tar_list.txt"
           touch "$workspace/artifacts/file_list.txt"
-          find "$symlink_path" -type f -exec realpath {} \; >> "$workspace/artifacts/tar_list.txt"
-          echo "🔍 Listing files in resolved directory: $symlink_path"
-          tar -cJf "$workspace/artifacts/${machine}_qcomflash_payload.tar.gz" -T "$workspace/artifacts/tar_list.txt"
-          echo "$workspace/artifacts/${machine}_qcomflash_payload.tar.gz" >> "$workspace/artifacts/file_list.txt"
-          echo "✅ Files prepared for upload:"
-          cat "$workspace/artifacts/tar_list.txt"
+          touch "$workspace/artifacts/tar_list.txt"
+
+          echo "🔍 Listing files in resolved directory: $resolved_dir"
+          find "$resolved_dir" -type f -exec realpath {} \; > "$workspace/artifacts/tar_list.txt"
+
+          if [ ! -s "$workspace/artifacts/tar_list.txt" ]; then
+            echo "⚠️ No files found to archive. Skipping tarball creation."
+            exit 1
+          fi
+
+          tarball="${machine}_qcomflash_payload.tar.gz"
+          tar -cJf "$tarball" -T "$workspace/artifacts/tar_list.txt"
+          mv "$tarball" ${{ github.workspace }}
+          echo "${{ github.workspace }}/$tarball" >> "$workspace/artifacts/file_list.txt"
+
+          echo "✅ Tarball created: $tarball"
 
       - name: Upload artifacts to S3
         id: upload-artifacts
