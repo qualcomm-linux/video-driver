@@ -1,0 +1,98 @@
+name: _process_image
+
+on:
+  workflow_call:
+    inputs:
+      build_matrix:
+        description: Build matrix for multi target builds
+        type: string
+        required: true
+
+jobs:
+  process:
+    runs-on:
+      group: GHA-video-Prd-SelfHosted-RG
+      labels: [self-hosted, video-prd-u2204-x64-large-od-ephem]
+    strategy:
+      fail-fast: false
+      matrix:
+        build_matrix: ${{ fromJson(inputs.build_matrix) }}
+
+    steps:
+      - name: Build docker image
+        id: docker_build
+        uses: hasiburr-qti/video-driver/.github/actions/build_docker_image@test-mount-2
+
+      - name: Sync codebase
+        uses: hasiburr-qti/video-driver/.github/actions/sync@test-mount-2
+        with:
+          event_name: ${{ github.event_name }}
+          pr_ref: ${{ github.event.pull_request.head.ref }}
+          pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
+          base_ref: ${{ github.ref_name }}
+
+      - name: Download Build from S3
+        uses: hasiburr-qti/video-driver/.github/actions/aws_s3_helper@test-mount-2
+        with:
+          mode: download
+          s3_bucket: qli-prd-video-gh-artifacts
+          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz"
+
+      - name: Unpack the build
+        run: |
+          mkdir build
+          echo "Extracting build artifacts..."
+          tar -xvf "${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" -C build/
+          echo "Artifacts Extracted successfully."
+
+      - name: Generate Iris test app
+        uses: hasiburr-qti/video-driver/.github/actions/generate_iris_test_app@test-mount-2
+        with:
+          docker_image: ${{ steps.docker_build.outputs.image_name }}
+
+      - name: Inject Iris test app to rootfs
+        runs: |
+          ls -l build/rootfs.img
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            -e "MACHINE=${{ matrix.build_matrix.machine }}" \
+            --privileged \
+            ${{ steps.docker_build.outputs.image_name }} \
+            bash -c "
+              set -eux
+
+              cd build
+              mkdir -p /tmp/rootfs
+
+              sudo mount rootfs.img /tmp/rootfs
+              echo "Image mounted Successfully."
+  
+              sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
+              sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/output
+
+              cp /workspace/v4l-video-test-app/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
+              sudo chmod +x /tmp/rootfs/data/vendor/iris_test_app/iris_v4l2_test
+              sync
+
+              sudo umount /tmp/rootfs
+              echo \"IRIS injection completed for \$MACHINE.\"
+            "
+
+      - name: Pack build with TestApp and prepare for Upload
+        run: |
+          ls -l build/
+          mkdir -p "${{ github.workspace }}/artifacts/file_list.txt"
+          tar -cjf "${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" build/
+          echo "${{ github.workspace }}/${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" >> "${{ github.workspace }}/artifacts/file_list.txt"
+
+      - name: Upload Build to S3
+        uses: hasiburr-qti/video-driver/.github/actions/aws_s3_helper@test-mount-2
+        with:
+          mode: multi-upload
+          s3_bucket: qli-prd-video-gh-artifacts
+          local_file: ${{ github.workspace }}/artifacts/file_list.txt
+
+      - name: Cleanup
+        run: |
+          rm -rf ${{ github.workspace }}/* || true

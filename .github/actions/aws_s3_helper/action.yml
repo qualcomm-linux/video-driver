@@ -23,7 +23,8 @@ inputs:
     default: single-upload
   upload_location:
     description: Upload location
-    required: true
+    required: false
+    default: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ env.machine }}
 
 outputs:
   presigned_url:
