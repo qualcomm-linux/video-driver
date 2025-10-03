@@ -10,19 +10,19 @@ on:
 
 jobs:
   loading:
-    uses: hasiburr-qti/video-driver/.github/workflows/loading.yml@test-mount-2
+    uses: qualcomm-linux/video-driver/.github/workflows/loading.yml@video.qclinux.0.0
     secrets: inherit
 
   build:
     needs: loading
-    uses: hasiburr-qti/video-driver/.github/workflows/build.yml@test-mount-2
+    uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
   
   process_image:
     needs: [loading, build]
-    uses: hasiburr-qti/video-driver/.github/workflows/process_image.yml@test-mount-2
+    uses: ./.github/workflows/process_image.yml
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
 
