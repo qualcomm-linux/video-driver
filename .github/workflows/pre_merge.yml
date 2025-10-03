@@ -3,7 +3,7 @@ name: pre_merge
 run-name: Pre Merge Workflow
 on:
   workflow_dispatch:
-  pull_request_target: # requiring access to base repo
+  pull_request: # requiring access to base repo
     types: [opened, synchronize, reopened]
     branches:
       - video.qclinux.0.0
@@ -25,3 +25,4 @@ jobs:
     uses: hasiburr-qti/video-driver/.github/workflows/process_image.yml@test-mount-2
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
+
