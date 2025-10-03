@@ -51,7 +51,7 @@ jobs:
           docker_image: ${{ steps.docker_build.outputs.image_name }}
 
       - name: Inject Iris test app to rootfs
-        runs: |
+        run: |
           ls -l build/rootfs.img
           docker run --rm \
             -v $PWD:/workspace \
@@ -96,3 +96,4 @@ jobs:
       - name: Cleanup
         run: |
           rm -rf ${{ github.workspace }}/* || true
+
