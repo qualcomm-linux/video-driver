@@ -15,6 +15,9 @@ jobs:
     outputs:
       build_matrix: ${{ steps.loading.outputs.build_matrix }}
     steps:
+      - name: checkout
+        uses: actions/checkout@v5
+
       - name: Sync codebase
         uses: ./.github/actions/sync
         with:

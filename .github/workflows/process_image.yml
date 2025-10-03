@@ -19,6 +19,9 @@ jobs:
         build_matrix: ${{ fromJson(inputs.build_matrix) }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Build docker image
         id: docker_build
         uses: qualcomm-linux/video-driver/.github/actions/build_docker_image@video.qclinux.0.0
@@ -92,6 +95,8 @@ jobs:
           mode: multi-upload
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
+        env:
+          machine: "${{ matrix.build_matrix.machine }}/"
 
       - name: Cleanup
         run: |

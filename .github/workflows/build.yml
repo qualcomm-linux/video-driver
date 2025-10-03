@@ -19,6 +19,9 @@ jobs:
         build_matrix: ${{ fromJson(inputs.build_matrix) }}
 
     steps:
+      - name: checkout
+        uses: actions/checkout@v5
+
       - name: Build docker image
         id: docker_build
         uses: qualcomm-linux/video-driver/.github/actions/build_docker_image@video.qclinux.0.0
@@ -85,7 +88,7 @@ jobs:
           local_file: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz
           mode: single-upload
         env:
-          machine: ${{ matrix.build_matrix.machine }}
+          machine: "${{ matrix.build_matrix.machine }}/"
 
       - name: Clean up
         run: |

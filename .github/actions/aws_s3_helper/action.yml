@@ -24,7 +24,7 @@ inputs:
   upload_location:
     description: Upload location
     required: false
-    default: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ env.machine }}
+    default: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}
 
 outputs:
   presigned_url:
@@ -32,7 +32,7 @@ outputs:
     value: ${{ steps.sync-data.outputs.presigned_url }}
   s3_location:
     description: Upload location
-    value: ${{ inputs.upload_location }}
+    value: ${{ steps.sync-data.outputs.s3_location }}
 
 runs:
   using: "composite"
@@ -62,7 +62,7 @@ runs:
               if [ -f "$resolved_file" ]; then
                 filename=$(basename "$resolved_file")
                 echo "📤 Uploading $filename..."
-                aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/"$filename"
+                aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}"$filename"
                 presigned_url=$(aws s3 presign s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/"$filename" --expires-in 259200)
 
                 if [ "$first_line" = true ]; then
@@ -83,7 +83,7 @@ runs:
           single-upload)
             resolved_file=$(readlink -f "${{ inputs.local_file }}")
             filename=$(basename "$resolved_file")
-            aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/"$filename"
+            aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}"$filename"
             presigned_url=$(aws s3 presign s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/"$filename" --expires-in 259200)
             echo "presigned_url=${presigned_url}" >> "$GITHUB_OUTPUT"
             ;;
@@ -97,6 +97,10 @@ runs:
             ;;
         esac
         echo "::endgroup::"
+        if [[ "${{ inputs.mode }}" == "sigle-upload" ] || ["${{ inputs.mode }} == "multi-upload"]]; then
+          upload_loc="${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ env.machine }}"
+          echo "s3_location=$upload_loc" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Upload presigned URL manifest
       if: ${{ inputs.mode == 'multi-upload' }}
