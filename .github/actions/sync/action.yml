@@ -20,7 +20,7 @@ runs:
   using: 'composite'
   steps:
     - name: Checkout PR code (pull_request_target)
-      if: ${{ (inputs.event_name == 'pull_request_target' || inputs.event_name == 'workflow_call') && inputs.pr_ref != '' && inputs.pr_repo != '' }}
+      if: ${{ (inputs.event_name == 'pull_request_target' || inputs.event_name == 'workflow_call' || inputs.event_name == 'pull_request') && inputs.pr_ref != '' && inputs.pr_repo != '' }}
       uses: actions/checkout@v4
       with:
         fetch-depth: 0

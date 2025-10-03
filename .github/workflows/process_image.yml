@@ -24,7 +24,7 @@ jobs:
         uses: qualcomm-linux/video-driver/.github/actions/build_docker_image@video.qclinux.0.0
 
       - name: Sync codebase
-        uses: qualcomm-linux/video-driver/.github/actions/sync@video.qclinux.0.0
+        uses: ./.github/actions/sync
         with:
           event_name: ${{ github.event_name }}
           pr_ref: ${{ github.event.pull_request.head.ref }}
