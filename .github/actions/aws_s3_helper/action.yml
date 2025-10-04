@@ -97,10 +97,8 @@ runs:
             ;;
         esac
         echo "::endgroup::"
-        if [[ "${{ inputs.mode }}" == "sigle-upload" ] || ["${{ inputs.mode }} == "multi-upload"]]; then
-          upload_loc="${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ env.machine }}"
-          echo "s3_location=$upload_loc" >> "$GITHUB_OUTPUT"
-        fi
+        upload_loc="${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ env.machine }}"
+        echo "s3_location=$upload_loc" >> "$GITHUB_OUTPUT"
 
     - name: Upload presigned URL manifest
       if: ${{ inputs.mode == 'multi-upload' }}
