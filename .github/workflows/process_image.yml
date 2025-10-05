@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir build
           echo "Extracting build artifacts..."
-          tar -xvf "${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" -C build/
+          tar -xvf "${{ matrix.build_matrix.machine }}_qcomflash.tar.gz" -C build/
           echo "Artifacts Extracted successfully."
 
       - name: Generate Iris test app
