@@ -106,7 +106,7 @@ jobs:
         uses: ./.github/actions/aws_s3_helper
         with:
           s3_bucket: qli-prd-video-gh-artifacts
-          local_file: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_irisTestApp.tar.gz
+          local_file: ${{ github.workspace }}/v4l-video-test-app/${{ matrix.build_matrix.machine }}_irisTestApp.tar.gz
           mode: single-upload
         env:
           machine: "${{ matrix.build_matrix.machine }}"
