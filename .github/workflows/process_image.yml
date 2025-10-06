@@ -69,9 +69,9 @@ jobs:
 
               cd build
               mkdir -p /tmp/rootfs
-
-              sudo losetup -fP rootfs.img
-              sudo mount /dev/loopX /tmp/rootfs
+             
+              loopdev=$(sudo losetup -f --show rootfs.img)
+              sudo mount "$loopdev" /tmp/rootfs
               echo "Image mounted Successfully."
   
               sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
