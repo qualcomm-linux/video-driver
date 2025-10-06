@@ -39,7 +39,7 @@ jobs:
         with:
           mode: download
           s3_bucket: qli-prd-video-gh-artifacts
-          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/18263438439-1/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz"
+          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/18270616027-1/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz"
 
       - name: Download testApp from S3
         uses: ./.github/actions/aws_s3_helper
