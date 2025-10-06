@@ -86,7 +86,7 @@ jobs:
       - name: Pack build with TestApp and prepare for Upload
         run: |
           ls -l build/
-          mkdir -p "${{ github.workspace }}/artifacts/file_list.txt"
+          touch -p "${{ github.workspace }}/artifacts/file_list.txt"
           tar -cjf "${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" build/
           echo "${{ github.workspace }}/${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" >> "${{ github.workspace }}/artifacts/file_list.txt"
 
