@@ -21,7 +21,7 @@ jobs:
   #     build_matrix: ${{ needs.loading.outputs.build_matrix }}
   
   process_image:
-    needs: [loading, build]
+    needs: [loading]
     uses: ./.github/workflows/process_image.yml
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
