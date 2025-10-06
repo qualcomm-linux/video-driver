@@ -87,7 +87,7 @@ jobs:
               sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
               sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/output
 
-              cp /workspace/testApp/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
+              sudo cp /workspace/testApp/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
               sudo chmod +x /tmp/rootfs/data/vendor/iris_test_app/iris_v4l2_test
               sync
 
