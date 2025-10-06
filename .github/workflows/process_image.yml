@@ -39,20 +39,31 @@ jobs:
         with:
           mode: download
           s3_bucket: qli-prd-video-gh-artifacts
-          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/18270616027-1/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz"
+          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz"
+
+      - name: Download testApp from S3
+        uses: ./.github/actions/aws_s3_helper
+        with:
+          mode: download
+          s3_bucket: qli-prd-video-gh-artifacts
+          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_irisTestApp.tar.gz"
 
       - name: Unpack the build
         run: |
           mkdir build
           echo "Extracting build artifacts..."
           tar -xvf "${{ matrix.build_matrix.machine }}_qcomflash.tar.gz" -C build/
-          echo "Artifacts Extracted successfully."
+          echo "Artifacts Extracted successfully!"
           ls -l build/
 
-      - name: Generate Iris test app
-        uses: qualcomm-linux/video-driver/.github/actions/generate_iris_test_app@video.qclinux.0.0
-        with:
-          docker_image: ${{ steps.docker_build.outputs.image_name }}
+      - name: Unpack the testApp
+        run: |
+          mkdir testApp
+          echo "Extracting the testApp..."
+          tar -xvf "${{ matrix.build_matrix.machine }}_irisTestApp.tar.gz" -C testApp/
+          echo "testApp Extracted Successfully!"
+          ls -l testApp/
+          ls -l testApp/build/
 
       - name: Inject Iris test app to rootfs
         run: |
@@ -76,7 +87,7 @@ jobs:
               sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
               sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/output
 
-              cp /workspace/v4l-video-test-app/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
+              cp /workspace/testApp/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
               sudo chmod +x /tmp/rootfs/data/vendor/iris_test_app/iris_v4l2_test
               sync
 
@@ -97,7 +108,7 @@ jobs:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
         env:
-          machine: "${{ matrix.build_matrix.machine }}/"
+          machine: "${{ matrix.build_matrix.machine }}"
 
       - name: Cleanup
         run: |

@@ -62,8 +62,8 @@ runs:
               if [ -f "$resolved_file" ]; then
                 filename=$(basename "$resolved_file")
                 echo "📤 Uploading $filename..."
-                aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}"$filename"
-                presigned_url=$(aws s3 presign s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/"$filename" --expires-in 259200)
+                aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}/"$filename"
+                presigned_url=$(aws s3 presign s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}/"$filename" --expires-in 259200)
 
                 if [ "$first_line" = true ]; then
                   first_line=false
@@ -83,8 +83,8 @@ runs:
           single-upload)
             resolved_file=$(readlink -f "${{ inputs.local_file }}")
             filename=$(basename "$resolved_file")
-            aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}"$filename"
-            presigned_url=$(aws s3 presign s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/"$filename" --expires-in 259200)
+            aws s3 cp "$resolved_file" s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}/"$filename"
+            presigned_url=$(aws s3 presign s3://${{ inputs.s3_bucket }}/${{ env.UPLOAD_LOCATION }}/${{ env.machine }}/"$filename" --expires-in 259200)
             echo "presigned_url=${presigned_url}" >> "$GITHUB_OUTPUT"
             ;;
           download)

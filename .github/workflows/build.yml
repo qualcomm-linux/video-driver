@@ -80,7 +80,19 @@ jobs:
 
           echo "✅ Tarball created: $tarball"
 
-      - name: Upload artifacts to S3
+      - name: Generate Iris test app
+        uses: qualcomm-linux/video-driver/.github/actions/generate_iris_test_app@video.qclinux.0.0
+        with:
+          docker_image: ${{ steps.docker_build.outputs.image_name }}
+
+      - name: Prepare TestApp for S3 Upload
+        run: |
+          echo "Creating a tar of testApp..."
+          cd v4l-video-test-app
+          tar -cJf ${{ matrix.build_matrix.machine }}_irisTestApp.tar.gz build/
+          echo "Tar for testApp created successfully!"
+
+      - name: Upload build artifacts to S3
         id: upload-artifacts
         uses: ./.github/actions/aws_s3_helper
         with:
@@ -88,8 +100,17 @@ jobs:
           local_file: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz
           mode: single-upload
         env:
-          machine: "${{ matrix.build_matrix.machine }}/"
+          machine: "${{ matrix.build_matrix.machine }}"
 
+      - name: Upload testApp to S3
+        uses: ./.github/actions/aws_s3_helper
+        with:
+          s3_bucket: qli-prd-video-gh-artifacts
+          local_file: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_irisTestApp.tar.gz
+          mode: single-upload
+        env:
+          machine: "${{ matrix.build_matrix.machine }}"
+        
       - name: Clean up
         run: |
           rm -rf ${{ github.workspace }}/artifacts
