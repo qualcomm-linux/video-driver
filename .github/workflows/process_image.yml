@@ -49,14 +49,14 @@ jobs:
           echo "Artifacts Extracted successfully."
           ls -l build/
 
-      - name: Generate Iris test app
-        uses: qualcomm-linux/video-driver/.github/actions/generate_iris_test_app@video.qclinux.0.0
-        with:
-          docker_image: ${{ steps.docker_build.outputs.image_name }}
+      # - name: Generate Iris test app
+      #   uses: qualcomm-linux/video-driver/.github/actions/generate_iris_test_app@video.qclinux.0.0
+      #   with:
+      #     docker_image: ${{ steps.docker_build.outputs.image_name }}
 
       - name: Inject Iris test app to rootfs
         run: |
-          ls -l build/rootfs.img
+          ls -l
           file build/rootfs.img
           docker run --rm \
             -v $PWD:/workspace \
@@ -68,21 +68,19 @@ jobs:
               set -eux
 
               cd build
+              ls -l
               mkdir -p /tmp/rootfs
              
-              loopdev=$(sudo losetup -f --show rootfs.img)
-              sudo mount "$loopdev" /tmp/rootfs
-              echo "Image mounted Successfully."
+              sudo mount rootfs.img /tmp/rootfs
   
               sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
               sudo mkdir -p /tmp/rootfs/data/vendor/iris_test_app/output
 
-              cp /workspace/v4l-video-test-app/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
-              sudo chmod +x /tmp/rootfs/data/vendor/iris_test_app/iris_v4l2_test
+              # cp /workspace/v4l-video-test-app/build/iris_v4l2_test /tmp/rootfs/data/vendor/iris_test_app/
+              # sudo chmod +x /tmp/rootfs/data/vendor/iris_test_app/iris_v4l2_test
               sync
 
               sudo umount /tmp/rootfs
-              echo \"IRIS injection completed for \$MACHINE.\"
             "
 
       - name: Pack build with TestApp and prepare for Upload
