@@ -67,7 +67,7 @@ jobs:
           touch "$workspace/artifacts/tar_list.txt"
 
           echo "🔍 Listing files in resolved directory: $resolved_dir"
-          find "$resolved_dir" -type f > "$workspace/artifacts/tar_list.txt"
+          find . -type f > "$workspace/artifacts/tar_list.txt"
 
           if [ ! -s "$workspace/artifacts/tar_list.txt" ]; then
             echo "⚠️ No files found to archive. Skipping tarball creation."
