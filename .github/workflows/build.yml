@@ -34,51 +34,51 @@ jobs:
           pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
           base_ref: ${{ github.ref_name }}
 
-      - name: Build ${{ matrix.build_matrix.machine }}
-        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.0.0
-        with:
-          docker_image: ${{ steps.docker_build.outputs.image_name }}
-          kas_file: ${{ matrix.build_matrix.kas_file }}
-          build_command: "bitbake qcom-multimedia-proprietary-image"
-        env:
-          machine: ${{ matrix.build_matrix.machine }}
+      # - name: Build ${{ matrix.build_matrix.machine }}
+      #   uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.0.0
+      #   with:
+      #     docker_image: ${{ steps.docker_build.outputs.image_name }}
+      #     kas_file: ${{ matrix.build_matrix.kas_file }}
+      #     build_command: "bitbake qcom-multimedia-proprietary-image"
+      #   env:
+      #     machine: ${{ matrix.build_matrix.machine }}
 
-      - name: Prepare .qcomflash files for S3 upload
-        run: |
-          set -e
-          workspace=${{ github.workspace }}
-          machine="${{ matrix.build_matrix.machine }}"
-          symlink_path="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
+      # - name: Prepare .qcomflash files for S3 upload
+      #   run: |
+      #     set -e
+      #     workspace=${{ github.workspace }}
+      #     machine="${{ matrix.build_matrix.machine }}"
+      #     symlink_path="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
 
-          if [ ! -L "$symlink_path" ]; then
-            echo "❌ Symlink not found: $symlink_path"
-            exit 1
-          fi
+      #     if [ ! -L "$symlink_path" ]; then
+      #       echo "❌ Symlink not found: $symlink_path"
+      #       exit 1
+      #     fi
 
-          resolved_dir=$(readlink -f "$symlink_path")
+      #     resolved_dir=$(readlink -f "$symlink_path")
 
-          if [ ! -d "$resolved_dir" ]; then
-            echo "❌ Resolved .qcomflash directory not found: $resolved_dir"
-            exit 1
-          fi
-          cd $resolved_dir
-          ls -larth
-          mkdir -p "$workspace/artifacts"
-          touch "$workspace/artifacts/tar_list.txt"
+      #     if [ ! -d "$resolved_dir" ]; then
+      #       echo "❌ Resolved .qcomflash directory not found: $resolved_dir"
+      #       exit 1
+      #     fi
+      #     cd $resolved_dir
+      #     ls -larth
+      #     mkdir -p "$workspace/artifacts"
+      #     touch "$workspace/artifacts/tar_list.txt"
 
-          echo "📥 Archiving files in resolved directory: $resolved_dir"
-          find . -type f > "$workspace/artifacts/tar_list.txt"
+      #     echo "📥 Archiving files in resolved directory: $resolved_dir"
+      #     find . -type f > "$workspace/artifacts/tar_list.txt"
 
-          if [ ! -s "$workspace/artifacts/tar_list.txt" ]; then
-            echo "⚠️ No files found to archive. Skipping tarball creation."
-            exit 1
-          fi
+      #     if [ ! -s "$workspace/artifacts/tar_list.txt" ]; then
+      #       echo "⚠️ No files found to archive. Skipping tarball creation."
+      #       exit 1
+      #     fi
 
-          tarball="${machine}_qcomflash.tar.gz"
-          tar -cJf "$tarball" -T "$workspace/artifacts/tar_list.txt"
-          mv "$tarball" ${{ github.workspace }}
+      #     tarball="${machine}_qcomflash.tar.gz"
+      #     tar -cJf "$tarball" -T "$workspace/artifacts/tar_list.txt"
+      #     mv "$tarball" ${{ github.workspace }}
 
-          echo "✅ Tarball created: $tarball"
+      #     echo "✅ Tarball created: $tarball"
 
       - name: Generate Iris test app
         uses: qualcomm-linux/video-driver/.github/actions/generate_iris_test_app@video.qclinux.0.0
@@ -92,15 +92,15 @@ jobs:
           tar -cJf ${{ matrix.build_matrix.machine }}_irisTestApp.tar.gz build/
           echo "Tar for testApp created successfully!"
 
-      - name: Upload build artifacts to S3
-        id: upload-artifacts
-        uses: ./.github/actions/aws_s3_helper
-        with:
-          s3_bucket: qli-prd-video-gh-artifacts
-          local_file: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz
-          mode: single-upload
-        env:
-          machine: "${{ matrix.build_matrix.machine }}"
+      # - name: Upload build artifacts to S3
+      #   id: upload-artifacts
+      #   uses: ./.github/actions/aws_s3_helper
+      #   with:
+      #     s3_bucket: qli-prd-video-gh-artifacts
+      #     local_file: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz
+      #     mode: single-upload
+      #   env:
+      #     machine: "${{ matrix.build_matrix.machine }}"
 
       - name: Upload testApp to S3
         uses: ./.github/actions/aws_s3_helper

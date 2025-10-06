@@ -39,7 +39,7 @@ jobs:
         with:
           mode: download
           s3_bucket: qli-prd-video-gh-artifacts
-          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz"
+          download_file: "${{ github.repository_owner }}/${{ github.event.repository.name }}/18263438439-1/${{ matrix.build_matrix.machine }}/${{ matrix.build_matrix.machine }}_qcomflash.tar.gz"
 
       - name: Download testApp from S3
         uses: ./.github/actions/aws_s3_helper
@@ -97,7 +97,8 @@ jobs:
       - name: Pack build with TestApp and prepare for Upload
         run: |
           ls -l build/
-          touch -p "${{ github.workspace }}/artifacts/file_list.txt"
+          mkdir artifacts
+          touch "${{ github.workspace }}/artifacts/file_list.txt"
           tar -cjf "${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" build/
           echo "${{ github.workspace }}/${{ matrix.build_matrix.machine }}_qcomflash_payload.tar.gz" >> "${{ github.workspace }}/artifacts/file_list.txt"
 
