@@ -66,7 +66,7 @@ jobs:
           mkdir -p "$workspace/artifacts"
           touch "$workspace/artifacts/tar_list.txt"
 
-          echo "🔍 Listing files in resolved directory: $resolved_dir"
+          echo "📥 Archiving files in resolved directory: $resolved_dir"
           find . -type f > "$workspace/artifacts/tar_list.txt"
 
           if [ ! -s "$workspace/artifacts/tar_list.txt" ]; then
