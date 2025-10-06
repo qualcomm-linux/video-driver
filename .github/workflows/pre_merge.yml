@@ -13,12 +13,12 @@ jobs:
     uses: ./.github/workflows/loading.yml
     secrets: inherit
 
-  build:
-    needs: loading
-    uses: ./.github/workflows/build.yml
-    secrets: inherit
-    with:
-      build_matrix: ${{ needs.loading.outputs.build_matrix }}
+  # build:
+  #   needs: loading
+  #   uses: ./.github/workflows/build.yml
+  #   secrets: inherit
+  #   with:
+  #     build_matrix: ${{ needs.loading.outputs.build_matrix }}
   
   process_image:
     needs: [loading, build]
