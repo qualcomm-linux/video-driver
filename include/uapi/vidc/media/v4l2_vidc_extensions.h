@@ -23,6 +23,9 @@
 /* APV */
 #define V4L2_PIX_FMT_VIDC_APV                   v4l2_fourcc('A', 'P', 'V', '0')
 
+/* VVC */
+#define V4L2_PIX_FMT_VIDC_VVC                   v4l2_fourcc('V', 'V', 'C', '0')
+
 /* P210 (YCbCr 422) color format */
 #define V4L2_PIX_FMT_VIDC_P210                  v4l2_fourcc('2', '1', '0', ' ')
 
@@ -455,6 +458,40 @@ enum v4l2_mpeg_vidc_subcache_type {
 	V4L2_MPEG_VIDSC_LAYER7      = 8,
 	V4L2_MPEG_VIDSC_DEPTH0      = 9,
 	V4L2_MPEG_VIDSC_DEPTH1      = 10,
+};
+
+/* Control ID to set / get VVC profile */
+#define V4L2_CID_MPEG_VIDEO_VIDC_VVC_PROFILE                 (VIDC_BASE + 0x6C)
+enum v4l2_mpeg_video_vidc_vvc_profile {
+	V4L2_MPEG_VIDEO_VIDC_VVC_PROFILE_MAIN_10 = 0,
+	V4L2_MPEG_VIDEO_VIDC_VVC_PROFILE_MAIN_10_STILL_PICTURE = 1,
+	V4L2_MPEG_VIDEO_VIDC_VVC_PROFILE_MAIN_10_MULTILAYER = 2,
+};
+
+/* Control ID to set / get VVC level */
+#define V4L2_CID_MPEG_VIDEO_VIDC_VVC_LEVEL                   (VIDC_BASE + 0x6D)
+enum v4l2_mpeg_video_vidc_vvc_level {
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_1    = 0,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_2    = 1,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_2_1  = 2,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_3    = 3,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_3_1  = 4,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_4    = 5,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_4_1  = 6,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_5    = 7,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_5_1  = 8,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_5_2  = 9,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6    = 10,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6_1  = 11,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6_2  = 12,
+	V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6_3  = 13,
+};
+
+/* Control ID to set / get VVC tier */
+#define V4L2_CID_MPEG_VIDEO_VIDC_VVC_TIER                    (VIDC_BASE + 0x6E)
+enum v4l2_mpeg_video_vidc_vvc_tier {
+	V4L2_MPEG_VIDEO_VIDC_VVC_TIER_MAIN = 0,
+	V4L2_MPEG_VIDEO_VIDC_VVC_TIER_HIGH = 1,
 };
 
 #endif

@@ -290,8 +290,8 @@ static struct matrix_coeff_info matrix_coeff_data_alor[] = {
 
 /*
  * IRIS4-1P
- * Dec: 8kUHD30 10-bit
- * Enc: 4k60 10-bit
+ * Dec: True8k30 10-bit
+ * Enc: 8kUHD30 10-bit
  */
 
 static const struct msm_platform_core_capability core_data_alor[] = {
@@ -303,10 +303,10 @@ static const struct msm_platform_core_capability core_data_alor[] = {
 	{MAX_NUM_4K_SESSIONS, 4},
 	{MAX_NUM_8K_SESSIONS, 2},
 	{MAX_SECURE_SESSION_COUNT, 3},
-	{MAX_RT_MBPF, 129600}, /* ((7680*4320)/256)) */
+	{MAX_RT_MBPF, 138240}, /* ((8192*4320)/256)) */
 	{MAX_MBPF, 139264}, /* (4 * ((4096*2176)/256)) */
 	/* max_load 1920x1088@480fps or 3840x2176@120fps
-	 * which is greater than 7680x4320@30fps
+	 * which is greater than 8192x4320@30fps
 	 * Concurrency: UHD@30 decode + uhd@30 encode
 	 */
 	{MAX_MBPS, 3916800},
@@ -411,7 +411,7 @@ static struct msm_platform_inst_capability instance_cap_data_alor[] = {
 		0, INT_MAX, 1, DRIVER_VERSION,
 		V4L2_CID_MPEG_VIDC_DRIVER_VERSION},
 
-	{FRAME_WIDTH, DEC, CODECS_ALL, 96, 7680, 1, 1920},
+	{FRAME_WIDTH, DEC, CODECS_ALL, 96, 8192, 1, 1920},
 
 	{FRAME_WIDTH, DEC, VP9, 96, 4096, 1, 1920},
 
@@ -431,7 +431,7 @@ static struct msm_platform_inst_capability instance_cap_data_alor[] = {
 
 	{SECURE_FRAME_WIDTH, ENC, HEVC, 96, 4096, 1, 1920},
 
-	{FRAME_HEIGHT, DEC, CODECS_ALL, 96, 7680, 1, 1080},
+	{FRAME_HEIGHT, DEC, CODECS_ALL, 96, 8192, 1, 1080},
 
 	{FRAME_HEIGHT, DEC, VP9, 96, 4096, 1, 1080},
 
@@ -2924,14 +2924,14 @@ static const struct clk_table alor_clk_table[] = {
 	{ "video_cc_mvs0c_clk",         VIDEO_CC_MVS0C_CLK,         0},
 	{ "video_cc_mvs0_vpp0_clk",     VIDEO_CC_MVS0_VPP0_CLK,     0},
 	{ "video_cc_mvs0_clk_src",      VIDEO_CC_MVS0_CLK_SRC,      1,
-	 (u64[]) {800000000, 630000000, 533000000, 444000000,
-		  420000000, 338000000, 240000000}, 7},
+	 (u64[]) {970000000, 800000000, 630000000, 533000000, 444000000,
+		  420000000, 338000000, 240000000}, 8},
 	{ "video_cc_mvs0b_clk_src",     VIDEO_CC_MVS0B_CLK_SRC,     1,
-	 (u64[]) {630000000, 630000000, 533000000, 444000000,
-		  420000000, 338000000, 240000000}, 7},
+	 (u64[]) {800000000, 630000000, 630000000, 533000000, 444000000,
+		  420000000, 338000000, 240000000}, 8},
 	{ "video_cc_mvs0c_clk_src",     VIDEO_CC_MVS0C_CLK_SRC,     1,
-	 (u64[]) {1260000000, 1104000000, 800000000, 666000000,
-		  630000000,  507000000,  360000000}, 7},
+	 (u64[]) {1260000000, 1260000000, 1104000000, 800000000, 666000000,
+		  630000000,  507000000,  360000000}, 8},
 };
 
 /* name, exclusive_release */

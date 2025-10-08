@@ -15,6 +15,7 @@
 #define CODEC_VP9                               3
 #define CODEC_AV1                               4
 #define CODEC_APV                               5
+#define CODEC_VVC                               6
 
 #define CODEC_BSE_FrameFactor                   0
 #define CODEC_BSE_MBFactor                      1
@@ -171,6 +172,7 @@ struct api_calculation_input {
 	u32 vpu_ver;
 	/* one of enum video_adv_feature { .. } */
 	u32 video_adv_feature;
+	u32 ref_frame_complexity_factor;
 };
 
 struct corner_voting {
@@ -234,6 +236,11 @@ struct api_calculation_bw_output {
 
 	u32 mmu_rd_noc;
 	u32 mmu_rd_ddr;
+
+	u32 apv_bitstream_rd_noc;
+	u32 apv_bitstream_rd_ddr;
+	u32 apv_bitstream_wr_noc;
+	u32 apv_bitstream_wr_ddr;
 
 	u32 noc_bw_rd;
 	u32 noc_bw_wr;

@@ -184,6 +184,37 @@ static const char * const av1_tier[] = {
 	NULL,
 };
 
+static const char *const mpeg_vidc_vvc_profile[] = {
+	"Main 10",
+	"Main 10 Still Picture",
+	"Main 10 Multilayer",
+	NULL,
+};
+
+static const char *const mpeg_vidc_vvc_level[] = {
+	"VVC_LEVEL_1",
+	"VVC_LEVEL_2",
+	"VVC_LEVEL_2_1",
+	"VVC_LEVEL_3",
+	"VVC_LEVEL_3_1",
+	"VVC_LEVEL_4",
+	"VVC_LEVEL_4_1",
+	"VVC_LEVEL_5",
+	"VVC_LEVEL_5_1",
+	"VVC_LEVEL_5_2",
+	"VVC_LEVEL_6",
+	"VVC_LEVEL_6_1",
+	"VVC_LEVEL_6_2",
+	"VVC_LEVEL_6_3",
+	NULL,
+};
+
+static const char *const mpeg_vidc_vvc_tier[] = {
+	"VVC_TIER_MAIN",
+	"VVC_TIER_HIGH",
+	NULL,
+};
+
 static const char *const mpeg_video_vidc_ir_type[] = {
 	"Random",
 	"Cyclic",
@@ -225,6 +256,8 @@ static const char * const *msm_vidc_get_qmenu_type(
 			return mpeg_vidc_apv_profile;
 		} else if (inst->codec == MSM_VIDC_AV1) {
 			return av1_profile;
+		} else if (inst->codec == MSM_VIDC_VVC) {
+			return mpeg_vidc_vvc_profile;
 		} else {
 			i_vpr_e(inst, "%s: invalid codec type %d for cap id %d\n",
 				__func__, inst->codec, cap_id);
@@ -235,6 +268,8 @@ static const char * const *msm_vidc_get_qmenu_type(
 			return av1_level;
 		} else if (inst->codec == MSM_VIDC_APV) {
 			return mpeg_vidc_apv_level;
+		} else if (inst->codec == MSM_VIDC_VVC) {
+			return mpeg_vidc_vvc_level;
 		} else {
 			i_vpr_e(inst, "%s: invalid codec type %d for cap id %d\n",
 				__func__, inst->codec, cap_id);
@@ -242,6 +277,8 @@ static const char * const *msm_vidc_get_qmenu_type(
 		}
 	case AV1_TIER:
 		return av1_tier;
+	case VVC_TIER:
+		return mpeg_vidc_vvc_tier;
 	case IR_TYPE:
 		return mpeg_video_vidc_ir_type;
 	case INPUT_RX_FENCE_TYPE:

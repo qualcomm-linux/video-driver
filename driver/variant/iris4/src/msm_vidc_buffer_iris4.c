@@ -246,9 +246,9 @@ static u32 msm_vidc_decoder_persist_size_iris4(struct msm_vidc_inst *inst)
 		if (inst->capabilities[DRAP].value)
 			HFI_BUFFER_PERSIST_AV1D(size,
 				inst->capabilities[FRAME_WIDTH].max,
-				inst->capabilities[FRAME_HEIGHT].max, 16);
+				inst->capabilities[FRAME_HEIGHT].max, 16, rpu_enabled);
 		else
-			HFI_BUFFER_PERSIST_AV1D(size, 0, 0, 0);
+			HFI_BUFFER_PERSIST_AV1D(size, 0, 0, 0, rpu_enabled);
 	} else if (inst->codec == MSM_VIDC_APV) {
 		HFI_BUFFER_PERSIST_APVD(size);
 	}

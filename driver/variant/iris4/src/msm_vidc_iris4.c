@@ -337,7 +337,8 @@ static int __program_bootup_registers_iris4(struct msm_vidc_core *core)
 	}
 
 	/* Based on below register programming, firmware WA for canoe-v2 would be enabled */
-	if (of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2")) {
+	if (of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2")
+			|| of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v3")) {
 		rc = __write_register(core, WRAPPER_IRIS_VCODEC_VPU_WRAPPER_SPARE_0_IRIS4, 0x1);
 		if (rc)
 			return rc;
@@ -603,7 +604,7 @@ static int __power_off_iris4_hardware(struct msm_vidc_core *core)
 				__func__, core->sub_state_name);
 			goto disable_power;
 		} else {
-			d_vpr_e("%s: video hw is power ON, try power collpase hw %s\n",
+			d_vpr_h("%s: video hw is power ON, try power collpase hw %s\n",
 				__func__, core->sub_state_name);
 		}
 	}

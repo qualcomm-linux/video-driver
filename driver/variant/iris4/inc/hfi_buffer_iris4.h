@@ -1642,7 +1642,7 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 				(((8192 + 127) / 128) * ((4352 + 127) / 128) * \
 				AV1D_SIZE_BSE_COL_MV_128x128))
 
-#define HFI_BUFFER_PERSIST_AV1D(_size, max_width, max_height, total_ref_count) \
+#define HFI_BUFFER_PERSIST_AV1D(_size, max_width, max_height, total_ref_count, rpu_enabled) \
 	do { \
 		HFI_U32 comv_size; \
 		HFI_BUFFER_COMV_AV1D(comv_size, max_width, max_height, total_ref_count); \
@@ -1653,7 +1653,8 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		AV1D_NUM_FRAME_HEADERS * (SIZE_AV1D_FRAME_HEADER + \
 		2 * SIZE_AV1D_PROB_TABLE) + \
 		comv_size + HDR10_HIST_EXTRADATA_SIZE + \
-		SIZE_AV1D_METADATA * AV1D_NUM_HW_PIC_BUF), VENUS_DMA_ALIGNMENT); \
+		SIZE_AV1D_METADATA * AV1D_NUM_HW_PIC_BUF) + \
+		rpu_enabled * NUM_HW_PIC_BUF * SIZE_DOLBY_RPU_METADATA, VENUS_DMA_ALIGNMENT); \
 	} while (0)
 
 /*

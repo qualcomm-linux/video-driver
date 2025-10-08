@@ -20,10 +20,6 @@ int msm_vidc_calculate_bandwidth_iris5(struct api_calculation_input codec_input,
 				struct api_calculation_bw_output *codec_output);
 int msm_vidc_calculate_frequency_iris5(struct api_calculation_input codec_input,
 				struct api_calculation_freq_output *codec_output);
-int msm_vidc_init_codec_input_freq_iris5p(struct msm_vidc_inst *inst, u32 data_size,
-		struct api_calculation_input *codec_input);
-int msm_vidc_init_codec_input_bus_iris5p(struct msm_vidc_inst *inst,
-	struct vidc_bus_vote_data *d, struct api_calculation_input *codec_input);
 int msm_vidc_ring_buf_count_iris5(struct msm_vidc_inst *inst, u32 data_size);
 
 #endif

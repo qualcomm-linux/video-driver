@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/types.h>
@@ -233,6 +233,8 @@ u32 get_hfi_codec(struct msm_vidc_inst *inst)
 		return HFI_CODEC_DECODE_VP9;
 	case MSM_VIDC_AV1:
 		return HFI_CODEC_DECODE_AV1;
+	case MSM_VIDC_VVC:
+		return HFI_CODEC_DECODE_VVC;
 	case MSM_VIDC_MPEG2:
 		return HFI_CODEC_DECODE_MPEG2;
 	default:

@@ -90,6 +90,8 @@ static u32 en_readfactor_iris5[8] = {1000, 1500, 1750, 1875, 1000, 2000, 2000, 1
 /* 1000x */
 static u32 en_writefactor_iris5[8] = {1000, 500, 500, 500, 1000, 0, 1000, 1000};
 
+static u32 vvcd_bins_to_bits_factor = 4;  // same as HEVC and other codecs
+
 static u32 calculate_number_lcus_iris5(u32 width, u32 height, u32 lcu_size)
 {
 	u32 mbs_width = (width % lcu_size) ?
@@ -267,8 +269,11 @@ static u32 calculate_bandwidth_apv_iris5(struct api_calculation_input codec_inpu
 	codec_output->ddr_bw_rd = 0;
 	codec_output->ddr_bw_wr = 0;
 	if (codec_input.decoder_or_encoder == CODEC_DECODER) {
-		codec_output->noc_bw_rd += target_bitrate / 8;
-		codec_output->ddr_bw_rd += target_bitrate / 8;
+		codec_output->apv_bitstream_rd_ddr = target_bitrate / 8;
+		codec_output->apv_bitstream_rd_noc = target_bitrate / 8;
+
+		codec_output->noc_bw_rd += codec_output->apv_bitstream_rd_noc;
+		codec_output->ddr_bw_rd += codec_output->apv_bitstream_rd_ddr;
 
 		if (codec_input.linear_opb == 1) {
 			ubwc_tile_w = 32; ubwc_tile_h = 4;
@@ -277,45 +282,77 @@ static u32 calculate_bandwidth_apv_iris5(struct api_calculation_input codec_inpu
 					frame_height, ubwc_tile_w, ubwc_tile_h)
 					* 256 * codec_input.frame_rate + 999) / 1000 + 999) / 1000;
 			if (codec_input.format_10bpp <= 1) { //YUV420
-				codec_output->ddr_bw_wr +=
+				codec_output->opb_write_total_ddr =
+					(frame420_y_bw_no_ubwc_tile_10bpp * 3) >> 1;
+				codec_output->opb_write_total_noc =
 					(frame420_y_bw_no_ubwc_tile_10bpp * 3) >> 1;
 			} else { // YUV422
-				codec_output->ddr_bw_wr += frame420_y_bw_no_ubwc_tile_10bpp * 2;
+				codec_output->opb_write_total_ddr =
+					frame420_y_bw_no_ubwc_tile_10bpp * 2;
+				codec_output->opb_write_total_noc =
+					frame420_y_bw_no_ubwc_tile_10bpp * 2;
 			}
-			codec_output->noc_bw_wr = codec_output->ddr_bw_wr;
 		} else {
 			if (codec_input.format_10bpp <= 1) { //YUV420
-				codec_output->ddr_bw_wr +=
-					(frame420_y_bw_no_ubwc_tile_10bpp * 100
-						+ dpb_compression_factor_y - 1) /
+				codec_output->opb_write_total_ddr =
+					(frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_y - 1) /
 						dpb_compression_factor_y;
-				codec_output->ddr_bw_wr +=
-					((frame420_y_bw_no_ubwc_tile_10bpp * 100
-						+ dpb_compression_factor_cbcr - 1) /
+				codec_output->opb_write_total_ddr +=
+					((frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_cbcr - 1) /
+						dpb_compression_factor_cbcr) >> 1;
+
+				codec_output->opb_write_total_noc =
+					(frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_y - 1) /
+						dpb_compression_factor_y;
+				codec_output->opb_write_total_noc +=
+					((frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_cbcr - 1) /
 						dpb_compression_factor_cbcr) >> 1;
 			} else {//YUV422
-				codec_output->ddr_bw_wr +=
-					(frame420_y_bw_no_ubwc_tile_10bpp * 100
-						+ dpb_compression_factor_y - 1) /
+				codec_output->opb_write_total_ddr =
+					(frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_y - 1) /
 						dpb_compression_factor_y;
-				codec_output->ddr_bw_wr +=
-					(frame420_y_bw_no_ubwc_tile_10bpp * 100
-						+ dpb_compression_factor_cbcr - 1) /
+				codec_output->opb_write_total_ddr +=
+					(frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_cbcr - 1) /
+						dpb_compression_factor_cbcr;
+
+				codec_output->opb_write_total_noc =
+					(frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_y - 1) /
+						dpb_compression_factor_y;
+				codec_output->opb_write_total_noc +=
+					(frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_cbcr - 1) /
 						dpb_compression_factor_cbcr;
 			}
-			codec_output->noc_bw_wr = codec_output->ddr_bw_wr;
 		}
+		codec_output->noc_bw_wr += codec_output->opb_write_total_noc;
+		codec_output->ddr_bw_wr += codec_output->opb_write_total_ddr;
+
+		//llc BW
+		codec_output->llc_bw_rd = codec_output->noc_bw_rd - codec_output->ddr_bw_rd;
+		codec_output->llc_bw_wr = codec_output->noc_bw_wr - codec_output->ddr_bw_wr;
 	} else {
-		codec_output->noc_bw_wr += target_bitrate / 8;
-		codec_output->ddr_bw_wr += target_bitrate / 8;
+		codec_output->apv_bitstream_wr_ddr = target_bitrate / 8;
+		codec_output->apv_bitstream_wr_noc = target_bitrate / 8;
 
-		/* CR bitstream copy */
-		codec_output->noc_bw_wr += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
-		codec_output->ddr_bw_wr += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
+		/*
+		 * CR bitstream copy
+		 * CR is 1/4 of the bitstream
+		 */
+		codec_output->apv_bitstream_wr_ddr += target_bitrate / 8 / 4;
+		codec_output->apv_bitstream_wr_noc += target_bitrate / 8 / 4;
 
-		/* CB bitstream copy */
-		codec_output->noc_bw_wr += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
-		codec_output->ddr_bw_wr += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
+		codec_output->apv_bitstream_wr_ddr += target_bitrate / 8 / 4;
+		codec_output->apv_bitstream_wr_noc += target_bitrate / 8 / 4;
+
+		codec_output->noc_bw_wr += codec_output->apv_bitstream_wr_noc;
+		codec_output->ddr_bw_wr += codec_output->apv_bitstream_wr_ddr;
 
 		if (codec_input.linear_ipb == 1) {
 			ubwc_tile_w = 32; ubwc_tile_h = 4;
@@ -324,55 +361,187 @@ static u32 calculate_bandwidth_apv_iris5(struct api_calculation_input codec_inpu
 				frame_height, ubwc_tile_w, ubwc_tile_h)
 				* 256 * codec_input.frame_rate + 999) / 1000 + 999) / 1000;
 			codec_output->dpb_rd_y_noc = frame420_y_bw_no_ubwc_tile_10bpp;
-			if (codec_input.format_10bpp <= 1) {/* YUV420 */
-				codec_output->dpb_rd_crcb_noc =
-					(frame420_y_bw_no_ubwc_tile_10bpp >> 1);
-			} else {/* YUV422 */
-				codec_output->dpb_rd_crcb_noc =
-					frame420_y_bw_no_ubwc_tile_10bpp;
-			}
+
+			codec_output->dpb_rd_crcb_noc = frame420_y_bw_no_ubwc_tile_10bpp;
+
+			codec_output->dpb_rd_y_ddr = codec_output->dpb_rd_y_noc;
+			codec_output->dpb_rd_crcb_ddr = codec_output->dpb_rd_crcb_noc;
+
 			codec_output->ddr_bw_rd =
 				codec_output->dpb_rd_y_noc + codec_output->dpb_rd_crcb_noc;
 			codec_output->noc_bw_rd = codec_output->ddr_bw_rd;
-			if (codec_input.format_10bpp == 1)
-				codec_output->noc_bw_rd = (codec_output->noc_bw_rd) / 100 * 120;
-			if (codec_input.format_10bpp == 3)
-				codec_output->noc_bw_rd = (codec_output->noc_bw_rd) / 100 * 125;
 
-		} else {
-			codec_output->dpb_rd_y_noc = (frame420_y_bw_no_ubwc_tile_10bpp * 100
-						+ dpb_compression_factor_y - 1) /
-						dpb_compression_factor_y;
-			if (codec_input.format_10bpp <= 1) {/* YUV420 */
-				codec_output->dpb_rd_crcb_noc =
-					((frame420_y_bw_no_ubwc_tile_10bpp * 100
-						+ dpb_compression_factor_cbcr - 1) /
-						dpb_compression_factor_cbcr) >> 1;
-			} else {/* YUV422 format */
-				codec_output->dpb_rd_crcb_noc =
-					((frame420_y_bw_no_ubwc_tile_10bpp * 100
-						+ dpb_compression_factor_cbcr - 1) /
-						dpb_compression_factor_cbcr);
+			if (codec_input.video_adv_feature == 1) { // APVe rotation
+				if (codec_input.format_10bpp == 1) {
+					//p010 and rotation
+					codec_output->noc_bw_rd =
+						(codec_output->noc_bw_rd) / 100 * 125;
+					codec_output->dpb_rd_y_noc =
+						(codec_output->dpb_rd_y_noc) / 100 * 125;
+					codec_output->dpb_rd_crcb_noc =
+						(codec_output->dpb_rd_crcb_noc) / 100 * 125;
+				} else if (codec_input.format_10bpp == 3) { //linear_P210
+					//NO chroma up sampling (p010),
+					//but rotation with double chroma pixels
+					codec_output->noc_bw_rd =
+						(codec_output->noc_bw_rd) / 100 * 150;
+					codec_output->dpb_rd_y_noc =
+						(codec_output->noc_bw_rd) / 100 * 150;
+					codec_output->dpb_rd_crcb_noc =
+						(codec_output->noc_bw_rd) / 100 * 150;
+				}
 			}
+		} else {
+			codec_output->dpb_rd_y_noc = (frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+						dpb_compression_factor_y - 1) /
+						dpb_compression_factor_y;
+
+			codec_output->dpb_rd_crcb_noc =
+				(frame420_y_bw_no_ubwc_tile_10bpp * 100 +
+					dpb_compression_factor_cbcr - 1) /
+					dpb_compression_factor_cbcr;
+
+			codec_output->dpb_rd_y_ddr = codec_output->dpb_rd_y_noc;
+			codec_output->dpb_rd_crcb_ddr = codec_output->dpb_rd_crcb_noc;
+
 			codec_output->ddr_bw_rd = codec_output->dpb_rd_y_noc +
 						codec_output->dpb_rd_crcb_noc;
 			codec_output->noc_bw_rd = codec_output->ddr_bw_rd;
-			if (codec_input.format_10bpp == 0) /* UBWC_TP10 */
-				codec_output->noc_bw_rd = (codec_output->noc_bw_rd) / 100 * 215;
-			if (codec_input.format_10bpp == 1) /* UBWC_P010 */
-				codec_output->noc_bw_rd = (codec_output->noc_bw_rd) / 100 * 175;
-			if (codec_input.format_10bpp == 3) /* UBWCP210 */
-				codec_output->noc_bw_rd = (codec_output->noc_bw_rd) / 100 * 185;
+
+			//assume below extra NOC bw can be hit in LLCC
+			if (codec_input.video_adv_feature == 1) { // APVe rotation
+				if (codec_input.format_10bpp == 0) { //UBWC_TP10
+					/*
+					 * rotation and chroma up sampling need 3x
+					 * NOC transactions (ubwc format), no ddr with LLC
+					 */
+					codec_output->dpb_rd_y_noc =
+						(codec_output->dpb_rd_y_noc) / 100 * 300;
+					codec_output->dpb_rd_crcb_noc =
+						(codec_output->dpb_rd_crcb_noc) / 100 * 300;
+
+					codec_output->noc_bw_rd =
+						(codec_output->noc_bw_rd) / 100 * 300;
+				} else if (codec_input.format_10bpp == 1) { //UBWC_P010
+					/*
+					 * rotation and chroma up sampling need 2x
+					 * NOC transactions (ubwc format), no ddr with LLC
+					 */
+					codec_output->dpb_rd_y_noc =
+						(codec_output->dpb_rd_y_noc) / 100 * 200;
+					codec_output->dpb_rd_crcb_noc =
+						(codec_output->dpb_rd_crcb_noc) / 100 * 200;
+
+					codec_output->noc_bw_rd =
+						(codec_output->noc_bw_rd) / 100 * 200;
+				} else if (codec_input.format_10bpp == 3) { //UBWCP210
+					/*
+					 * rotation and chroma up sampling need 2x
+					 * NOC transactions (ubwc format), no ddr with LLC
+					 */
+					codec_output->dpb_rd_y_noc =
+						(codec_output->dpb_rd_y_noc) / 100 * 200;
+					codec_output->dpb_rd_crcb_noc =
+						(codec_output->dpb_rd_crcb_noc) / 100 * 200;
+
+					codec_output->noc_bw_rd =
+						(codec_output->noc_bw_rd) / 100 * 200;
+				}
+			}
 		}
 
-		/* CR bitstream copy */
-		codec_output->noc_bw_rd += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
-		codec_output->ddr_bw_rd += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
+		//CR bitstream copy
+		//CR is 1/4 of the bitstream
+		codec_output->apv_bitstream_rd_noc = target_bitrate / 8 / 4;
+		codec_output->apv_bitstream_rd_ddr = target_bitrate / 8 / 4;
 
-		/* CB bitstream copy */
-		codec_output->noc_bw_rd += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
-		codec_output->ddr_bw_rd += target_bitrate / 8 / 4;  /* CR is 1/4 of the bitstream */
+		//CB bitstream copy
+		codec_output->apv_bitstream_rd_noc += target_bitrate / 8 / 4;
+		codec_output->apv_bitstream_rd_ddr += target_bitrate / 8 / 4;
+
+		codec_output->noc_bw_rd += codec_output->apv_bitstream_rd_noc;
+		codec_output->ddr_bw_rd += codec_output->apv_bitstream_rd_ddr;
+
+		//llc BW
+		codec_output->llc_bw_rd = codec_output->noc_bw_rd - codec_output->ddr_bw_rd;
+		codec_output->llc_bw_wr = codec_output->noc_bw_wr - codec_output->ddr_bw_wr;
 	}
+	return 0;
+}
+
+static u32 calculate_bandwidth_vvcd(struct api_calculation_input codec_input, u32 *p_vvc_bse_bw)
+{
+	u32 vvcd_small_traffic_vsp;
+	u32 dec_vvc_fe_left_lb_alf_ctrl; // FE_LEFT_LINE_BUF_CTRL_ALF
+	u32 dec_vvc_fe_left_lb_alf_lcbcr; // FE_LEFT_LINE_BUF_CTRL_ALF
+	u8 num_slice_assumption = 12; // reasonable assumption encoder <12;
+	u32 dec_vvc_profile_tier_level = 1056; // Byte per sequency
+	u32 dec_vvc_ols_timing_hdr = 544; // Byte per sequency
+	u32 dec_vvc_dpb_parameter = 64; // Byte per sequency
+	u32 dec_vvc_vps_output_layer = 2080; // Byte per sequency
+	u32 dec_vvc_subpic_info = 1280; // Byte per sequency
+	u32 dec_vvc_subpic_id = 2560; // Byte per sequency
+	u32 dec_vvc_scaling_list = 2048; // Bytes per picture
+	u32 dec_vvc_chroma_qp_table = 256; // Bytes per picture
+	u32 dec_vvc_weighted_pred_table = 256; // Bytes per slice
+	u32 dec_vvc_alf_aps = 512; // Bytes per slice
+	u32 dec_vvc_slice_hdr = 64; // Bytes per slice
+	u32 dec_vvc_rect_slice_info = 800; //Bytes per slice
+
+	if (codec_input.lcu_size == 128) {
+		*(p_vvc_bse_bw++) = 128;  //lcu size
+		*(p_vvc_bse_bw++) = (32 * 2) * (128 / 8) * (128 / 8) / 8;   //2048Byte  collocated
+		*(p_vvc_bse_bw++) = 104;  // llc efficiency
+		*(p_vvc_bse_bw++) = 4 * 128 / 8;  // bse tlb
+	} else if (codec_input.lcu_size == 64) {
+		*(p_vvc_bse_bw++) = 64;
+		*(p_vvc_bse_bw++) = (32 * 2) * (64 / 8) * (64 / 8) / 8;   //512Byte
+		*(p_vvc_bse_bw++) = 107;
+		*(p_vvc_bse_bw++) = 2 * 128 / 8;
+	} else if (codec_input.lcu_size == 32) {
+		*(p_vvc_bse_bw++) = 32;
+		*(p_vvc_bse_bw++) = (32 * 2) * (32 / 8) * (32 / 8) / 8;   //128Byte
+		*(p_vvc_bse_bw++) = 114;
+		*(p_vvc_bse_bw++) = 1 * 128 / 8;
+	}
+
+	if (codec_input.frame_width * codec_input.frame_height > 4096 * 2160)
+		num_slice_assumption = 12;
+	else if (codec_input.frame_width * codec_input.frame_height > 1920 * 1080)
+		num_slice_assumption = 6;
+	else
+		num_slice_assumption = 4;
+
+
+	vvcd_small_traffic_vsp += dec_vvc_profile_tier_level;
+
+	vvcd_small_traffic_vsp += dec_vvc_ols_timing_hdr;
+
+	vvcd_small_traffic_vsp += dec_vvc_dpb_parameter;
+
+	vvcd_small_traffic_vsp += dec_vvc_vps_output_layer;
+
+	vvcd_small_traffic_vsp += dec_vvc_subpic_info;
+
+	vvcd_small_traffic_vsp += dec_vvc_subpic_id;
+
+	vvcd_small_traffic_vsp += (dec_vvc_scaling_list +
+		dec_vvc_chroma_qp_table) * codec_input.frame_rate;
+
+
+	vvcd_small_traffic_vsp += (dec_vvc_weighted_pred_table + dec_vvc_alf_aps +
+				dec_vvc_slice_hdr + dec_vvc_rect_slice_info) *
+				num_slice_assumption * codec_input.frame_rate;
+
+	*(p_vvc_bse_bw++) = vvcd_small_traffic_vsp;
+
+	dec_vvc_fe_left_lb_alf_ctrl =
+		(codec_input.frame_height / codec_input.lcu_size + 1) * 80 * 3;
+	dec_vvc_fe_left_lb_alf_lcbcr =
+		(codec_input.frame_height / codec_input.lcu_size + 1) * 80 * 4*2;
+
+	*(p_vvc_bse_bw++) = (dec_vvc_fe_left_lb_alf_lcbcr +
+			dec_vvc_fe_left_lb_alf_ctrl) * codec_input.frame_rate;
 	return 0;
 }
 
@@ -428,6 +597,8 @@ static int calculate_bandwidth_decoder_iris5(
 	u32 bse_tlb_byte_per_lcu = 0;
 
 	u32 large_bw_calculation_fp = 0;
+	u32 vvcd_small_traffic_vsp;
+	u32 vvcd_lb_traffic_vpp;
 
 	u8 llc_enabled_ref_y_rd = (codec_input.status_llc_onoff) ? 1 : 0;
 	u8 llc_enable_ref_crcb_rd = (codec_input.status_llc_onoff) ? 1 : 0;
@@ -441,7 +612,21 @@ static int calculate_bandwidth_decoder_iris5(
 
 	frame_width = codec_input.frame_width;
 	frame_height = codec_input.frame_height;
-	if ((codec_input.codec == CODEC_H264) ||
+
+	if (codec_input.codec == CODEC_VVC) {
+		u32 vvc_bse_bw[6];
+
+		calculate_bandwidth_vvcd(codec_input, vvc_bse_bw);
+		frame_lcu_size = vvc_bse_bw[0];
+		collocated_bytes_per_lcu = vvc_bse_bw[1];
+		llc_saving = vvc_bse_bw[2];
+		bse_tlb_byte_per_lcu = vvc_bse_bw[3];
+		vvcd_small_traffic_vsp = vvc_bse_bw[4];
+		vvcd_lb_traffic_vpp = vvc_bse_bw[5];
+
+		bins_to_bits_factor = vvcd_bins_to_bits_factor;
+		decoder_vsp_read_factor = bins_to_bits_factor + 2;
+	} else if ((codec_input.codec == CODEC_H264) ||
 		(codec_input.codec == CODEC_H264_CAVLC)) {
 		frame_lcu_size = 16;
 		collocated_bytes_per_lcu = 16;
@@ -523,7 +708,19 @@ static int calculate_bandwidth_decoder_iris5(
 		(codec_input.complexity_setting == 0) ?
 		400 : ((codec_input.complexity_setting == 1) ? 266 : 100);
 
+	/*
+	 * VVC with large L1 cache, PWC reference comlexity NOT going beyond 400
+	 * VVC vs HEVC, average BW increase because of BDOF, DMVR; but <20%; here assume 15%
+	 */
+	if (codec_input.codec == CODEC_VVC)
+		decoder_frame_complexity_factor =
+			(codec_input.complexity_setting == 0) ?
+				400 : ((codec_input.complexity_setting == 1) ? 300 : 115);
+
 	reconstructed_write_bw_factor_rd = (codec_input.complexity_setting == 0) ? 105 : 100;
+
+	if (codec_input.video_adv_feature == 3) // take real HW L1 cache miss ratio
+		decoder_frame_complexity_factor = codec_input.ref_frame_complexity_factor;
 
 	reference_y_read_bw_factor = llc_saving;
 
@@ -787,6 +984,16 @@ static int calculate_bandwidth_decoder_iris5(
 		codec_output->ddr_bw_rd += codec_output->statistics_rd_ddr;
 		codec_output->noc_bw_wr += codec_output->statistics_wr_noc;
 		codec_output->ddr_bw_wr += codec_output->statistics_wr_ddr;
+	} else if (codec_input.codec == CODEC_VVC) {
+		//non cacheable small streaming client and LB traffic
+		codec_output->noc_bw_rd +=
+			(vvcd_small_traffic_vsp + vvcd_lb_traffic_vpp) / 1000 / 1000;
+		codec_output->ddr_bw_rd +=
+			(vvcd_small_traffic_vsp + vvcd_lb_traffic_vpp) / 1000 / 1000;
+		codec_output->noc_bw_wr +=
+			(vvcd_small_traffic_vsp + vvcd_lb_traffic_vpp) / 1000 / 1000;
+		codec_output->ddr_bw_wr +=
+			(vvcd_small_traffic_vsp + vvcd_lb_traffic_vpp) / 1000 / 1000;
 	}
 
 	codec_output->mmu_rd_ddr = 0;
@@ -794,6 +1001,10 @@ static int calculate_bandwidth_decoder_iris5(
 	/* accumulation */
 	codec_output->noc_bw_rd += codec_output->mmu_rd_noc;
 	codec_output->ddr_bw_rd += codec_output->mmu_rd_ddr;
+
+	//llc BW
+	codec_output->llc_bw_rd = codec_output->noc_bw_rd - codec_output->ddr_bw_rd;
+	codec_output->llc_bw_wr = codec_output->noc_bw_wr - codec_output->ddr_bw_wr;
 
 	return 0;
 }
@@ -849,6 +1060,11 @@ static int calculate_bandwidth_encoder_iris5(
 	u32 en_P_h_search_range = 192;
 	u32 en_B_2REFP_tilesize = 768;
 	u32 en_B_2REFP_h_search_range = 96;
+
+	u32 en_P_tilesize_newmode = 768;
+	u32 en_P_h_search_range_newmode = 288;
+	u32 en_B_2REFP_tilesize_newmode = 576;
+	u32 en_B_2REFP_h_search_range_newmode = 192;
 
 	/*H265D BSE tlb in LLC will be pored in Kailua */
 	u8 llc_enabled_bse_tlb = (codec_input.status_llc_onoff) ? 1 : 0;
@@ -910,14 +1126,27 @@ static int calculate_bandwidth_encoder_iris5(
 	ipb_compression_factor = compression_factor_iris5.ipb_cr;
 
 	if (codec_input.hierachical_layer == CODEC_GOP_IPP) {
-		en_vertical_tiles_width = en_P_tilesize;
-		en_search_windows_size_horizontal = en_P_h_search_range;
+		if (codec_input.video_adv_feature == 2) {
+			en_vertical_tiles_width = en_P_tilesize_newmode;
+			en_search_windows_size_horizontal = en_P_h_search_range_newmode;
+		} else {
+			en_vertical_tiles_width = en_P_tilesize;
+			en_search_windows_size_horizontal = en_P_h_search_range;
+		}
 	} else if (codec_input.hierachical_layer >= CODEC_GOP_IbP &&
 				codec_input.hierachical_layer <= CODEC_GOP_I3B4b1P) {
-		en_vertical_tiles_width = en_B_2REFP_tilesize;
-		en_search_windows_size_horizontal = (en_B_2REFP_h_search_range
-							+ en_P_h_search_range) >> 1;
+		if (codec_input.video_adv_feature == 2) {
+			en_vertical_tiles_width = en_B_2REFP_tilesize_newmode;
+			en_search_windows_size_horizontal =
+					(en_B_2REFP_h_search_range_newmode
+						+ en_P_h_search_range_newmode) >> 1;
+		} else {
+			en_vertical_tiles_width = en_B_2REFP_tilesize;
+			en_search_windows_size_horizontal = (en_B_2REFP_h_search_range
+								+ en_P_h_search_range) >> 1;
+		}
 	}
+
 	en_tile_number = (frame_width % en_vertical_tiles_width) ?
 		((frame_width / en_vertical_tiles_width) + 1) :
 		(frame_width / en_vertical_tiles_width);
@@ -934,6 +1163,9 @@ static int calculate_bandwidth_encoder_iris5(
 		ubwc_tile_w + (frame_width - 1)) / frame_width + 100;
 
 	reference_crcb_read_bw_factor = 150;
+
+	if (codec_input.video_adv_feature == 3) // take real HW L1 cache miss ratio
+		reference_crcb_read_bw_factor = codec_input.ref_frame_complexity_factor;
 
 	codec_output->noc_bw_rd = 0;
 	codec_output->noc_bw_wr = 0;
@@ -1190,6 +1422,10 @@ static int calculate_bandwidth_encoder_iris5(
 	codec_output->noc_bw_rd += codec_output->mmu_rd_noc;
 	codec_output->ddr_bw_rd += codec_output->mmu_rd_ddr;
 
+	//llc BW
+	codec_output->llc_bw_rd = codec_output->noc_bw_rd - codec_output->ddr_bw_rd;
+	codec_output->llc_bw_wr = codec_output->noc_bw_wr - codec_output->ddr_bw_wr;
+
 	return 0;
 }
 
@@ -1210,11 +1446,19 @@ int msm_vidc_calculate_bandwidth_iris5(struct api_calculation_input codec_input,
 		d_vpr_e("%s: invalid codec %u\n", __func__, codec_input.decoder_or_encoder);
 		return -EINVAL;
 	}
+
 	if (codec_input.hierachical_layer == CODEC_GOP_IONLY ||
 		codec_input.hierachical_layer == CODEC_GOP_LOSSLESS) {
-		codec_output->noc_bw_rd =
-			codec_output->vsp_read_noc + codec_output->ipb_rd_total_noc;
+		codec_output->noc_bw_rd = codec_output->vsp_read_noc;
+
+		if (codec_input.decoder_or_encoder == CODEC_ENCODER)
+			codec_output->noc_bw_rd += codec_output->ipb_rd_total_noc;
+
 		codec_output->noc_bw_wr = codec_output->vsp_write_noc;
+
+		if (codec_input.decoder_or_encoder == CODEC_DECODER)
+			codec_output->noc_bw_wr += codec_output->dpb_wr_noc;
+
 		codec_output->ddr_bw_rd = codec_output->noc_bw_rd;
 		codec_output->ddr_bw_wr = codec_output->noc_bw_wr;
 	}

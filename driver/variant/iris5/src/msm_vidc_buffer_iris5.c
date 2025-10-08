@@ -53,6 +53,9 @@ static u32 msm_vidc_decoder_bin_size_iris5(struct msm_vidc_inst *inst)
 	else if (inst->codec == MSM_VIDC_AV1)
 		HFI_BUFFER_BIN_AV1D(size, width, height, is_interlaced,
 			0, num_vpp_pipes);
+	else if (inst->codec == MSM_VIDC_VVC)
+		HFI_BUFFER_BIN_H266D(size, width, height,
+			vpp_delay, num_vpp_pipes);
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
 }
@@ -105,6 +108,8 @@ static u32 msm_vidc_decoder_comv_size_iris5(struct msm_vidc_inst *inst)
 			size = 0;
 		else
 			HFI_BUFFER_COMV_AV1D(size, width, height, num_comv);
+	} else if (inst->codec == MSM_VIDC_VVC) {
+		HFI_BUFFER_COMV_H266D(size, width, height, num_comv);
 	}
 
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
@@ -130,6 +135,8 @@ static u32 msm_vidc_decoder_non_comv_size_iris5(struct msm_vidc_inst *inst)
 		HFI_BUFFER_NON_COMV_H264D(size, width, height, num_vpp_pipes);
 	else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC)
 		HFI_BUFFER_NON_COMV_H265D(size, width, height, num_vpp_pipes);
+	else if (inst->codec == MSM_VIDC_VVC)
+		HFI_BUFFER_NON_COMV_H266D(size, width, height, num_vpp_pipes);
 
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
@@ -199,6 +206,14 @@ static u32 msm_vidc_decoder_line_size_iris5(struct msm_vidc_inst *inst)
 			HFI_BUFFER_LINE_AV1D_IRIS5(size, width, height, is_opb,
 						num_vpp_pipes);
 		}
+	} else if (inst->codec == MSM_VIDC_VVC) {
+		if (inst->capabilities[SCALE_ENABLE].value) {
+			HFI_BUFFER_LINE_H266D_DS(size, width, height,
+					ds_width, ds_height, is_opb, num_vpp_pipes);
+		} else {
+			HFI_BUFFER_LINE_H266D(size, width, height, is_opb,
+						num_vpp_pipes);
+		}
 	}
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
@@ -251,6 +266,8 @@ static u32 msm_vidc_decoder_persist_size_iris5(struct msm_vidc_inst *inst)
 			HFI_BUFFER_PERSIST_AV1D(size, 0, 0, 0);
 	} else if (inst->codec == MSM_VIDC_APV) {
 		HFI_BUFFER_PERSIST_APVD(size);
+	} else if (inst->codec == MSM_VIDC_VVC) {
+		HFI_BUFFER_PERSIST_H266D(size, rpu_enabled);
 	}
 
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);

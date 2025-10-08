@@ -4011,6 +4011,9 @@ int msm_vidc_session_set_default_header(struct msm_vidc_inst *inst)
 	int rc = 0;
 	u32 default_header = false;
 
+	if (inst->codec == MSM_VIDC_VVC)
+		return 0;
+
 	default_header = inst->capabilities[DEFAULT_HEADER].value;
 	i_vpr_h(inst, "%s: default header: %d", __func__, default_header);
 	rc = venus_hfi_session_property(inst,
@@ -5643,6 +5646,7 @@ static const char *get_codec_str(enum msm_vidc_codec_type type)
 	case MSM_VIDC_AV1:  return " av1";
 	case MSM_VIDC_HEIC: return "heic";
 	case MSM_VIDC_MPEG2: return "mpeg2";
+	case MSM_VIDC_VVC:  return " vvc";
 	}
 
 	return "....";

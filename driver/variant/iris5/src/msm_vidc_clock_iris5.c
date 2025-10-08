@@ -17,36 +17,41 @@ static u32 input_bitrate_fp_iris5;
  * Chipset Generation Technology: SW/FW overhead profiling
  * need update with new numbers
  */
-static u32 frequency_table_iris5[2][7] = {
-	/* make lowsvs_D1 as invalid; */
-	{ 800, 630, 533, 444, 420, 338, 240 }, //core clk
-	{ 1360, 1260, 800, 666, 630, 507, 360 }, //Tensilica clk
+static u32 frequency_table_iris5[4][9] = {
+	{  826, 714, 630, 533, 444, 420, 338, 240, 150 }, //VPP clk
+	{  710, 667, 630, 533, 444, 420, 338, 240, 150 }, //VSP clk
+	{  710, 710, 630, 533, 444, 420, 338, 240, 150 }, //APV clk
+	{ 1170, 1060, 928, 782, 634, 557, 430, 360, 225 }, //Tensilica clk
+	//{ 600, 600, 533, 403, 403, 300, 200, Pending, Pending}, //AXI clk
 };
 
 static u32 apv_encoder_ppc_iris5[2][4] = {
-	/* ubwc  422, 422+rot (NA for K-T), 420, 420 + rot ;
-	 * UBWC 420 includes both p010, tp10
-	 */
-	{800, 800, 681, 648 },
-	/* linear 422, 422+rot (NA for K-T), 420, 420 + rot ;
-	 * linear 420 includes p010
-	 */
-	{800, 800, 604, 341 },
+	// ubwc   422, 422+rot (NA for K-T), 420, 420 + rot ; UBWC 420 includes both p010, tp10
+	{800, 580, 625, 590 },
+	// linear 422, 422+rot (NA for K-T), 420, 420 + rot ; linear 420 includes p010
+	{800, 341, 604, 341 },
 };
 
-static u32 sw_overhead_iris5[7] = {47200, 37170, 31447, 26196, 24780, 19942, 14160 };
+static u32 sw_overhead_iris5[8] = { 59000, 47200, 37170, 31447, 26196, 24780, 19942, 14160 };
 
 #define TENSILICA_CORE_RATIO_IRIS5                                                 (15)
 
+#define DECODER_VPP_FW_OVERHEAD_VVCD_IRIS5                                        (42000)
+#define DECODER_VPP_FW_OVERHEAD_HEVCD_IRIS5                                       (50000)
+#define DECODER_VPP_FW_OVERHEAD_H264D_IRIS5                                       (76630)
 #define DECODER_VPP_FW_OVERHEAD_AV1D_IRIS5                                        (42000)
 #define DECODER_VPP_FW_OVERHEAD_NONAV1D_IRIS5                                     (32000)
 #define DECODER_VPP_FW_OVERHEAD_APVD_IRIS5                                        (60000)
+
+//28000 FW overhead; 4000 ARP overhead
+#define ENCODER_VPP_FW_OVERHEAD_IRIS5                                            (28000+4000)
+#define ENCODER_VPP_FW_OVERHEAD_APVE_IRIS5                                        (69000)
+
+#define DECODER_VPPVSP1STAGE_FW_OVERHEAD_VVCD_IRIS5                               (65100)
+#define DECODER_WALKER_FW_OVERHEAD_VVCD_IRIS5                                     (158000)
+
 #define DECODER_VPPVSP1STAGE_FW_OVERHEAD_AV1D_IRIS5                               (65100)
 #define DECODER_VPPVSP1STAGE_FW_OVERHEAD_NONAV1D_IRIS5                            (49600)
-
-/* 28000 FW overhead; 4000 ARP overhead */
-#define ENCODER_VPP_FW_OVERHEAD_IRIS5                                              (28000+4000)
-#define ENCODER_VPP_FW_OVERHEAD_APVE_IRIS5                                         (69000)
 
 /* 205000 FW overhead; 4000 ARP overhead */
 #define ENCODER_VPPVSP1STAGE_FW_OVERHEAD_IRIS5                                     (49600)
@@ -55,6 +60,15 @@ static u32 sw_overhead_iris5[7] = {47200, 37170, 31447, 26196, 24780, 19942, 141
 #define ENCODER_WORKER_FW_OVERHEAD_IRIS5                                           (205000 + 4000)
 #define DECODER_WORKER_FW_OVERHEAD_AV1_IRIS5                                       (158000)
 #define DECODER_WORKER_FW_OVERHEAD_NONAV1_IRIS5                                    (108000)
+
+static u32 encoder_vpp_cycles_4pipe_iris5[3][8] = {
+	//h264e LCU16: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 141, 141, 141, 142, 143, 147, 150, 152},
+	//h265e LCU32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 141, 141, 142, 145, 147, 153, 158, 160},
+	//vpss_m2m   : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 156, 156, 156, 156, 156, 156, 156, 156},
+};
 
 static u32 encoder_vpp_cycles_2pipe_iris5[3][8] = {
 	/* h264e LCU16: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
@@ -74,49 +88,60 @@ static u32 encoder_vpp_cycles_1pipe_iris5[3][8] = {
 	{ 156, 156, 156, 156, 156, 156, 156, 156},
 };
 
+static u32 decoder_vpp_cycles_4pipe_iris5[4][8] = {
+	//h265/h264 LCU16/32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 192, 192, 192, 194, 195, 199, 204, 210 },
+	//vp9/av1      LCU64: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 193, 198, 204, 206, 208, 208, 208, 214 },
+	//av1          LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 204, 209, 215, 242, 267, 287, 308, 314 },
+	//vvc          LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 153, 161, 170, 188, 206, 220, 234, 240 },
+};
+
 static u32 decoder_vpp_cycles_2pipe_iris5[4][8] = {
-	/* h265/h264 LCU16/32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 204, 204, 204, 204, 203, 210, 217, 219},
-	/* h265/vp9/av1 LCU64: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 204, 205, 205, 210, 215, 218, 221, 223},
-	/* av1          LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 205, 217, 217, 230, 242, 240, 238, 241},
-	/* vvc/200cycle LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 205, 217, 217, 230, 242, 240, 238, 241},
+	//h265/h264 LCU16/32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 192, 192, 192, 189, 186, 194, 202, 204},
+	//h265/vp9/av1 LCU64: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 192, 192, 192, 189, 186, 194, 202, 204},
+	//av1  LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 192, 192, 192, 206, 220, 220, 220, 223},
+	//vvc  LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 145, 149, 153, 162, 171, 170, 168, 171},
 };
 
 static u32 decoder_vpp_cycles_1pipe_iris5[4][8] = {
-	/* h265/h264 LCU16/32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 202, 202, 202, 202, 202, 202, 202, 202},
-	/* h265/vp9/av1 LCU64: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 203, 203, 203, 203, 202, 209, 215, 215},
-	/* av1          LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 203, 203, 203, 209, 214, 216, 218, 218},
-	/* vvc/200cycle LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end */
-	{ 203, 203, 203, 209, 214, 216, 218, 218},
+	//h265/h264 LCU16/32: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 191, 191, 191, 191, 191, 191, 191, 191},
+	//h265/vp9/av1 LCU64: 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 192, 192, 192, 192, 191, 197, 202, 202},
+	//av1 LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 192, 192, 192, 197, 202, 204, 206, 206},
+	//vvc LCU128  : 8KUHD, middle, UHD, middle, 1080p, middle, 720p, end
+	{ 144, 144, 144, 149, 153, 154, 155, 155},
 };
 
-/* Video IP Core Technology: bitrate constraint
- * HW limit bitrate table (these values are measured end to end
- * fw/sw impacts are also considered)
- */
-static u32 bitrate_table_2stage_fp_iris5[5][10] = {
-	{ 0, 220, 220, 220, 220, 220, 220, 220, 220, 220 },   /* h264 cavlc */
-	{ 0, 140, 150, 160, 175, 190, 190, 190, 190, 190 },   /* h264 cabac */
-	{ 95, 168, 200, 225, 237, 260, 260, 260, 260, 260 },  /* h265 */
-	{ 90, 90, 90, 90, 90, 90, 90, 90, 90, 90 },           /* vp9 */
-	{ 130, 130, 120, 120, 120, 120, 120, 120, 120, 120 },   /* av1 */
-};
+//Video IP Core Technology: bitrate constraint
+//HW limit bitrate table (these values are measured end to end fw/sw impacts are also considered)
 
-/* HW limit bitrate table (these values are measured end to end
- * fw/sw impacts are also considered)
- */
-static u32 bitrate_table_1stage_fp_iris5[5][10] = {       /* 1-stage assume IPPP */
-	{ 0, 220, 220, 220, 220, 220, 220, 220, 220, 220 },   /* h264 cavlc */
-	{ 0, 110, 150, 150, 150, 150, 150, 150, 150, 150 },   /* h264 cabac */
-	{ 0, 168, 185, 185, 185, 185, 185, 185, 185, 185 },   /* h265 */
-	{ 0, 70, 70, 70, 70, 70, 70, 70, 70, 70 },            /* vp9 */
-	{ 0, 100, 100, 100, 100, 100, 100, 100, 100, 100 },	  /* av1 */
+// NOTE : HAWI AV1d acheived 15% bitrate uplift (at TOP) compared to K-T
+
+static u32 bitrate_table_2stage_fp_iris5[6][10] = {
+	{ 0, 220, 220, 220, 220, 220, 220, 220, 220, 220 },   //h264 cavlc
+	{ 0, 140, 150, 160, 175, 190, 190, 190, 190, 190 },   //h264 cabac
+	{ 95, 168, 200, 225, 237, 260, 260, 260, 260, 260 },   //h265
+	{ 90, 90, 90, 90, 90, 90, 90, 90, 90, 90 },    //vp9
+	{ 150, 150, 150, 150, 150, 150, 150, 150, 150, 150 },   //av1
+	{ 105, 187, 223, 250, 265, 290, 290, 290, 290, 290 },   //vvc
+};
+//HW limit bitrate table (these values are measured end to end fw/sw impacts are also considered)
+static u32 bitrate_table_1stage_fp_iris5[6][10] = { //1-stage assume IPPP
+	{ 0, 220, 220, 220, 220, 220, 220, 220, 220, 220 },   //h264 cavlc
+	{ 0, 110, 150, 150, 150, 150, 150, 150, 150, 150 },   //h264 cabac
+	{ 0, 168, 185, 185, 185, 185, 185, 185, 185, 185 },   //h265
+	{ 0, 70, 70, 70, 70, 70, 70, 70, 70, 70 },   //vp9
+	{ 0, 115, 115, 115, 115, 115, 115, 115, 115, 115 },  //av1
+	{ 0, 235, 260, 260, 260, 260, 260, 260, 260, 260 },   //vvc
 };
 
 /* 8KUHD60; UHD240; 1080p960  with B
@@ -149,15 +174,12 @@ static u32 fp_pixel_count_bar8_iris5 = 1920 * 1080 * 30;
 #define CODEC_RESOLUTION_4096x2160_IRIS5                (4096 * 2160)
 #define CODEC_RESOLUTION_8KUHD_IRIS5                    (7680 * 4320)
 
-static u32 calculate_number_mbs_iris5(u32 width, u32 height, u32 lcu_size)
+static u32 calculate_number_mbs_iris5(u32 width, u32 height)
 {
-	u32 mbs_width = (width % lcu_size) ?
-		(width / lcu_size + 1) : (width / lcu_size);
+	u32 mbs_width = (width % 16) ? (width / 16 + 1) : (width / 16);
+	u32 mbs_height = (height % 16) ? (height / 16 + 1) : (height / 16);
 
-	u32 mbs_height = (height % lcu_size) ?
-		(height / lcu_size + 1) : (height / lcu_size);
-
-	return mbs_width * mbs_height * (lcu_size / 16) * (lcu_size / 16);
+	return mbs_width * mbs_height;
 }
 
 static int initialize_encoder_complexity_table_iris5(void)
@@ -395,8 +417,6 @@ static u32 get_vpp_cycles_iris5(struct api_calculation_input codec_input)
 			i = 0;
 		else if (codec_input.lcu_size <= 32)
 			i = 1;
-		else if (codec_input.lcu_size <= 64)
-			i = 3;
 		else
 			i = 2;
 	}
@@ -435,11 +455,15 @@ static u32 get_vpp_cycles_iris5(struct api_calculation_input codec_input)
 	if (codec_input.decoder_or_encoder == CODEC_DECODER) {
 		if (codec_input.vpu_ver == VPU_VERSION_IRIS5_1P)
 			ret = decoder_vpp_cycles_1pipe_iris5[i][j];
+		else if (codec_input.vpu_ver == VPU_VERSION_IRIS5_4P)
+			ret = decoder_vpp_cycles_4pipe_iris5[i][j];
 		else
 			ret = decoder_vpp_cycles_2pipe_iris5[i][j];
 	} else {
 		if (codec_input.vpu_ver == VPU_VERSION_IRIS5_1P)
 			ret = encoder_vpp_cycles_1pipe_iris5[i][j];
+		else if (codec_input.vpu_ver == VPU_VERSION_IRIS5_4P)
+			ret = encoder_vpp_cycles_4pipe_iris5[i][j];
 		else
 			ret = encoder_vpp_cycles_2pipe_iris5[i][j];
 	}
@@ -456,6 +480,11 @@ static int calculate_vsp_min_freq_iris5(struct api_calculation_input codec_input
 	u32 vsp_hw_min_frequency = 0;
 	u32 allintra_bitrate_533 = 343; /* @533MHz  max UHD30 or UHD60 HDR10; HEVC ONLY */
 	u32 lossless_bitrate_533 = 720; /* @533MHz  max 720p30 HDR10; HEVC only */
+
+	//bitrate was profiled at 444MHz for legacy codec
+	//bitrate was profiled at 533 for av1
+	u32 freq_topcorner0_4bitrate = 533;
+	u32 freq_topcorner1_4bitrate = 444;
 
 	if (codec_input.codec == CODEC_APV) {
 		codec_output->vsp_min_freq = 0;
@@ -474,8 +503,9 @@ static int calculate_vsp_min_freq_iris5(struct api_calculation_input codec_input
 		codec_input.frame_height * codec_input.frame_rate;
 
 	u8 bitrate_entry = get_bitrate_entry_iris5(pixle_count); /* TODO EXTRACT */
-	u32 freq_4bitrate = (codec_input.decoder_or_encoder == CODEC_DECODER) ?
-					frequency_table_iris5[0][3] : frequency_table_iris5[0][5];
+
+	//top corner is 338MHz for encoders in iris4/beyond
+	freq_topcorner1_4bitrate = (codec_input.decoder_or_encoder == CODEC_DECODER) ? 444 : 338;
 
 	input_bitrate_fp_iris5 = ((u32)(codec_input.bitrate_mbps * 100 + 99)) / 100;
 
@@ -483,22 +513,21 @@ static int calculate_vsp_min_freq_iris5(struct api_calculation_input codec_input
 	 * bitrate was profiled at 444MHz for legacy codec
 	 * bitrate was profiled at 533MHz for av1
 	 */
-	vsp_hw_min_frequency = freq_4bitrate * input_bitrate_fp_iris5 * 1000;
+	vsp_hw_min_frequency = freq_topcorner1_4bitrate * input_bitrate_fp_iris5 * 1000;
 
 	if (codec_input.codec == CODEC_AV1 && bitrate_entry == 1)
-		vsp_hw_min_frequency = frequency_table_iris5[0][2] *
-			input_bitrate_fp_iris5 * 1000;
+		vsp_hw_min_frequency = freq_topcorner0_4bitrate * input_bitrate_fp_iris5 * 1000;
 
 	if (codec_input.vsp_vpp_mode == CODEC_VSPVPP_MODE_2S) {
 		u32 corner_bitrate = bitrate_table_2stage_fp_iris5[codec][bitrate_entry];
 
-		if (codec_input.codec == CODEC_HEVC) {
+		if (codec_input.codec == CODEC_HEVC || codec_input.codec == CODEC_VVC) {
 			if (codec_input.hierachical_layer == CODEC_GOP_LOSSLESS) {
-				vsp_hw_min_frequency = frequency_table_iris5[0][2] *
+				vsp_hw_min_frequency = freq_topcorner0_4bitrate *
 					input_bitrate_fp_iris5 * 1000;
 				corner_bitrate = lossless_bitrate_533;
 			} else if (codec_input.hierachical_layer == CODEC_GOP_IONLY) {
-				vsp_hw_min_frequency = frequency_table_iris5[0][2] *
+				vsp_hw_min_frequency = freq_topcorner0_4bitrate *
 					input_bitrate_fp_iris5 * 1000;
 				corner_bitrate = allintra_bitrate_533;
 			}
@@ -589,7 +618,7 @@ static int calculate_apv_freq_iris5(struct api_calculation_input codec_input,
 
 	temp = fmin / 1000 / 1000;
 	len = ARRAY_SIZE(frequency_table_iris5[0]);
-	while (index < len - 1) {
+	while (index < len - 2) {
 		if (temp >= frequency_table_iris5[0][index])
 			break;
 		index++;
@@ -598,10 +627,9 @@ static int calculate_apv_freq_iris5(struct api_calculation_input codec_input,
 
 	fmin = (fmin + 99999) / 1000 / 1000;
 
-	codec_output->apv_min_freq = (u32)((vpp_hw_min_frequency + 99999) / 1000 / 1000);
+	codec_output->vpp_min_freq = (u32)((vpp_hw_min_frequency + 99999) / 1000 / 1000);
 	codec_output->vsp_min_freq = vsp_hw_min_frequency / 1000 / 1000;
 	codec_output->tensilica_min_freq = (tensilica_min_frequency + 99999) / 1000 / 1000;
-	codec_output->vpp_min_freq = 0;
 	codec_output->hw_min_freq = fmin;
 
 	return 0;
@@ -632,15 +660,22 @@ static int calculate_vpp_min_freq_iris5(struct api_calculation_input codec_input
 
 	codec_mbspersession =
 		calculate_number_mbs_iris5(codec_input.frame_width,
-		codec_input.frame_height, codec_input.lcu_size) *
-		codec_input.frame_rate;
+			codec_input.frame_height) * codec_input.frame_rate;
 
 	/* Section 2. 0  VPP/VSP calculation */
 	if (codec_input.decoder_or_encoder == CODEC_DECODER) { /* decoder */
 		vpp_hw_min_frequency =
 			(vpp_target_clk_per_mb * codec_mbspersession +
 			 codec_input.pipe_num - 1) / (codec_input.pipe_num);
-		if (codec_input.codec == CODEC_AV1) {
+
+		if (codec_input.codec == CODEC_H264 || codec_input.codec == CODEC_H264_CAVLC) {
+			vpp_fw_overhead = DECODER_VPP_FW_OVERHEAD_H264D_IRIS5;
+		} else if (codec_input.codec == CODEC_HEVC) {
+			vpp_fw_overhead = DECODER_VPP_FW_OVERHEAD_HEVCD_IRIS5;
+		} else if (codec_input.codec == CODEC_VVC) {
+			vpp_fw_overhead = DECODER_VPP_FW_OVERHEAD_VVCD_IRIS5;
+			vppvsp1stage_fw_overhead = DECODER_VPPVSP1STAGE_FW_OVERHEAD_VVCD_IRIS5;
+		} else if (codec_input.codec == CODEC_AV1) {
 			vpp_fw_overhead = DECODER_VPP_FW_OVERHEAD_AV1D_IRIS5;
 			vppvsp1stage_fw_overhead = DECODER_VPPVSP1STAGE_FW_OVERHEAD_AV1D_IRIS5;
 			worker_fw_overhead = DECODER_WORKER_FW_OVERHEAD_AV1_IRIS5;
@@ -676,9 +711,8 @@ static int calculate_vpp_min_freq_iris5(struct api_calculation_input codec_input
 					[CODEC_ENCODER_GOP_FACTORY_ENTRY];
 		if (hq_mode)
 			vpp_target_clk_per_mb = vpp_target_clk_per_mb << 1;
-		else
-			vpp_target_clk_per_mb =
-				(vpp_target_clk_per_mb * gop_complexity + 99) / 100;
+
+		vpp_target_clk_per_mb = (vpp_target_clk_per_mb * gop_complexity + 99) / 100;
 
 		vpp_hw_min_frequency =
 			(vpp_target_clk_per_mb * codec_mbspersession +
@@ -713,7 +747,7 @@ static int calculate_vpp_min_freq_iris5(struct api_calculation_input codec_input
 
 	temp = fmin / 1000 / 1000;
 	len = ARRAY_SIZE(frequency_table_iris5[0]);
-	while (index < len - 1) {
+	while (index < len - 2) {
 		if (temp >= frequency_table_iris5[0][index])
 			break;
 		index++;
@@ -725,7 +759,6 @@ static int calculate_vpp_min_freq_iris5(struct api_calculation_input codec_input
 	codec_output->vpp_min_freq = (vpp_hw_min_frequency + 99999) / 1000 / 1000;
 	codec_output->vsp_min_freq = vsp_hw_min_frequency / 1000 / 1000;
 	codec_output->tensilica_min_freq = (tensilica_min_frequency + 99999) / 1000 / 1000;
-	codec_output->apv_min_freq = 0;
 	codec_output->hw_min_freq = fmin;
 
 	return 0;

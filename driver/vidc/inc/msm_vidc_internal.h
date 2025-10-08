@@ -405,6 +405,7 @@ enum msm_vidc_log_encode_mode {
 	CAP(LEVEL)                                \
 	CAP(HEVC_TIER)                            \
 	CAP(AV1_TIER)                             \
+	CAP(VVC_TIER)                             \
 	CAP(DISPLAY_DELAY_ENABLE)                 \
 	CAP(DISPLAY_DELAY)                        \
 	CAP(CONCEAL_COLOR_8BIT)                   \
@@ -509,6 +510,7 @@ enum msm_vidc_codec_type {
 	MSM_VIDC_AV1               = BIT(4),
 	MSM_VIDC_MPEG2             = BIT(5),
 	MSM_VIDC_APV               = BIT(6),
+	MSM_VIDC_VVC               = BIT(7),
 };
 
 enum msm_vidc_colorformat_type {

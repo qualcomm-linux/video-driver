@@ -406,7 +406,7 @@ decision_done:
 	return 0;
 }
 
-int msm_vidc_update_scaling_iris5p(struct msm_vidc_inst *inst,
+static int msm_vidc_update_scaling_iris5p(struct msm_vidc_inst *inst,
 		u32 aspect_ratio_w, u32 aspect_ratio_h)
 {
 	u32 wxh_contraint = 32;
@@ -578,7 +578,7 @@ exit:
 	return 0;
 }
 
-int msm_vidc_get_hier_layer_val_iris5p(struct msm_vidc_inst *inst)
+static int msm_vidc_get_hier_layer_val_iris5p(struct msm_vidc_inst *inst)
 {
 	int hierachical_layer = CODEC_GOP_IPP;
 
@@ -603,7 +603,7 @@ int msm_vidc_get_hier_layer_val_iris5p(struct msm_vidc_inst *inst)
 	return hierachical_layer;
 }
 
-int msm_vidc_init_codec_iris5p(struct msm_vidc_inst *inst,
+static int msm_vidc_init_codec_iris5p(struct msm_vidc_inst *inst,
 		struct api_calculation_input *codec_input)
 {
 	if (is_encode_session(inst)) {
@@ -757,7 +757,6 @@ int msm_vidc_init_codec_input_freq_iris5p(struct msm_vidc_inst *inst, u32 data_s
 
 	core = inst->core;
 	codec_input->vpu_ver = core->platform->data.vpu_ver;
-
 	return 0;
 }
 
