@@ -440,6 +440,10 @@ enum v4l2_mpeg_vidc_apv_level {
 
 /* Control to enable or disable LOG video encoding */
 #define V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE                  (VIDC_BASE + 0x69)
+enum v4l2_mpeg_vidc_log_encode_mode {
+	VIDC_LOG_VIDEO_TYPE_NONE     = 0x0,
+	VIDC_LOG_VIDEO_TYPE_HDR      = 0x1,
+};
 
 /* Control to set input subcache id */
 #define V4L2_CID_MPEG_VIDC_INPUT_SUBCACHE_ID                 (VIDC_BASE + 0x6A)

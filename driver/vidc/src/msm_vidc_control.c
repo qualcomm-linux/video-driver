@@ -221,6 +221,12 @@ static const char *const mpeg_video_vidc_ir_type[] = {
 	NULL,
 };
 
+static const char *const log_video_mode_type[] = {
+	"Log_video_mode_none",
+	"Log_video_mode_hdr",
+	NULL,
+};
+
 static const char *const mpeg_video_vidc_fence_type[] = {
 	"Fence None",
 	"Sw Fence",
@@ -281,6 +287,8 @@ static const char * const *msm_vidc_get_qmenu_type(
 		return mpeg_vidc_vvc_tier;
 	case IR_TYPE:
 		return mpeg_video_vidc_ir_type;
+	case LOG_VIDEO_ENCODE:
+		return log_video_mode_type;
 	case INPUT_RX_FENCE_TYPE:
 	case INPUT_TX_FENCE_TYPE:
 	case OUTPUT_RX_FENCE_TYPE:

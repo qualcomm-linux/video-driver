@@ -2994,7 +2994,7 @@ static const struct clk_table art_clk_table[] = {
 	{ "video_cc_mvs0c_clk",              VIDEO_CC_MVS0C_CLK,              0},
 	{ "video_cc_mvs0_vpp0_clk",          VIDEO_CC_MVS0_VPP0_CLK,          0},
 	{ "video_cc_mvs0_vpp1_clk",          VIDEO_CC_MVS0_VPP1_CLK,          0},
-//	{ "video_cc_mvs0c_debug_clk",        VCODEC_VIDEO_CC_MVS0C_DEBUG_CLK, 0},
+	{ "video_cc_mvs0c_debug_clk",        VIDEO_CC_MVS0C_DEBUG_CLK,        0},
 	{ "video_cc_cx_axi0_clk",            VIDEO_CC_CX_AXI0_CLK,            0},
 	{ "video_cc_mvs0_vpp0_vpp1_gating_clk",  VIDEO_CC_MVS0_VPP0_VPP1_GATING_CLK,     0},
 	{ "video_cc_mvs0_clk_src",      VIDEO_CC_MVS0_CLK_SRC,      1,

@@ -561,7 +561,7 @@ typedef HFI_U32 HFI_BOOL;
 		HFI_U32 LUT_SIZE_H264D_LEFT_FE[RES] = { 880640, 1320960, 2818048, 5636096 }; \
 		HFI_U32 LUT_SIZE_H264D_DPB_OPB[RES] = { 494592, 740352, 1575936, 3148800}; \
 		HFI_U32 LUT_SIZE_H264D_LEFT_SE[RES] = { 1280, 1920, 4096, 8192 }; \
-		HFI_U32 LUT_SIZE_H264D_TOP_LB[RES] = { 207360, 310528, 665080, 1320192 }; \
+		HFI_U32 LUT_SIZE_H264D_TOP_LB[RES] = { 310016, 464384, 988672, 1975808 }; \
 		HFI_U32 res = 0; \
 		if (frame_height <= SIZE_HD) { \
 			res = RES_HD; \
@@ -595,7 +595,7 @@ typedef HFI_U32 HFI_BOOL;
 		HFI_U32 LUT_SIZE_H264D_LEFT_FE[RES] = { 880640, 1320960, 2818048, 5636096 }; \
 		HFI_U32 LUT_SIZE_H264D_DPB_OPB[RES] = { 494592, 740352, 1575936, 3148800}; \
 		HFI_U32 LUT_SIZE_H264D_LEFT_SE[RES] = { 1280, 1920, 4096, 8192 }; \
-		HFI_U32 LUT_SIZE_H264D_TOP_LB[RES] = { 207360, 310528, 665080, 1320192 }; \
+		HFI_U32 LUT_SIZE_H264D_TOP_LB[RES] = { 310016, 464384, 988672, 1975808 }; \
 		HFI_U32 vpss_lb_size = 0; \
 		HFI_U32 res = 0; \
 		if (frame_height <= SIZE_HD) { \
@@ -917,7 +917,7 @@ typedef HFI_U32 HFI_BOOL;
 		HFI_U32 LUT_SIZE_H265D_DPB_OPB[RES] = { 494592, 740352, 1575936, 3148800}; \
 		HFI_U32 LUT_SIZE_H265D_LEFT_SE[RES] = { 2672, 3952, 8304, 16496 }; \
 		HFI_U32 LUT_SIZE_H265D_LEFT_VSP[RES] = { 2560, 3840, 8192, 16384}; \
-		HFI_U32 LUT_SIZE_H265D_TOP_LB[RES] = { 178176, 266496, 566784, 1132032 }; \
+		HFI_U32 LUT_SIZE_H265D_TOP_LB[RES] = { 280832, 420352, 894720, 1787648 }; \
 		if (frame_height <= SIZE_HD) { \
 			res = RES_HD; \
 		} else if (frame_height <= SIZE_FHD) { \
@@ -955,7 +955,7 @@ typedef HFI_U32 HFI_BOOL;
 		HFI_U32 LUT_SIZE_H265D_DPB_OPB[RES] = { 494592, 740352, 1575936, 3148800}; \
 		HFI_U32 LUT_SIZE_H265D_LEFT_SE[RES] = { 2672, 3952, 8304, 16496 }; \
 		HFI_U32 LUT_SIZE_H265D_LEFT_VSP[RES] = { 2560, 3840, 8192, 16384}; \
-		HFI_U32 LUT_SIZE_H265D_TOP_LB[RES] = { 178176, 266496, 566784, 1132032 }; \
+		HFI_U32 LUT_SIZE_H265D_TOP_LB[RES] = { 280832, 420352, 894720, 1787648 }; \
 		if (frame_height <= SIZE_HD) { \
 			res = RES_HD; \
 		} else if (frame_height <= SIZE_FHD) { \
@@ -1504,10 +1504,10 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		}; \
 		HFI_U32 LUT_AV1D_TOP_LINE[RES][2] = \
 		{ \
-			{ 287232, 430080, }, \
-			{ 468992, 683264, }, \
-			{ 1278464, 1735168, }, \
-			{ 3604992, 4518400, }, \
+			{ 307200, 450048, }, \
+			{ 499200, 713472, }, \
+			{ 1343488, 1800192, }, \
+			{ 3735552, 4648960, }, \
 		}; \
 		if (frame_height <= SIZE_HD) { \
 			res = RES_HD; \
@@ -1545,10 +1545,10 @@ _yuv_bufcount_min, is_opb, num_vpp_pipes)           \
 		}; \
 		HFI_U32 LUT_AV1D_TOP_LINE[RES][2] = \
 		{ \
-			{287232, 430080}, \
-			{468992, 683264}, \
-			{1278464, 1735168}, \
-			{3604992, 4518400}, \
+			{307200, 450048}, \
+			{499200, 713472}, \
+			{1343488, 1800192}, \
+			{3735552, 4648960}, \
 		}; \
 		if (frame_height <= SIZE_HD) {\
 			res = RES_HD; \

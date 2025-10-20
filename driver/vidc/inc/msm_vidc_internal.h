@@ -82,7 +82,7 @@ enum msm_vidc_metadata_bits {
 
 enum msm_vidc_log_encode_mode {
 	MSM_VIDC_LOG_VIDEO_TYPE_NONE    = 0x0,
-	MSM_VIDC_LOG_VIDEO_TYPE_COMMON  = 0x1,
+	MSM_VIDC_LOG_VIDEO_TYPE_HDR  = 0x1,
 };
 
 #define MSM_VIDC_METADATA_SIZE             (4 * 4096) /* 16 KB */

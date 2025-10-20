@@ -4,7 +4,7 @@
  */
 
 #include <dt-bindings/clock/qcom,x1e80100-gcc.h>
-#include <dt-bindings/clock/qcom,x1e80100-videocc.h>
+#include <dt-bindings/clock/qcom,sm8650-videocc.h>
 
 #include <linux/soc/qcom/llcc-qcom.h>
 #include <soc/qcom/of_common.h>
@@ -319,7 +319,7 @@ static struct msm_platform_core_capability core_data_x1e80100[] = {
 	{ENC_AUTO_FRAMERATE, 1},
 	{DEVICE_CAPS, V4L2_CAP_VIDEO_M2M_MPLANE | V4L2_CAP_META_CAPTURE |
 		V4L2_CAP_STREAMING},
-	{SUPPORTS_SYNX_FENCE, 0},
+	{SUPPORTS_SYNX_V2_FENCE, 0},
 	{SUPPORTS_REQUESTS, 0},
 };
 
@@ -548,6 +548,26 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 		HFI_PROP_FENCE_OUTPUT,
 		CAP_FLAG_BITMASK | CAP_FLAG_META | CAP_FLAG_DYNAMIC_ALLOWED},
 
+	{OUTPUT_RX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
+		0, 1, 1, 0,
+		V4L2_CID_MPEG_VIDC_OUTPUT_RX_FENCE_ENABLE,
+		HFI_PROP_FENCE_OUTPUT,
+		CAP_FLAG_OUTPUT_PORT},
+
+	/* enable input rx fence feature */
+	{INPUT_RX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
+		0, 1, 1, 0,
+		V4L2_CID_MPEG_VIDC_INPUT_RX_FENCE_ENABLE,
+		HFI_PROP_FENCE_INPUT,
+		CAP_FLAG_INPUT_PORT},
+
+	/* enable input rx fence feature */
+	{INPUT_TX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
+		0, 1, 1, 0,
+		V4L2_CID_MPEG_VIDC_INPUT_TX_FENCE_ENABLE,
+		HFI_PROP_FENCE_INPUT,
+		CAP_FLAG_INPUT_PORT},
+
 	/*
 	 * Client to do set_ctrl with OUTPUT_TX_FENCE_ID to set fence_id
 	 * and then client will do get_ctrl with OUTPUT_TX_FENCE_FD to get
@@ -564,6 +584,12 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 		V4L2_CID_MPEG_VIDC_OUTPUT_TX_FENCE_FD,
 		0,
 		CAP_FLAG_VOLATILE},
+
+	{FENCE_INFO, DEC|ENC, CODECS_ALL,
+		0, sizeof(struct v4l2_vidc_fence_info), 1, 0,
+		V4L2_CID_MPEG_VIDC_FENCE_INFO,
+		0,
+		CAP_FLAG_BLOB | CAP_FLAG_DYNAMIC_ALLOWED},
 
 	/* Fence type for input buffer. Currently unused */
 	{INPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
@@ -586,8 +612,7 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 
 	{OUTPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		MSM_VIDC_FENCE_NONE, MSM_VIDC_SYNX_V2_FENCE,
-		BIT(MSM_VIDC_FENCE_NONE) | BIT(MSM_VIDC_SW_FENCE) |
-			BIT(MSM_VIDC_SYNX_V2_FENCE),
+		BIT(MSM_VIDC_FENCE_NONE),
 		MSM_VIDC_FENCE_NONE,
 		0,
 		HFI_PROP_FENCE_TYPE,
@@ -595,8 +620,7 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 
 	{OUTPUT_TX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 				MSM_VIDC_FENCE_NONE, MSM_VIDC_SYNX_V2_FENCE,
-		BIT(MSM_VIDC_FENCE_NONE) | BIT(MSM_VIDC_SW_FENCE) |
-			BIT(MSM_VIDC_SYNX_V2_FENCE),
+		BIT(MSM_VIDC_FENCE_NONE),
 		MSM_VIDC_FENCE_NONE,
 		0,
 		HFI_PROP_FENCE_TYPE,
@@ -786,6 +810,12 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 		CAP_FLAG_OUTPUT_PORT |
 			CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
 
+	{OPEN_GOP, ENC, HEVC,
+		0, 1, 1, 0,
+		V4L2_CID_MPEG_VIDC_OPEN_GOP_ENABLE,
+		HFI_PROP_OPEN_GOP,
+		CAP_FLAG_OUTPUT_PORT},
+
 	{GOP_CLOSURE, ENC, H264 | HEVC,
 		0, 1, 1, 1,
 		V4L2_CID_MPEG_VIDEO_GOP_CLOSURE,
@@ -835,6 +865,12 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 		V4L2_CID_MPEG_VIDC_LOWLATENCY_REQUEST,
 		0,
 		CAP_FLAG_NONE},
+
+	{LOWLATENCY_MODE, DEC, H264 | HEVC | VP9 | AV1,
+		0, 1, 1, 0,
+		V4L2_CID_MPEG_VIDC_LOWLATENCY_REQUEST,
+		HFI_PROP_SEQ_CHANGE_AT_SYNC_FRAME,
+		CAP_FLAG_INPUT_PORT | CAP_FLAG_DYNAMIC_ALLOWED},
 
 	{LTR_COUNT, ENC, H264 | HEVC,
 		0, MAX_LTR_FRAME_COUNT_5, 1, 0,
@@ -1276,7 +1312,7 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 		V4L2_MPEG_VIDEO_H264_LEVEL_5_0,
 		V4L2_CID_MPEG_VIDEO_H264_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
+		CAP_FLAG_VOLATILE | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{LEVEL, ENC, HEVC | HEIC,
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_1,
@@ -1297,7 +1333,7 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_5,
 		V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
 		HFI_PROP_LEVEL,
-		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
+		CAP_FLAG_VOLATILE | CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{LEVEL, DEC, H264,
 		V4L2_MPEG_VIDEO_H264_LEVEL_1_0,
@@ -1762,6 +1798,14 @@ static struct msm_platform_inst_capability instance_cap_data_x1e80100[] = {
 		HFI_PROP_HISTOGRAM_INFO,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
 
+	{META_HIST_INFO, ENC, HEVC,
+		MSM_VIDC_META_DISABLE,
+		MSM_VIDC_META_ENABLE | MSM_VIDC_META_RX_OUTPUT,
+		0, MSM_VIDC_META_DISABLE,
+		V4L2_CID_MPEG_VIDC_METADATA_HISTOGRAM_INFO,
+		HFI_PROP_HISTOGRAM_INFO,
+		CAP_FLAG_BITMASK | CAP_FLAG_META},
+
 	{META_TRANSCODING_STAT_INFO, DEC, HEVC|H264,
 		MSM_VIDC_META_DISABLE,
 		MSM_VIDC_META_ENABLE | MSM_VIDC_META_RX_OUTPUT,
@@ -2024,7 +2068,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 		NULL},
 
 	{META_OUTPUT_TX_FENCE, DEC, H264 | HEVC | AV1,
-		{OUTPUT_TX_FENCE_TYPE, SLICE_DECODE, EARLY_NOTIFY_ENABLE},
+		{OUTPUT_TX_FENCE_TYPE},
 		NULL,
 		NULL},
 
@@ -2132,7 +2176,8 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 			P_FRAME_QP, B_FRAME_QP, CONSTANT_QUALITY, ENH_LAYER_COUNT,
 			BIT_RATE, META_ROI_INFO, MIN_QUALITY, BITRATE_BOOST, VBV_DELAY,
 			PEAK_BITRATE, SLICE_MODE, CONTENT_ADAPTIVE_CODING,
-			BLUR_TYPES},
+			BLUR_TYPES, LOWLATENCY_MODE, META_EVA_STATS,
+			OPEN_GOP},
 		msm_vidc_adjust_bitrate_mode,
 		msm_vidc_set_u32_enum},
 
@@ -2154,6 +2199,11 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 	{GOP_SIZE, ENC, HEIC,
 		{0},
 		NULL,
+		msm_vidc_set_u32},
+
+	{OPEN_GOP, ENC, HEVC,
+		{GOP_SIZE},
+		msm_vidc_adjust_open_gop,
 		msm_vidc_set_u32},
 
 	{B_FRAME, ENC, H264 | HEVC,
@@ -2187,7 +2237,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 		NULL},
 
 	{LOWLATENCY_MODE, DEC, H264 | HEVC | AV1,
-		{STAGE, SLICE_DECODE, EARLY_NOTIFY_ENABLE},
+		{STAGE},
 		NULL,
 		NULL},
 
@@ -2323,15 +2373,15 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 		{CONTENT_ADAPTIVE_CODING, LTR_COUNT, OPEN_GOP}},
 
 	{LAYER_ENABLE, ENC, H264 | HEVC,
-		{CONTENT_ADAPTIVE_CODING}},
+		{CONTENT_ADAPTIVE_CODING, LEVEL}},
 
 	{ENH_LAYER_COUNT, ENC, H264,
-		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, LTR_COUNT},
+		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, SLICE_MODE, LTR_COUNT, LEVEL},
 		msm_vidc_adjust_layer_count,
 		msm_vidc_set_layer_count_and_type},
 
 	{ENH_LAYER_COUNT, ENC, HEVC,
-		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, LTR_COUNT},
+		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, SLICE_MODE, LTR_COUNT, OPEN_GOP},
 		msm_vidc_adjust_layer_count,
 		msm_vidc_set_layer_count_and_type},
 
@@ -2392,7 +2442,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 
 	{PROFILE, ENC, HEVC,
 		{META_SEI_MASTERING_DISP, META_SEI_CLL, META_HDR10PLUS,
-		META_HIST_INFO, META_HDR10_MAX_RGB_INFO},
+		META_HIST_INFO},
 		msm_vidc_adjust_profile,
 		msm_vidc_set_u32_enum},
 
@@ -2412,7 +2462,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 		NULL,
 		msm_vidc_set_u32_enum},
 
-	{LEVEL, ENC, CODECS_ALL,
+	{LEVEL, ENC, H264 | HEVC,
+		{0},
+		msm_vidc_adjust_level_tier,
+		msm_vidc_set_level},
+
+	{LEVEL, ENC, HEIC,
 		{0},
 		NULL,
 		msm_vidc_set_level},
@@ -2568,7 +2623,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 		NULL},
 
 	{META_ROI_INFO, ENC, H264 | HEVC,
-		{IR_PERIOD, BLUR_TYPES},
+		{MIN_QUALITY, IR_PERIOD, BLUR_TYPES},
 		msm_vidc_adjust_roi_info_iris4,
 		NULL},
 
@@ -2591,6 +2646,26 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 		{0},
 		NULL,
 		msm_vidc_set_signal_color_info},
+
+	{META_HIST_INFO, ENC, HEVC,
+		{0},
+		msm_vidc_adjust_histogram_info,
+		NULL},
+
+	{META_SEI_MASTERING_DISP, ENC, HEVC | HEIC,
+		{0},
+		msm_vidc_adjust_sei_mastering_disp,
+		NULL},
+
+	{META_SEI_CLL, ENC, HEVC | HEIC,
+		{0},
+		msm_vidc_adjust_sei_cll,
+		NULL},
+
+	{META_HDR10PLUS, ENC, HEVC | HEIC,
+		{0},
+		msm_vidc_adjust_hdr10plus,
+		NULL},
 };
 
 /* Default UBWC config for LPDDR5 */
@@ -2646,7 +2721,8 @@ static const struct subcache_table x1e80100_subcache_table[] = {
 
 /* name, start, size, secure, dma_coherant, region, dma_mask */
 const struct context_bank_table x1e80100_context_bank_table[] = {
-	{"qcom,vidc,cb-ns",            0x25800000, 0xba800000, 0, 1, MSM_VIDC_NON_SECURE, 0 },
+	{"qcom,vidc,cb-ns",            0x25800000, 0xba800000, 0, 1,
+		MSM_VIDC_NON_SECURE | MSM_VIDC_NON_SECURE_BITSTREAM, 0 },
 	{"qcom,vidc,cb-ns-pxl",        0x00100000, 0xdff00000, 0, 1, MSM_VIDC_NON_SECURE_PIXEL, 0 },
 	{"qcom,vidc,cb-sec-pxl",       0x00500000, 0xdfb00000, 1, 0, MSM_VIDC_SECURE_PIXEL,     0 },
 	{"qcom,vidc,cb-sec-non-pxl",   0x01000000, 0x24800000, 1, 0, MSM_VIDC_SECURE_NONPIXEL,  0 },
@@ -2800,7 +2876,7 @@ static const struct msm_vidc_platform_data x1e80100_data = {
 	.clock_source_scaling_ratio = 1,
 	.fwname = "vpu30_4v",
 	.pas_id = 9,
-	.supports_mmrm = 1,
+	.supports_mmrm = 0,
 
 	/* caps related resorces */
 	.core_data = core_data_x1e80100,

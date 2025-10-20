@@ -358,12 +358,17 @@ static u32 msm_vidc_encoder_bin_size_iris5(struct msm_vidc_inst *inst)
 	ring_buf_count = inst->capabilities[ENC_RING_BUFFER_COUNT].value;
 	lookahead_enable = inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value;
 
-	if (inst->codec == MSM_VIDC_H264)
-		HFI_BUFFER_BIN_H264E(size, inst->hfi_rc_type, width,
-			height, stage, num_vpp_pipes, profile, ring_buf_count, lookahead_enable);
-	else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC)
-		HFI_BUFFER_BIN_H265E(size, inst->hfi_rc_type, width,
-			height, stage, num_vpp_pipes, profile, ring_buf_count, lookahead_enable);
+	if (inst->codec == MSM_VIDC_H264) {
+		HFI_BUFFER_BIN_H264E_IRIS5(size, inst->hfi_rc_type, width,
+			height, stage, num_vpp_pipes, profile, ring_buf_count,
+			0, lookahead_enable, false,
+			f->fmt.pix_mp.pixelformat);
+	} else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC) {
+		HFI_BUFFER_BIN_H265E_IRIS5(size, inst->hfi_rc_type, width,
+			height, stage, num_vpp_pipes, profile, ring_buf_count,
+			0, lookahead_enable, true,
+			f->fmt.pix_mp.pixelformat);
+	}
 
 	i_vpr_l(inst, "%s: size %d\n", __func__, size);
 	return size;
@@ -585,7 +590,8 @@ static u32 msm_vidc_encoder_output_size_iris5(struct msm_vidc_inst *inst)
 		hfi_rc_type = HFI_RC_CQ;
 
 	HFI_BUFFER_BITSTREAM_ENC(frame_size, f->fmt.pix_mp.width,
-		f->fmt.pix_mp.height, hfi_rc_type, is_ten_bit);
+		f->fmt.pix_mp.height, hfi_rc_type, is_ten_bit,
+		f->fmt.pix_mp.pixelformat);
 
 	frame_size = msm_vidc_enc_delivery_mode_based_output_buf_size(inst, frame_size);
 

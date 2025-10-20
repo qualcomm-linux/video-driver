@@ -14,7 +14,7 @@ ddk_headers(
 )
 
 ddk_headers(
-    name = "x1e80100_headers",
+    name = "hamoa_headers",
     hdrs = glob([
       "driver/platform/x1e80100/inc/*.h",
     ]),
@@ -121,7 +121,7 @@ ddk_headers(
 
 ddk_headers(
     name = "video_driver_headers",
-    hdrs = [":uapi_headers", "x1e80100_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "canoe_headers", "seraph_headers", "alor_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris4_headers", "vidc_headers"]
+    hdrs = [":uapi_headers", "hamoa_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "canoe_headers", "seraph_headers", "alor_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris4_headers", "vidc_headers"]
 )
 
 load(":target.bzl", "define_target_modules")

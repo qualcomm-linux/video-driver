@@ -1,6 +1,7 @@
 targets = [
     # keep sorted
     "canoe",
+    "hamoa",
     "gen3auto",
     "sun",
     "seraph",

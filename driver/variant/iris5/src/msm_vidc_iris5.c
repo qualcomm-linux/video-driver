@@ -1328,6 +1328,15 @@ static int __power_on_controller_iris5(struct msm_vidc_core *core)
 	if (rc)
 		goto fail_regulator;
 
+	rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_clk");
+	if (rc)
+		goto fail_clk_controller;
+
+	/* video controller powered on successfully */
+	rc = msm_vidc_change_core_sub_state(core, 0, CORE_SUBSTATE_POWER_ENABLE, __func__);
+	if (rc)
+		goto fail_power_on_substate;
+
 	rc = __read_register(core, WRAPPER_CI_VERSION_IRIS5, &ci_version);
 	if (rc)
 		return rc;
@@ -1337,22 +1346,14 @@ static int __power_on_controller_iris5(struct msm_vidc_core *core)
 		if (rc)
 			goto fail_video_axi0c;
 
-		rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_freerun_clk");
-		if (rc)
-			goto fail_clk_freerun;
-
-		rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_clk");
-		if (rc)
-			goto fail_clk_controller;
-
 		rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_ctl_freerun_clk");
 		if (rc)
 			goto fail_clk_ctl_freerun;
 
-		/* rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_debug_clk");
-		 * if (rc)
-		 *	goto fail_clk_ctl_debug;
-		 */
+		rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_debug_clk");
+		if (rc)
+			goto fail_clk_ctl_debug;
+
 		if (is_fallback_mode_iris5(core)) {
 			rc = __write_register_masked(core, WRAPPER_GPIO_OUT_IRIS5,
 				1 << 3, BIT(3));
@@ -1390,6 +1391,38 @@ static int __power_on_controller_iris5(struct msm_vidc_core *core)
 				return rc;
 			}
 		}
+
+		rc = __write_register_masked(core, CPU_NOC_SBM_FAULTINEN0_LOW,
+				0x1, BIT(0));
+		if (rc)
+			return rc;
+
+		rc = __write_register_masked(core, CPU_NOC_ERRORLOGGER_MAINCTL_LOW,
+					0x1, BIT(0));
+		if (rc)
+			return rc;
+
+		rc = __write_register_masked(core, WRAPPER_INTR_MASK_IRIS5,
+					0 << 6, BIT(6));
+		if (rc)
+			return rc;
+
+		rc = __write_register_masked(core,
+				NOC_SIDEBANDMANAGER_MAIN_SIDEBANDMANAGER_FAULTINEN0_LOW,
+					0x1, BIT(0));
+		if (rc)
+			return rc;
+
+		rc = __write_register_masked(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_MAINCTL_LOW,
+					0x1, BIT(0));
+		if (rc)
+			return rc;
+
+		rc = __write_register_masked(core, WRAPPER_INTR_MASK_IRIS5,
+					0 << 5, BIT(5));
+		if (rc)
+			return rc;
+
 	} else {
 		rc = call_res_op(core, clk_enable, core, "gcc_video_axi1_clk");
 		if (rc)
@@ -1398,59 +1431,24 @@ static int __power_on_controller_iris5(struct msm_vidc_core *core)
 		rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_freerun_clk");
 		if (rc)
 			goto fail_clk_freerun;
-
-		rc = call_res_op(core, clk_enable, core, "video_cc_mvs0c_clk");
-		if (rc)
-			goto fail_clk_controller;
 	}
-
-	rc = __write_register_masked(core, CPU_NOC_SBM_FAULTINEN0_LOW,
-				0x1, BIT(0));
-	if (rc)
-		return rc;
-
-	rc = __write_register_masked(core, CPU_NOC_ERRORLOGGER_MAINCTL_LOW,
-				0x1, BIT(0));
-	if (rc)
-		return rc;
-
-	rc = __write_register_masked(core, WRAPPER_INTR_MASK_IRIS5,
-				0 << 6, BIT(6));
-	if (rc)
-		return rc;
-
-	rc = __write_register_masked(core,
-			NOC_SIDEBANDMANAGER_MAIN_SIDEBANDMANAGER_FAULTINEN0_LOW,
-				0x1, BIT(0));
-	if (rc)
-		return rc;
-
-	rc = __write_register_masked(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_MAINCTL_LOW,
-				0x1, BIT(0));
-	if (rc)
-		return rc;
-
-	rc = __write_register_masked(core, WRAPPER_INTR_MASK_IRIS5,
-				0 << 5, BIT(5));
-	if (rc)
-		return rc;
 
 	return 0;
 
-/* fail_clk_ctl_debug:
- * call_res_op(core, clk_disable, core, "video_cc_mvs0c_ctl_freerun_clk");
- */
+fail_clk_ctl_debug:
+call_res_op(core, clk_disable, core, "video_cc_mvs0c_ctl_freerun_clk");
 fail_clk_ctl_freerun:
-	call_res_op(core, clk_disable, core, "video_cc_mvs0c_clk");
-fail_clk_controller:
-	call_res_op(core, clk_disable, core, "video_cc_mvs0c_freerun_clk");
+	call_res_op(core, clk_disable, core, "gcc_video_axi0c_clk");
 fail_clk_freerun:
 	if (ci_version >= 0x10010000)
-		call_res_op(core, clk_disable, core, "gcc_video_axi0c_clk");
+		// do nothing
 	else
 		call_res_op(core, clk_disable, core, "gcc_video_axi1_clk");
-fail_video_axi0c:
+fail_power_on_substate:
 fail_video_axi1:
+fail_video_axi0c:
+	call_res_op(core, clk_disable, core, "video_cc_mvs0c_clk");
+fail_clk_controller:
 	call_res_op(core, gdsc_off, core, "iris-ctl");
 fail_regulator:
 	return rc;
@@ -1520,6 +1518,8 @@ static int __power_on_cx_int_iris5(struct msm_vidc_core *core)
 		goto fail_mvp_noc_cx_lpi_register;
 	}
 
+	return 0;
+
 fail_mvp_noc_cx_lpi_register:
 	call_res_op(core, clk_disable, core, "video_cc_cx_axi0_clk");
 fail_clk_cx_axi0:
@@ -1556,11 +1556,6 @@ static int __power_on_hardware_iris5(struct msm_vidc_core *core)
 	if (rc)
 		goto fail_regulator;
 
-	/* video controller and hardware powered on successfully */
-	rc = msm_vidc_change_core_sub_state(core, 0, CORE_SUBSTATE_POWER_ENABLE, __func__);
-	if (rc)
-		goto fail_power_on_substate;
-
 	rc = __read_register(core, WRAPPER_EFUSE_MONITOR_IRIS5, &value);
 	if (rc)
 		goto fail_read_efuse;
@@ -1587,9 +1582,13 @@ static int __power_on_hardware_iris5(struct msm_vidc_core *core)
 	if (rc)
 		goto fail_clk_axi;
 
-	rc = call_res_op(core, clk_enable, core, "video_cc_mvs0_freerun_clk");
-	if (rc)
-		goto fail_clk_freerun;
+	if (ci_version >= 0x10010000) {
+		// do nothing
+	} else {
+		rc = call_res_op(core, clk_enable, core, "video_cc_mvs0_freerun_clk");
+		if (rc)
+			goto fail_clk_freerun;
+	}
 
 	rc = call_res_op(core, clk_enable, core, "video_cc_mvs0_clk");
 	if (rc)
@@ -1633,7 +1632,10 @@ fail_clk_vpp0:
 fail_clk_bse_controller:
 	call_res_op(core, clk_disable, core, "video_cc_mvs0_clk");
 fail_clk_controller:
-	call_res_op(core, clk_disable, core, "video_cc_mvs0_freerun_clk");
+	if (ci_version >= 0x10010000)
+		// do nothing
+	else
+		call_res_op(core, clk_disable, core, "video_cc_mvs0_freerun_clk");
 fail_clk_freerun:
 	call_res_op(core, clk_disable, core, "gcc_video_axi0_clk");
 fail_clk_axi:
@@ -1645,13 +1647,13 @@ fail_regulator_vpp1:
 		call_res_op(core, gdsc_off, core, "vpp0");
 fail_regulator_vpp0:
 fail_read_efuse:
-fail_power_on_substate:
 	call_res_op(core, gdsc_off, core, "vcodec");
 fail_regulator:
 	if (ci_version >= 0x10010000)
 		__power_off_mm_int_iris5(core);
 fail_mm_int:
-	__power_off_cx_int_iris5(core);
+	if (ci_version >= 0x10010000)
+		__power_off_cx_int_iris5(core);
 fail_cx_int:
 	return rc;
 }
