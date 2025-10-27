@@ -315,6 +315,11 @@ static struct codec_info codec_data_common[] = {
 		.pixfmt_name = "HEVC",
 	},
 	{
+		.v4l2_codec  = V4L2_PIX_FMT_VIDC_VVC,
+		.vidc_codec  = MSM_VIDC_VVC,
+		.pixfmt_name = "VVC",
+	},
+	{
 		.v4l2_codec  = V4L2_PIX_FMT_VP9,
 		.vidc_codec  = MSM_VIDC_VP9,
 		.pixfmt_name = "VP9",

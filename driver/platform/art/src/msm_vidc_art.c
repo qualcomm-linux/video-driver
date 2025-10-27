@@ -110,35 +110,6 @@ static const struct msm_platform_core_capability core_data_art[] = {
 	{SUPPORTS_MINIDUMP, 1},
 };
 
-static int msm_vidc_adjust_bitrate_apv(void *instance,
-			struct v4l2_ctrl *ctrl)
-{
-	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
-
-	u32 adjusted_value = 0, resolution = 0;
-	struct v4l2_format *output_fmt;
-
-	adjusted_value =  ctrl ? ctrl->val : inst->capabilities[BIT_RATE].value;
-	output_fmt = &inst->fmts[OUTPUT_PORT];
-	resolution = output_fmt->fmt.pix_mp.width * output_fmt->fmt.pix_mp.height;
-
-	/* Set user input bitrate for 8k session if input bitrate >= 2gpbs */
-	if (resolution >= 7680 * 4320 && msm_vidc_apv_bitrate >= 2000000000) {
-		/* Max bitrate allowed is 3.3gbps */
-		if (msm_vidc_apv_bitrate > 3.3 * 1000 * 1000 * 1000) {
-			i_vpr_h(inst, "%s:  limit APV bitrate to 3.3Gbps\n", __func__);
-			msm_vidc_apv_bitrate = 3.3 * 1000 * 1000 * 1000;
-		}
-		i_vpr_h(inst, "%s: update bitrate to %u for 8k resolution\n",
-			__func__, msm_vidc_apv_bitrate);
-		adjusted_value = msm_vidc_apv_bitrate;
-	}
-
-	msm_vidc_update_cap_value(inst, BIT_RATE, adjusted_value, __func__);
-
-	return 0;
-}
-
 static struct msm_platform_inst_capability instance_cap_data_art[] = {
 	/* {cap, domain, codec,
 	 *      min, max, step_or_mask, value,

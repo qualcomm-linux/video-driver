@@ -41,6 +41,11 @@ include $(VIDEO_ROOT)/config/canoe_video.conf
 LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/canoe_video.h
 endif
 
+ifeq ($(CONFIG_ARCH_ART), y)
+include $(VIDEO_ROOT)/config/art_video.conf
+LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/art_video.h
+endif
+
 ifeq ($(CONFIG_ARCH_SERAPH), y)
 include $(VIDEO_ROOT)/config/seraph_video.conf
 LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/seraph_video.h
@@ -75,6 +80,11 @@ ifeq ($(CONFIG_MSM_VIDC_CANOE), y)
 LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/canoe/inc \
                   -I$(VIDEO_DRIVER_ABS_PATH)/platform/alor/inc \
                   -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris4/inc
+endif
+
+ifeq ($(CONFIG_MSM_VIDC_ART), y)
+LINUXINCLUDE   += -I$(VIDEO_DRIVER_ABS_PATH)/platform/art/inc \
+                  -I$(VIDEO_DRIVER_ABS_PATH)/variant/iris5/inc
 endif
 
 ifeq ($(CONFIG_MSM_VIDC_SERAPH), y)
@@ -151,6 +161,14 @@ msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/canoe/src/msm_vidc_canoe.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris4/src/msm_vidc_bus_iris4.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris4/src/msm_vidc_clock_iris4.o \
                   $(VIDEO_DRIVER_REL_PATH)/variant/iris4/src/msm_vidc_iris4.o
+endif
+ifeq ($(CONFIG_MSM_VIDC_ART), y)
+msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/art/src/msm_vidc_art.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris5/src/msm_vidc_buffer_iris5.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris5/src/msm_vidc_power_iris5.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris5/src/msm_vidc_bus_iris5.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris5/src/msm_vidc_clock_iris5.o \
+                  $(VIDEO_DRIVER_REL_PATH)/variant/iris5/src/msm_vidc_iris5.o
 endif
 ifeq ($(CONFIG_MSM_VIDC_SERAPH), y)
 msm_video-objs += $(VIDEO_DRIVER_REL_PATH)/platform/seraph/src/msm_vidc_seraph.o \

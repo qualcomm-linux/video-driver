@@ -1440,9 +1440,7 @@ call_res_op(core, clk_disable, core, "video_cc_mvs0c_ctl_freerun_clk");
 fail_clk_ctl_freerun:
 	call_res_op(core, clk_disable, core, "gcc_video_axi0c_clk");
 fail_clk_freerun:
-	if (ci_version >= 0x10010000)
-		// do nothing
-	else
+	if (ci_version < 0x10010000)
 		call_res_op(core, clk_disable, core, "gcc_video_axi1_clk");
 fail_power_on_substate:
 fail_video_axi1:
@@ -1632,9 +1630,7 @@ fail_clk_vpp0:
 fail_clk_bse_controller:
 	call_res_op(core, clk_disable, core, "video_cc_mvs0_clk");
 fail_clk_controller:
-	if (ci_version >= 0x10010000)
-		// do nothing
-	else
+	if (ci_version < 0x10010000)
 		call_res_op(core, clk_disable, core, "video_cc_mvs0_freerun_clk");
 fail_clk_freerun:
 	call_res_op(core, clk_disable, core, "gcc_video_axi0_clk");

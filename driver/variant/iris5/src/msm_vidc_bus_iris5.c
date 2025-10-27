@@ -471,7 +471,7 @@ static u32 calculate_bandwidth_apv_iris5(struct api_calculation_input codec_inpu
 
 static u32 calculate_bandwidth_vvcd(struct api_calculation_input codec_input, u32 *p_vvc_bse_bw)
 {
-	u32 vvcd_small_traffic_vsp;
+	u32 vvcd_small_traffic_vsp = 0;
 	u32 dec_vvc_fe_left_lb_alf_ctrl; // FE_LEFT_LINE_BUF_CTRL_ALF
 	u32 dec_vvc_fe_left_lb_alf_lcbcr; // FE_LEFT_LINE_BUF_CTRL_ALF
 	u8 num_slice_assumption = 12; // reasonable assumption encoder <12;

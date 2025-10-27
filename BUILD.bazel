@@ -70,6 +70,14 @@ ddk_headers(
 )
 
 ddk_headers(
+    name = "art_headers",
+    hdrs = glob([
+      "driver/platform/art/inc/*.h",
+    ]),
+    includes = ["driver/platform/art/inc"]
+)
+
+ddk_headers(
     name = "seraph_headers",
     hdrs = glob([
       "driver/platform/seraph/inc/*.h",
@@ -110,6 +118,14 @@ ddk_headers(
 )
 
 ddk_headers(
+    name = "iris5_headers",
+    hdrs = glob([
+      "driver/variant/iris5/inc/*.h",
+    ]),
+    includes = ["driver/variant/iris5/inc"]
+)
+
+ddk_headers(
     name = "vidc_headers",
     hdrs = glob([
       "driver/vidc/inc/*.h",
@@ -121,7 +137,7 @@ ddk_headers(
 
 ddk_headers(
     name = "video_driver_headers",
-    hdrs = [":uapi_headers", "hamoa_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "canoe_headers", "seraph_headers", "alor_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris4_headers", "vidc_headers"]
+    hdrs = [":uapi_headers", "hamoa_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "canoe_headers", "seraph_headers", "alor_headers", "art_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris4_headers", "iris5_headers", "vidc_headers"]
 )
 
 load(":target.bzl", "define_target_modules")

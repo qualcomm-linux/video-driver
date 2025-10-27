@@ -82,6 +82,14 @@ module_entry(
             "driver/platform/canoe/src/msm_vidc_canoe.c",
             "driver/platform/alor/src/msm_vidc_alor.c",
         ],
+        "CONFIG_MSM_VIDC_ART" : [
+            "driver/variant/iris5/src/msm_vidc_buffer_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_bus_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_clock_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_power_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_iris5.c",
+            "driver/platform/art/src/msm_vidc_art.c",
+        ],
         "CONFIG_MSM_VIDC_SERAPH" : [
             "driver/variant/iris4/src/msm_vidc_buffer_iris4.c",
             "driver/variant/iris4/src/msm_vidc_bus_iris4.c",
@@ -176,6 +184,14 @@ module_entry(
             "driver/variant/iris4/src/msm_vidc_bus_iris4.c",
             "driver/variant/iris4/src/msm_vidc_clock_iris4.c",
             "driver/variant/iris4/src/msm_vidc_iris4.c",
+        ],
+        "CONFIG_MSM_VIDC_ART" : [
+            "driver/platform/art/src/art.c",
+            "driver/variant/iris5/src/msm_vidc_buffer_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_power_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_bus_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_clock_iris5.c",
+            "driver/variant/iris5/src/msm_vidc_iris5.c",
         ],
         "CONFIG_MSM_VIDC_SERAPH" : [
             "driver/platform/seraph/src/seraph.c",
