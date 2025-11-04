@@ -1172,13 +1172,12 @@ static int __power_off_controller_iris5(struct msm_vidc_core *core)
 			rc = 0;
 		}
 
-		/* rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_debug_clk");
-		 * if (rc) {
-		 *	d_vpr_e("%s: disable unprepare video_cc_mvs0c_debug_clk failed\n",
-		 *					__func__);
-		 *	rc = 0;
-		 *   }
-		 */
+		rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_debug_clk");
+		if (rc) {
+			d_vpr_e("%s: disable unprepare video_cc_mvs0c_debug_clk failed\n",
+							__func__);
+			rc = 0;
+		}
 
 		rc = call_res_op(core, clk_disable, core, "video_cc_mvs0c_clk");
 		if (rc) {

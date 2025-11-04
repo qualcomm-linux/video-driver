@@ -341,7 +341,7 @@ static struct msm_platform_inst_capability instance_cap_data_art[] = {
 		V4L2_CID_MPEG_VIDC_CLIENT_ID},
 
 	{SECURE_MODE, ENC | DEC, H264 | HEVC | VVC | VP9 | AV1 | APV,
-		0, 0, 1, 0,
+		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_SECURE,
 		HFI_PROP_SECURE,
 		CAP_FLAG_NONE},

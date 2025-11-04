@@ -898,8 +898,10 @@ struct msm_vidc_hfi_frame_info {
 	u32                    fence_error;
 	u32                    av1_tile_rows_columns;
 	bool                   av1_non_uniform_tile_spacing;
-	u64                    fence_id[MAX_FENCE_COUNT];
-	u32                    fence_count;
+	u32                    tx_fence_count;
+	u32                    rx_fence_count;
+	u64                    tx_fence_id[MAX_FENCE_COUNT];
+	u64                    rx_fence_id[MAX_FENCE_COUNT];
 };
 
 struct msm_vidc_decode_vpp_delay {

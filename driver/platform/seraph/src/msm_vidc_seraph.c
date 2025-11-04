@@ -611,27 +611,27 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 		MSM_VIDC_META_ENABLE | MSM_VIDC_META_RX_INPUT,
 		0, MSM_VIDC_META_DISABLE,
 		V4L2_CID_MPEG_VIDC_METADATA_OUTPUT_TX_FENCE,
-		HFI_PROP_FENCE_OUTPUT,
+		HFI_PROP_TX_FENCE_ID_OUTPUT,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
 
 	{OUTPUT_RX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_OUTPUT_RX_FENCE_ENABLE,
-		HFI_PROP_FENCE_OUTPUT,
+		HFI_PROP_RX_FENCE_ID_OUTPUT,
 		CAP_FLAG_OUTPUT_PORT},
 
 	/* enable input rx fence feature */
 	{INPUT_RX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_INPUT_RX_FENCE_ENABLE,
-		HFI_PROP_FENCE_INPUT,
+		HFI_PROP_RX_FENCE_ID_INPUT,
 		CAP_FLAG_INPUT_PORT},
 
-	/* enable input rx fence feature */
+	/* enable input tx fence feature */
 	{INPUT_TX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_INPUT_TX_FENCE_ENABLE,
-		HFI_PROP_FENCE_INPUT,
+		HFI_PROP_TX_FENCE_ID_INPUT,
 		CAP_FLAG_INPUT_PORT},
 
 	/*
@@ -674,7 +674,7 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_FENCE_NONE,
 		V4L2_CID_MPEG_VIDC_INPUT_RX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_RX_FENCE_TYPE,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_MENU},
 
 	/* Fence type for input tx buffer */
@@ -684,7 +684,7 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_FENCE_NONE,
 		V4L2_CID_MPEG_VIDC_INPUT_TX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_TX_FENCE_TYPE,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_MENU},
 
 	{OUTPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
@@ -693,7 +693,7 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_FENCE_NONE,
 		V4L2_CID_MPEG_VIDC_OUTPUT_RX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_RX_FENCE_TYPE,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{OUTPUT_TX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
@@ -702,7 +702,7 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_SW_FENCE,
 		V4L2_CID_MPEG_VIDC_OUTPUT_TX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_TX_FENCE_TYPE,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{OUTPUT_SCID, DEC, H264 | HEVC | VP9 | AV1,
@@ -2260,22 +2260,22 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_sera
 	{INPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_input_rx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{INPUT_TX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_input_tx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{OUTPUT_TX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_output_tx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{OUTPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_output_rx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{OUTPUT_SCID, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
@@ -3047,12 +3047,16 @@ static const u32 seraph_vdec_input_properties_avc[] = {
 	HFI_PROP_NO_OUTPUT,
 	HFI_PROP_SUBFRAME_INPUT,
 	HFI_PROP_DPB_LIST,
+	HFI_PROP_TX_FENCE_ID_INPUT,
+	HFI_PROP_RX_FENCE_ID_INPUT,
 };
 
 static const u32 seraph_vdec_input_properties_hevc[] = {
 	HFI_PROP_NO_OUTPUT,
 	HFI_PROP_SUBFRAME_INPUT,
 	HFI_PROP_DPB_LIST,
+	HFI_PROP_TX_FENCE_ID_INPUT,
+	HFI_PROP_RX_FENCE_ID_INPUT,
 };
 
 static const u32 seraph_vdec_input_properties_vp9[] = {
@@ -3074,14 +3078,16 @@ static const u32 seraph_vdec_output_properties_avc[] = {
 	HFI_PROP_WORST_COMPLEXITY_FACTOR,
 	HFI_PROP_PICTURE_TYPE,
 	HFI_PROP_CABAC_SESSION,
-	HFI_PROP_FENCE_OUTPUT,
+	HFI_PROP_TX_FENCE_ID_OUTPUT,
+	HFI_PROP_RX_FENCE_ID_OUTPUT,
 };
 
 static const u32 seraph_vdec_output_properties_hevc[] = {
 	HFI_PROP_WORST_COMPRESSION_RATIO,
 	HFI_PROP_WORST_COMPLEXITY_FACTOR,
 	HFI_PROP_PICTURE_TYPE,
-	HFI_PROP_FENCE_OUTPUT,
+	HFI_PROP_TX_FENCE_ID_OUTPUT,
+	HFI_PROP_RX_FENCE_ID_OUTPUT,
 };
 
 static const u32 seraph_vdec_output_properties_vp9[] = {

@@ -914,13 +914,20 @@ int msm_vidc_v4l2_menu_to_hfi(struct msm_vidc_inst *inst,
 			*value = 1;
 			goto set_default;
 		}
-		return 0;
+		break;
+	case INPUT_TX_FENCE_TYPE:
+	case INPUT_RX_FENCE_TYPE:
+	case OUTPUT_TX_FENCE_TYPE:
+	case OUTPUT_RX_FENCE_TYPE:
+		*value = inst->capabilities[cap_id].value;
+		break;
 	default:
 		i_vpr_e(inst,
 			"%s: mapping not specified for ctrl_id: %#x\n",
 			__func__, inst->capabilities[cap_id].v4l2_id);
 		return -EINVAL;
 	}
+	return 0;
 
 set_default:
 	i_vpr_e(inst,
