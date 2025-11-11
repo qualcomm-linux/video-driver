@@ -2597,15 +2597,11 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v1[] = {
 	 *      flags}
 	 */
 
-	{FRAME_WIDTH, DEC, CODECS_ALL, 96, 4096, 1, 1920},
-
 	{FRAME_WIDTH, ENC, CODECS_ALL, 128, 4096, 1, 1920},
 
 	{FRAME_WIDTH, ENC, HEVC | APV, 96, 4096, 1, 1920},
 
 	{LOSSLESS_FRAME_WIDTH, ENC, CODECS_ALL, 128, 4096, 1, 1920},
-
-	{FRAME_HEIGHT, DEC, CODECS_ALL, 96, 7680, 1, 1080},
 
 	{FRAME_HEIGHT, ENC, CODECS_ALL, 128, 4096, 1, 1080},
 

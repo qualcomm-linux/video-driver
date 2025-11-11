@@ -5846,7 +5846,7 @@ int msm_vidc_check_core_mbps(struct msm_vidc_inst *inst)
 		/* reject encoder if all encoders mbps is greater than MAX_MBPS */
 		if (enc_mbps > core->capabilities[MAX_MBPS].value) {
 			i_vpr_e(inst, "%s: Hardware overloaded. needed %llu, max %llu", __func__,
-				mbps, core->capabilities[MAX_MBPS].value);
+				enc_mbps, core->capabilities[MAX_MBPS].value);
 			return -ENOMEM;
 		}
 		/*
@@ -6158,6 +6158,8 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 {
 	u32 width = 0, height = 0;
 	u32 num_1080p_sessions = 0, num_4k_sessions = 0, num_8k_sessions = 0;
+	u32 num_mvhevc_secure_sessions = 0;
+	s32 profile = 0;
 	struct msm_vidc_inst *i;
 	struct msm_vidc_core *core;
 
@@ -6203,6 +6205,13 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 					       736 + (736 >> 2))) {
 			num_1080p_sessions += 1;
 		}
+		profile = i->capabilities[PROFILE].value;
+		if ((i->codec == MSM_VIDC_HEVC) &&
+			(profile == V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_MULTIVIEW ||
+			profile == V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10_MULTIVIEW)) {
+			if (is_secure_session(i))
+				num_mvhevc_secure_sessions += 2;
+		}
 	}
 	core_unlock(core, __func__);
 
@@ -6224,6 +6233,14 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 		i_vpr_e(inst, "%s: total 1080p sessions %d, exceeded max limit %lld\n",
 			__func__, num_1080p_sessions,
 			core->capabilities[MAX_NUM_1080P_SESSIONS].value);
+		return -ENOMEM;
+	}
+
+	if (num_mvhevc_secure_sessions >
+		core->capabilities[MAX_SECURE_SESSION_COUNT].value) {
+		i_vpr_e(inst, "%s: total mvhevc secure sessions %d, exceeded max limit %lld\n",
+			__func__, num_mvhevc_secure_sessions,
+			core->capabilities[MAX_SECURE_SESSION_COUNT].value);
 		return -ENOMEM;
 	}
 

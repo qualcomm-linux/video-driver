@@ -388,11 +388,10 @@ static int __boot_firmware_iris5(struct msm_vidc_core *core)
 			return rc;
 
 		if ((ctrl_status & HFI_CTRL_ERROR_FATAL) ||
-		    (ctrl_status & HFI_CTRL_ERROR_UC_REGION_NOT_SET) ||
-		    (ctrl_status & HFI_CTRL_ERROR_HW_FENCE_QUEUE)) {
-			d_vpr_e("%s: boot firmware failed, ctrl status %#x\n",
-				__func__, ctrl_status);
-			return -EINVAL;
+			(ctrl_status & HFI_CTRL_ERROR_UC_REGION_NOT_SET) ||
+			(ctrl_status & HFI_CTRL_ERROR_HW_FENCE_QUEUE)) {
+			rc = -EINVAL;
+			goto boot_error;
 		} else if (ctrl_status & HFI_CTRL_READY) {
 			d_vpr_h("%s: boot firmware is successful, ctrl status %#x\n",
 				__func__, ctrl_status);
@@ -404,8 +403,8 @@ static int __boot_firmware_iris5(struct msm_vidc_core *core)
 	}
 
 	if (count >= max_tries) {
-		d_vpr_e(FMT_STRING_BOOT_FIRMWARE_ERROR, ctrl_status, ctrl_init_val);
-		return -ETIME;
+		rc = -ETIME;
+		goto boot_error;
 	}
 
 	/* Enable interrupt before sending commands to venus */
@@ -417,6 +416,11 @@ static int __boot_firmware_iris5(struct msm_vidc_core *core)
 	if (rc)
 		return rc;
 
+	return rc;
+
+boot_error:
+	__read_register(core, HFI_CTRL_INIT_IRIS5, &ctrl_init_val);
+	d_vpr_e(FMT_STRING_BOOT_FIRMWARE_ERROR, ctrl_status, ctrl_init_val);
 	return rc;
 }
 
@@ -1885,8 +1889,79 @@ static int __noc_error_info_iris5(struct msm_vidc_core *core)
 	return rc;
 }
 
+static int __ahb_sync_reset_apv_iris5(struct msm_vidc_core *core)
+{
+	u32 value = 0;
+	int rc = 0;
+
+	if (!is_hw_enabled_iris5(core, "apv"))
+		return 0;
+
+	rc = __read_register(core, WRAPPER_EFUSE_MONITOR_IRIS5, &value);
+	if (rc)
+		return rc;
+
+	if (is_vpu_1p_iris5(core) || (value & BIT(27)))
+		return 0;
+
+	d_vpr_h("%s: ahb reset\n", __func__);
+
+	/*
+	 * Reset both sides of 2 ahb2ahb_bridges (TZ and non-TZ)
+	 * do we need to check status register here?
+	 */
+	rc = __write_register(core, VCODEC_VPU_CPU_CS_APV_BRIDGE_SYNC_RESET_IRIS5, 0x3);
+	if (rc)
+		return rc;
+	rc = __write_register(core, VCODEC_VPU_CPU_CS_APV_BRIDGE_SYNC_RESET_IRIS5, 0x2);
+	if (rc)
+		return rc;
+	rc = __write_register(core, VCODEC_VPU_CPU_CS_APV_BRIDGE_SYNC_RESET_IRIS5, 0x0);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
+static int __ahb_sync_reset_hardware_iris5(struct msm_vidc_core *core)
+{
+	int rc = 0;
+
+	d_vpr_h("%s: ahb reset\n", __func__);
+
+	/*
+	 * Reset both sides of 2 ahb2ahb_bridges (TSW and non-TSW)
+	 */
+	rc = __write_register(core, CPU_CS_AHB_BRIDGE_SYNC_RESET_IRIS5, 0x3);
+	if (rc)
+		return rc;
+	rc = __write_register(core, CPU_CS_AHB_BRIDGE_SYNC_RESET_IRIS5, 0x2);
+	if (rc)
+		return rc;
+	rc = __write_register(core, CPU_CS_AHB_BRIDGE_SYNC_RESET_IRIS5, 0x0);
+	if (rc)
+		return rc;
+
+	return rc;
+}
+
 static int __hw_ctrl_gdsc_iris5(struct msm_vidc_core *core)
 {
+	int rc = 0;
+
+	/**
+	 * switching hw_ctrl will turn off the core, so perform
+	 * ahb reset before hw_ctrl switch to avoid secure retention
+	 * register corruption issue.
+	 */
+	rc = __ahb_sync_reset_apv_iris5(core);
+	if (rc)
+		return rc;
+
+	rc = __ahb_sync_reset_hardware_iris5(core);
+	if (rc)
+		return rc;
+
 	return call_res_op(core, gdsc_hw_ctrl, core);
 }
 
