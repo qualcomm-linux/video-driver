@@ -1755,6 +1755,9 @@ static int msm_vidc_decide_scaling_iris4(struct msm_vidc_inst *inst)
 	if (msm_vidc_update_scaling_iris4(inst, aspect_ratio_w, aspect_ratio_h))
 		goto exit;
 
+	inst->crop.width = inst->compose.width;
+	inst->crop.height = inst->compose.height;
+
 	i_vpr_h(inst,
 		"%s: scaling enabled, input wxh: %dx%d, compose wxh: %dx%d\n",
 		__func__, input_width, input_height,

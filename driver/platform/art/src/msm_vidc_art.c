@@ -302,9 +302,9 @@ static struct msm_platform_inst_capability instance_cap_data_art[] = {
 
 	{SCALE_FACTOR, ENC, H264 | HEVC | APV, 1, 8, 1, 8},
 
-	{SCALE_FACTOR, DEC, H264 | HEVC | AV1, 1, 8, 1, 8},
+	{SCALE_FACTOR, DEC, H264 | HEVC | AV1 | VP9, 1, 8, 1, 8},
 
-	{SCALE_ENABLE, DEC, H264 | HEVC | AV1, 0, 1, 1, 0},
+	{SCALE_ENABLE, DEC, H264 | HEVC | AV1 | VP9, 0, 1, 1, 0},
 
 	{MB_CYCLES_VSP, ENC, CODECS_ALL, 25, 25, 1, 25},
 
@@ -614,8 +614,9 @@ static struct msm_platform_inst_capability instance_cap_data_art[] = {
 
 	{BITRATE_MODE, ENC, APV,
 		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
-		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
-		BIT(V4L2_MPEG_VIDEO_BITRATE_MODE_VBR),
+		V4L2_MPEG_VIDEO_BITRATE_MODE_CQ,
+		BIT(V4L2_MPEG_VIDEO_BITRATE_MODE_VBR) |
+		BIT(V4L2_MPEG_VIDEO_BITRATE_MODE_CQ),
 		V4L2_MPEG_VIDEO_BITRATE_MODE_VBR,
 		V4L2_CID_MPEG_VIDEO_BITRATE_MODE,
 		HFI_PROP_RATE_CONTROL,
@@ -670,6 +671,13 @@ static struct msm_platform_inst_capability instance_cap_data_art[] = {
 
 	{CONSTANT_QUALITY, ENC, HEIC,
 		1, MAX_CONSTANT_QUALITY, 1, 100,
+		V4L2_CID_MPEG_VIDEO_CONSTANT_QUALITY,
+		HFI_PROP_CONSTANT_QUALITY,
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_INPUT_PORT |
+			CAP_FLAG_DYNAMIC_ALLOWED},
+
+	{CONSTANT_QUALITY, ENC, APV,
+		1, MAX_CONSTANT_QUALITY, 1, 90,
 		V4L2_CID_MPEG_VIDEO_CONSTANT_QUALITY,
 		HFI_PROP_CONSTANT_QUALITY,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_INPUT_PORT |
@@ -2355,7 +2363,8 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_art[
 		msm_vidc_set_u32_enum},
 
 	{BITRATE_MODE, ENC, APV,
-		{BIT_RATE, PEAK_BITRATE, META_EVA_STATS, TIME_DELTA_BASED_RC},
+		{BIT_RATE, PEAK_BITRATE, META_EVA_STATS, TIME_DELTA_BASED_RC,
+			CONSTANT_QUALITY},
 		msm_vidc_adjust_bitrate_mode,
 		msm_vidc_set_u32_enum},
 
@@ -2367,6 +2376,11 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_art[
 	{CONSTANT_QUALITY, ENC, HEVC | HEIC,
 		{0},
 		NULL,
+		msm_vidc_set_constant_quality},
+
+	{CONSTANT_QUALITY, ENC, APV,
+		{BIT_RATE},
+		msm_vidc_adjust_constant_quality,
 		msm_vidc_set_constant_quality},
 
 	{GOP_SIZE, ENC, H264 | HEVC | HEIC,

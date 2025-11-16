@@ -406,56 +406,102 @@ decision_done:
 	return 0;
 }
 
-static int msm_vidc_update_scaling_iris5p(struct msm_vidc_inst *inst,
-		u32 aspect_ratio_w, u32 aspect_ratio_h)
+int msm_vidc_update_scaling_iris5p(struct msm_vidc_inst *inst)
 {
-	u32 wxh_contraint = 32;
 	u32 input_width, input_height;
-	u32 factor, factor_w, factor_h;
+	u32 output_crop_width, output_crop_height;
+	u32 output_width, output_height;
+	u32 factor_w, factor_h, aspect_factor;
 
 	input_width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 	input_height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
 
-	/* adjust compose width and height based on video hardware requirements */
-	factor_w = inst->compose.width / (aspect_ratio_w * wxh_contraint);
+	/*
+	 * Calculate aspect factor using width-based scaling.
+	 * As kernel don't support floating point so left
+	 * shifting the numerator by 16.
+	 */
+	aspect_factor = ((u64)inst->crop.width << 16) / inst->compose.width;
 
-	if ((factor_w * (aspect_ratio_w * wxh_contraint)) < inst->compose.width)
-		factor_w++;
-	factor_h = inst->compose.height / (aspect_ratio_h * wxh_contraint);
-	if ((factor_h * (aspect_ratio_h * wxh_contraint)) < inst->compose.height)
-		factor_h++;
-	factor = (factor_w < factor_h) ? factor_w : factor_h;
+	/* Calculate output crop dimensions and make them multiple of 4 */
+	output_crop_width = ((inst->compose.width + 4 - 1) >> 2) << 2;
+	output_crop_height =
+		(((((uint64_t)inst->crop.height << 16) / aspect_factor) + 4 - 1) >> 2) << 2;
 
-	inst->compose.top = 0;
-	inst->compose.left = 0;
-	inst->compose.width = factor * aspect_ratio_w * wxh_contraint;
-	inst->compose.height = factor * aspect_ratio_h * wxh_contraint;
+	bool crop_en_right  = (input_width  != inst->crop.width);
+	bool crop_en_bottom = (input_height != inst->crop.height);
 
-	/* disable downscaling if updated compose >= input width/height */
-	if (inst->compose.width >= input_width ||
-	    inst->compose.height >= input_height) {
-		i_vpr_h(inst, "%s: compose wxh %ux%u >= input wxh %ux%u\n",
-			__func__, inst->compose.width, inst->compose.height,
+	/*
+	 * Adjust output width and height based on video hardware requirements.
+	 * round it down to the nearest even number using bitwise AND with 0xFFFE.
+	 */
+	if (crop_en_right) {
+		factor_w = (input_width * output_crop_width) / inst->crop.width;
+		output_width = factor_w & 0xFFFE;
+	} else {
+		output_width = output_crop_width;
+	}
+
+	if (crop_en_bottom) {
+		factor_h = (input_height * output_crop_height) / inst->crop.height;
+		output_height = factor_h & 0xFFFE;
+	} else {
+		output_height = output_crop_height;
+	}
+
+	/* disable downscaling if updated compose width and height not between 128 and 8192*/
+	if (output_width < 128 || output_width > 8192) {
+		i_vpr_h(inst, "%s: output_width %u must be between 128 and 8192\n",
+			__func__, output_width);
+		return -EINVAL;
+	}
+
+	if (output_height < 128 || output_height > 8192) {
+		i_vpr_h(inst, "%s: output_height %u must be between 128 and 8192\n",
+			__func__, output_height);
+		return -EINVAL;
+	}
+
+	/* disable downscaling if updated compose > input width/height */
+	if (output_width > input_width ||
+	    output_height > input_height) {
+		i_vpr_h(inst, "%s: compose wxh %ux%u > input wxh %ux%u\n",
+			__func__, output_width, output_height,
 			input_width, input_height);
 		return -EINVAL;
 	}
 
 	/* disable downscaling if updated compose is beyond 1/8 of input */
-	if (inst->compose.width < input_width / 8 ||
-	    inst->compose.height < input_height / 8) {
+	if (output_width < input_width / 8 ||
+	    output_height < input_height / 8) {
 		i_vpr_h(inst, "%s: compose wxh %ux%u < 1/8 of input wxh %ux%u\n",
-			__func__, inst->compose.width, inst->compose.height,
+			__func__, output_width, output_height,
 			input_width, input_height);
 		return -EINVAL;
 	}
+
+	/* both input and output width (height) cannot be 8192 */
+	if ((output_width == 8192 && input_width == 8192) ||
+		(output_height == 8192 && input_height == 8192)) {
+		i_vpr_h(inst, "%s: both input and output width or height can not be 8192\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	inst->compose.width = output_width;
+	inst->compose.height = output_height;
+	inst->crop.width =
+		(input_width  != inst->crop.width) ? output_crop_width : inst->compose.width;
+	inst->crop.height =
+		(input_height != inst->crop.height) ? output_crop_height : inst->compose.height;
 
 	return 0;
 }
 
 int msm_vidc_decide_scaling_iris5p(struct msm_vidc_inst *inst)
 {
-	u32 aspect_ratio_w = 0, aspect_ratio_h = 0;
 	u32 input_width = 0, input_height = 0;
+	u32 input_crop_width = 0, input_crop_height = 0;
 
 	/* check if scaling requested */
 	if (!inst->capabilities[SCALE_ENABLE].value)
@@ -469,29 +515,31 @@ int msm_vidc_decide_scaling_iris5p(struct msm_vidc_inst *inst)
 	if (inst->capabilities[SCALE_FACTOR].max <= 1)
 		goto exit;
 
-	/* downscaling supported for AVC, HEVC, AV1 (not VP9, APV) */
+	/* downscaling supported for AVC, HEVC, AV1, VP9 (not APV) */
 	if (inst->codec != MSM_VIDC_H264 &&
 	    inst->codec != MSM_VIDC_HEVC &&
-	    inst->codec != MSM_VIDC_AV1)
+	    inst->codec != MSM_VIDC_AV1  &&
+	    inst->codec != MSM_VIDC_VP9)
 		goto exit;
 
 	input_width = inst->fmts[INPUT_PORT].fmt.pix_mp.width;
 	input_height = inst->fmts[INPUT_PORT].fmt.pix_mp.height;
+	input_crop_width = inst->crop.width;
+	input_crop_height = inst->crop.height;
 
-	/* downscaling not supported for odd resolution */
-	if (input_width & 0x1 || input_height & 0x1) {
-		i_vpr_h(inst, "%s: odd wxh %ux%u\n",
-			__func__, input_width, input_height);
+	/* downscaling not supported if crop top or left offset are present */
+	if (inst->crop.top || inst->crop.left) {
+		i_vpr_e(inst, "%s: crop_top %u crop_left %u\n",
+			__func__, inst->crop.top, inst->crop.left);
 		goto exit;
 	}
 
-	/* downscaling not supported if crop is present */
-	if (inst->crop.top || inst->crop.left ||
-	    inst->crop.width != input_width ||
-	    inst->crop.height != input_height) {
-		i_vpr_h(inst, "%s: crop %ux%u != wxh %ux%u\n",
+	/* disable downscaling if crop more than input */
+	if (inst->crop.width > input_width ||
+	    inst->crop.height > input_height) {
+		i_vpr_e(inst, "%s: crop %ux%u > compose %ux%u\n",
 			__func__, inst->crop.width, inst->crop.height,
-			input_width, input_height);
+			inst->compose.width, inst->compose.height);
 		goto exit;
 	}
 
@@ -501,6 +549,11 @@ int msm_vidc_decide_scaling_iris5p(struct msm_vidc_inst *inst)
 		i_vpr_h(inst, "%s: compose %ux%u >= crop %ux%u\n",
 			__func__, inst->compose.width, inst->compose.height,
 			inst->crop.width, inst->crop.height);
+		goto exit;
+	}
+
+	if (inst->compose.width == 0 || inst->compose.height == 0) {
+		i_vpr_e(inst, "%s: client set invalid ds width or height\n", __func__);
 		goto exit;
 	}
 
@@ -525,42 +578,40 @@ int msm_vidc_decide_scaling_iris5p(struct msm_vidc_inst *inst)
 
 	/*
 	 * downscaling supported for input resolutions
-	 * 7680x4320, 4320x7680, 8192x4320 or 4320x8192 only
+	 * between 128 and 8192 only
 	 */
-	if (input_width == 7680 && input_height == 4320) {
-		if (inst->compose.width > inst->compose.height) {
-			aspect_ratio_w = 16;
-			aspect_ratio_h = 9;
-		}
-	} else if (input_width == 4320 && input_height == 7680) {
-		if (inst->compose.width < inst->compose.height) {
-			aspect_ratio_w = 9;
-			aspect_ratio_h = 16;
-		}
-	} else if (input_width == 8192 && input_height == 4320) {
-		if (inst->compose.width > inst->compose.height) {
-			aspect_ratio_w = 19;
-			aspect_ratio_h = 10;
-		}
-	} else if (input_width == 4320 && input_height == 8192) {
-		if (inst->compose.width < inst->compose.height) {
-			aspect_ratio_w = 10;
-			aspect_ratio_h = 19;
-		}
-	}
-	if (!aspect_ratio_w || !aspect_ratio_h) {
-		i_vpr_h(inst, "%s: aspect ratio %ux%u\n",
-			__func__, aspect_ratio_w, aspect_ratio_h);
+	if (input_width < 128 || input_width > 8192) {
+		i_vpr_h(inst, "%s: input_width %u must be between 128 and 8192\n",
+			__func__, input_width);
 		goto exit;
 	}
 
-	if (msm_vidc_update_scaling_iris5p(inst, aspect_ratio_w, aspect_ratio_h))
+	if (input_height < 128 || input_height > 8192) {
+		i_vpr_h(inst, "%s: input_height %u must be between 128 and 8192\n",
+			__func__, input_height);
+		goto exit;
+	}
+
+	if (input_crop_width < 128 || input_crop_width > 8192) {
+		i_vpr_h(inst, "%s: input_crop_width %u must be between 128 and 8192\n",
+			__func__, input_crop_width);
+		goto exit;
+	}
+
+	if (input_crop_height < 128 || input_crop_height > 8192) {
+		i_vpr_h(inst, "%s: input_crop_height %u must be between 128 and 8192\n",
+			__func__, input_crop_height);
+		goto exit;
+	}
+
+	if (msm_vidc_update_scaling_iris5p(inst))
 		goto exit;
 
 	i_vpr_h(inst,
-		"%s: scaling enabled, input wxh: %dx%d, compose wxh: %dx%d\n",
+		"%s: scaling enabled, input wxh: %dx%d, compose wxh: %dx%d, crop wxh: %dx%d\n",
 		__func__, input_width, input_height,
-		inst->compose.width, inst->compose.height);
+		inst->compose.width, inst->compose.height,
+		inst->crop.width, inst->crop.height);
 
 	return 0;
 
@@ -570,10 +621,12 @@ exit:
 	inst->compose.width = inst->crop.width;
 	inst->compose.height = inst->crop.height;
 	msm_vidc_update_cap_value(inst, SCALE_ENABLE, 0, __func__);
+
 	i_vpr_h(inst,
-		"%s: scaling disabled, input wxh: %dx%d, compose wxh: %dx%d\n",
+		"%s: scaling disabled, input wxh: %dx%d, compose wxh: %dx%d, crop wxh: %dx%d\n",
 		__func__, input_width, input_height,
-		inst->compose.width, inst->compose.height);
+		inst->compose.width, inst->compose.height,
+		inst->crop.width, inst->crop.height);
 
 	return 0;
 }

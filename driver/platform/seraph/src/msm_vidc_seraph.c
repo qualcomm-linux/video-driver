@@ -950,13 +950,13 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 		0},
 
 	{B_FRAME, ENC, H264 | HEVC,
-		0, 0, 1, 0,
+		0, 7, 1, 0,
 		V4L2_CID_MPEG_VIDEO_B_FRAMES,
 		HFI_PROP_MAX_B_FRAMES,
 		CAP_FLAG_OUTPUT_PORT},
 
 	{B_FRAME, ENC, HEIC,
-		0, 0, 1, 0,
+		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDEO_B_FRAMES,
 		HFI_PROP_MAX_B_FRAMES,
 		CAP_FLAG_OUTPUT_PORT},
@@ -1219,8 +1219,9 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 			CAP_FLAG_DYNAMIC_ALLOWED},
 
 	{LAYER_TYPE, ENC, HEVC,
+		V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B,
 		V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P,
-		V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P,
+		BIT(V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B) |
 		BIT(V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P),
 		V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P,
 		V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE,
@@ -1228,8 +1229,9 @@ static struct msm_platform_inst_capability instance_cap_data_seraph[] = {
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{LAYER_TYPE, ENC, H264,
+		V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_B,
 		V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_P,
-		V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_P,
+		BIT(V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_B) |
 		BIT(V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_P),
 		V4L2_MPEG_VIDEO_H264_HIERARCHICAL_CODING_P,
 		V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_TYPE,
@@ -2905,6 +2907,14 @@ static const struct regulator_table seraph_regulator_table[] = {
 	{ "vpp1",     1 },
 };
 
+/* name, hw_trigger, hw_enable */
+static struct pd_table seraph_pd_table[] = {
+	{ "iris-ctl", 0, 1 },
+	{ "vcodec",   1, 1 },
+	{ "vpp0",     1, 1 },
+	{ "vpp1",     1, 1 },
+};
+
 /* name, clock id, scaling */
 static const struct clk_table seraph_clk_table[] = {
 	{ "gcc_video_axi0_clk",         GCC_VIDEO_AXI0_CLK,         0 },
@@ -3112,8 +3122,6 @@ static const struct msm_vidc_platform_data seraph_data = {
 	/* resources dependent on other module */
 	.bw_tbl = seraph_bw_table,
 	.bw_tbl_size = ARRAY_SIZE(seraph_bw_table),
-	.regulator_tbl = seraph_regulator_table,
-	.regulator_tbl_size = ARRAY_SIZE(seraph_regulator_table),
 	.clk_tbl = seraph_clk_table,
 	.clk_tbl_size = ARRAY_SIZE(seraph_clk_table),
 	.clk_rst_tbl = seraph_clk_reset_table,
@@ -3195,8 +3203,18 @@ static int msm_vidc_seraph_check_ddr_type(void)
 
 int msm_vidc_get_platform_data_seraph(struct msm_vidc_core *core)
 {
+	struct device *dev = &core->pdev->dev;
+
 	d_vpr_h("%s: initialize seraph data\n", __func__);
 	core->platform->data = seraph_data;
+
+	if (of_device_is_compatible(dev->of_node, "qcom,seraph-vidc")) {
+		core->platform->data.regulator_tbl = seraph_regulator_table;
+		core->platform->data.regulator_tbl_size = ARRAY_SIZE(seraph_regulator_table);
+	} else {
+		core->platform->data.pd_tbl = seraph_pd_table;
+		core->platform->data.pd_tbl_size = ARRAY_SIZE(seraph_pd_table);
+	}
 
 	return 0;
 }

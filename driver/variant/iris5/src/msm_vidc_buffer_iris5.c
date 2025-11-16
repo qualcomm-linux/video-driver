@@ -196,8 +196,13 @@ static u32 msm_vidc_decoder_line_size_iris5(struct msm_vidc_inst *inst)
 						num_vpp_pipes);
 		}
 	} else if (inst->codec == MSM_VIDC_VP9) {
-		HFI_BUFFER_LINE_VP9D_IRIS5(size, width, height, 0, 0,
-					is_opb, num_vpp_pipes);
+		if (inst->capabilities[SCALE_ENABLE].value) {
+			HFI_BUFFER_LINE_VP9D_IRIS5(size, width, height,
+				ds_width, ds_height, is_opb, num_vpp_pipes);
+		} else {
+			HFI_BUFFER_LINE_VP9D_IRIS5(size, width, height, 0, 0,
+						is_opb, num_vpp_pipes);
+		}
 	} else if (inst->codec == MSM_VIDC_AV1) {
 		if (inst->capabilities[SCALE_ENABLE].value) {
 			HFI_BUFFER_LINE_AV1D_DS_IRIS5(size, width, height,

@@ -1509,8 +1509,6 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 	output_fmt = v4l2_colorformat_to_driver(inst,
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat, __func__);
 	if (is_dec_scaling_enabled(inst)) {
-		inst->crop.width = inst->compose.width;
-		inst->crop.height = inst->compose.height;
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.width = inst->compose.width;
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.height = inst->compose.height;
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.plane_fmt[0].bytesperline =

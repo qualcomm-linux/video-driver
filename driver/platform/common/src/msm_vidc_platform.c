@@ -292,6 +292,12 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.init_platform              = msm_vidc_init_platform_seraph,
 		.init_iris                  = msm_vidc_init_iris4,
 	},
+	{
+		.compat                     = "qcom,seraph-vidc-v2",
+		.get_platform_data          = msm_vidc_get_platform_data_seraph,
+		.init_platform              = msm_vidc_init_platform_seraph,
+		.init_iris                  = msm_vidc_init_iris4,
+	},
 #endif
 #if defined(CONFIG_MSM_VIDC_NORDAU)
 	{
