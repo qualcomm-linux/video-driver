@@ -147,6 +147,7 @@ struct msm_vidc_core {
 	struct msm_vidc_synx_fence_data        synx_fence_data;
 	/* hw_version: distinguish chip versions: v1, v2 */
 	enum msm_vidc_hw_version               hw_version;
+	int                                    cb_count;
 };
 
 #endif // _MSM_VIDC_CORE_H_
