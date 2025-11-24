@@ -108,6 +108,7 @@ static const struct msm_platform_core_capability core_data_art[] = {
 	{DEVICE_CAPS, V4L2_CAP_VIDEO_M2M_MPLANE | V4L2_CAP_META_CAPTURE | V4L2_CAP_STREAMING},
 	{SUPPORTS_REQUESTS, 0},
 	{SUPPORTS_MINIDUMP, 1},
+	{SUPPORTS_CROP_SCALING, 1},
 };
 
 static struct msm_platform_inst_capability instance_cap_data_art[] = {
@@ -3015,10 +3016,9 @@ const struct context_bank_table art_context_bank_table[] = {
 	{"qcom,vidc,cb-sec-non-pxl",    0x01000000, 0x24800000, 1, 0,
 		MSM_VIDC_SECURE_NONPIXEL,      0 },
 	{"qcom,vidc,cb-ns",             0x25800000, 0xda400000, 0, 1,
-		MSM_VIDC_NON_SECURE |
-		MSM_VIDC_NON_SECURE_BITSTREAM, 0 },
+		MSM_VIDC_NON_SECURE,           0 },
 	{"qcom,vidc,cb-ns-bitstream",   0x00100000, 0xffb00000, 0, 1,
-		MSM_VIDC_REGION_NONE,          0 },
+		MSM_VIDC_NON_SECURE_BITSTREAM, 0 },
 	{"qcom,vidc,cb-ns-pxl",         0x00100000, 0xffb00000, 0, 1,
 		MSM_VIDC_NON_SECURE_PIXEL,     0 },
 	{"qcom,vidc,cb-sec-pxl",        0x00100000, 0xffb00000, 1, 0,

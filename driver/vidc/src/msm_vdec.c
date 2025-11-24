@@ -145,6 +145,55 @@ static int msm_vdec_set_scale_resolution(struct msm_vidc_inst *inst)
 	return rc;
 }
 
+static int msm_vdec_set_scale_crop(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	struct msm_vidc_core *core;
+	u32 payload[2] = {0};
+	u32 left_offset, top_offset, ds_crop_width, ds_crop_height;
+
+	if (!inst || !inst->core) {
+		i_vpr_e(inst, "%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	core = inst->core;
+	if (!core->capabilities[SUPPORTS_CROP_SCALING].value)
+		return 0;
+
+	left_offset = inst->crop.left;
+	top_offset = inst->crop.top;
+	ds_crop_width = inst->crop.width;
+	ds_crop_height = inst->crop.height;
+
+	if (inst->capabilities[SCALE_ENABLE].value &&
+		(inst->crop.width <= inst->compose.width ||
+		inst->crop.height <= inst->compose.height)) {
+		payload[0] = left_offset << 16 | top_offset;
+		payload[1] = ds_crop_width << 16 | ds_crop_height;
+		i_vpr_h(inst,
+			"%s: left_offset: %d top_offset: %d ds_crop_width: %d ds_crop_height: %d\n",
+			__func__, left_offset, top_offset, ds_crop_width, ds_crop_height);
+	} else {
+		i_vpr_e(inst, "%s: ds crop resolution set as 0\n", __func__);
+		return -EINVAL;
+	}
+
+	rc = venus_hfi_session_property(inst,
+					HFI_PROP_DOWNSCALE_CROP_RECTANGLE,
+					HFI_HOST_FLAGS_NONE,
+					HFI_PORT_RAW,
+					HFI_PAYLOAD_64_PACKED,
+					&payload,
+					sizeof(u64));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_linear_stride_scanline(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -740,6 +789,10 @@ static int msm_vdec_set_output_properties(struct msm_vidc_inst *inst)
 		return rc;
 
 	rc = msm_vdec_set_scale_resolution(inst);
+	if (rc)
+		return rc;
+
+	rc = msm_vdec_set_scale_crop(inst);
 	if (rc)
 		return rc;
 
