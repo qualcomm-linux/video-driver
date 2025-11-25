@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _MSM_VIDC_VB2_H_
@@ -31,7 +31,7 @@ void *msm_vb2_attach_dmabuf(struct vb2_buffer *vb, struct device *dev,
 #endif
 
 void msm_vb2_put(void *buf_priv);
-int msm_vb2_mmap(void *buf_priv, struct vm_area_struct *vma);
+int msm_vb2_mmap(void *dmabuf, struct vm_area_struct *vma);
 struct dma_buf *msm_vb2_get_dmabuf(struct vb2_buffer *vb,
 				   void *buf_priv,
 				   unsigned long flags);

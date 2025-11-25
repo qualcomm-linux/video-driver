@@ -18,6 +18,7 @@
 
 extern struct msm_vidc_core *g_core;
 
+static struct sg_table *vb2_dc_get_base_sgt(struct msm_vidc_buffer *buf);
 static void msm_vb2_vm_open(struct vm_area_struct *vma);
 static void msm_vb2_vm_close(struct vm_area_struct *vma);
 
@@ -65,9 +66,16 @@ void *msm_vb2_alloc(struct vb2_buffer *vb, struct device *dev,
 	struct msm_vidc_buffer *buf;
 	struct msm_vidc_inst *inst;
 	struct msm_vidc_core *core;
+	struct msm_vidc_dma_buf_info *dinfo;
 
-	if (!vb || !dev || !vb->vb2_queue)
+	dinfo = kzalloc(sizeof(*dinfo), GFP_KERNEL);
+	if (!dinfo)
+		return NULL;
+
+	if (!vb || !dev || !vb->vb2_queue) {
+		kfree(dinfo);
 		return ERR_PTR(-EINVAL);
+	}
 
 	inst = vb->vb2_queue->drv_priv;
 	inst = get_inst_ref(g_core, inst);
@@ -109,12 +117,20 @@ void *msm_vb2_alloc(struct vb2_buffer *vb, struct device *dev,
 		goto error;
 	}
 
-	buf->handler.refcount = &buf->refcount;
-	buf->handler.put = msm_vb2_put;
-	buf->handler.arg = buf;
-
-	refcount_set(&buf->refcount, 1);
-
+	buf->sg_table = vb2_dc_get_base_sgt(buf);
+	if (!buf->sg_table) {
+		i_vpr_e(inst, "Failed to build sg_table for buffer\n");
+		dma_free_attrs(cb->dev,
+			       buf->buffer_size,
+			       buf->kvaddr,
+			       buf->device_addr,
+			       buf->dma_attrs);
+		goto error;
+	}
+	dinfo->buf = buf;
+	refcount_set(&dinfo->refcount, 1);
+	d_vpr_l("%s: refcount set to %d\n", __func__, refcount_read(&dinfo->refcount));
+	buf->dma_buf_info = dinfo;
 	return buf;
 
 error:
@@ -187,6 +203,8 @@ void msm_vb2_vm_open(struct vm_area_struct *vma)
 		return;
 
 	refcount_inc(h->refcount);
+	d_vpr_l("%s: refcount incremented to %d dbuf: %pK\n", __func__,
+		refcount_read(h->refcount), h->arg);
 }
 
 void msm_vb2_vm_close(struct vm_area_struct *vma)
@@ -196,8 +214,9 @@ void msm_vb2_vm_close(struct vm_area_struct *vma)
 	if (IS_ERR_OR_NULL(h))
 		return;
 
-	if (h->put && h->arg)
-		h->put(h->arg);
+	refcount_dec(h->refcount);
+	d_vpr_l("%s: refcount decremented to %d dbuf: %pK\n", __func__,
+		refcount_read(h->refcount), h->arg);
 }
 
 static const struct vm_operations_struct msm_vb2_vm_dma_ops = {
@@ -208,7 +227,9 @@ static const struct vm_operations_struct msm_vb2_vm_dma_ops = {
 void msm_vb2_put(void *buf_priv)
 {
 	struct msm_vidc_buffer *buf = buf_priv;
+	struct msm_vidc_buffer *temp, *dummy;
 	enum msm_vidc_buffer_region region;
+	struct msm_vidc_buffers *buffers;
 	struct context_bank_info *cb;
 	struct msm_vidc_inst *inst;
 	struct msm_vidc_core *core;
@@ -222,9 +243,6 @@ void msm_vb2_put(void *buf_priv)
 
 	core = inst->core;
 
-	if (refcount_read(&buf->refcount) == 0)
-		return;
-
 	region = call_mem_op(core, buffer_region, inst, buf->type);
 	cb = msm_vidc_get_context_bank_for_region(inst->core, region);
 	if (!cb) {
@@ -232,52 +250,53 @@ void msm_vb2_put(void *buf_priv)
 		return;
 	}
 
-	if (!refcount_dec_and_test(&buf->refcount))
+	buffers = msm_vidc_get_buffers(inst, buf->type, __func__);
+	if (!buffers)
 		return;
 
-	if (buf->kvaddr && buf->device_addr) {
+	if (buf->dma_buf_info && refcount_dec_and_test(&buf->dma_buf_info->refcount)) {
+		i_vpr_h(inst, "%s: dma_free_atts: device_addr %llu, size %d\n",
+			__func__, buf->device_addr, buf->buffer_size);
 		dma_free_attrs(cb->dev, buf->buffer_size, buf->kvaddr,
 			       buf->device_addr, buf->dma_attrs);
-		buf->kvaddr = NULL;
-		buf->device_addr = 0x0;
+	} else {
+		d_vpr_l("%s: refcount decremented to %d dbuf: %pK\n", __func__,
+			refcount_read(&buf->dma_buf_info->refcount), buf->dmabuf);
 	}
-	put_inst(inst);
+
+	list_for_each_entry_safe(temp, dummy, &buffers->list, list) {
+		if (temp == buf) {
+			temp->dmabuf = NULL;
+			list_del_init(&temp->list);
+			msm_vidc_pool_free(inst, temp);
+			break;
+		}
+	}
 }
 
-int msm_vb2_mmap(void *buf_priv, struct vm_area_struct *vma)
+int msm_vb2_mmap(void *dma_buf, struct vm_area_struct *vma)
 {
-	struct msm_vidc_buffer *buf = buf_priv;
-	enum msm_vidc_buffer_region region;
-	struct context_bank_info *cb;
-	struct msm_vidc_inst *inst;
-	struct msm_vidc_core *core;
+	if (IS_ERR_OR_NULL(dma_buf))
+		return -EINVAL;
+
+	struct dma_buf *dbuf = dma_buf;
+	struct msm_vidc_dma_buf_info *dinfo = dbuf->priv;
 	int ret;
 
-	if (IS_ERR_OR_NULL(buf_priv))
+	if (!dinfo)
 		return -EINVAL;
-
-	inst = buf->inst;
-    if (!inst || !inst->core)
-		return -EINVAL;
-
-    core = inst->core;
-
-	region = call_mem_op(core, buffer_region, inst, buf->type);
-	cb = msm_vidc_get_context_bank_for_region(inst->core, region);
-	if (!cb) {
-		i_vpr_e(inst, "%s: failed to get context bank device\n", __func__);
-		return 0;
-	}
-
-	ret = dma_mmap_attrs(cb->dev, vma, buf->kvaddr, buf->device_addr,
-			     buf->buffer_size, buf->dma_attrs);
+	ret = dma_mmap_attrs(dinfo->dev, vma, dinfo->kvaddr, dinfo->device_addr,
+			     dinfo->buffer_size, dinfo->dma_attrs);
 	if (ret) {
-		i_vpr_e(inst, "Remapping memory failed, error: %d\n", ret);
+		d_vpr_e("Remapping memory failed, error: %d\n", ret);
 		return ret;
 	}
 
+	dinfo->handler.refcount = &dinfo->refcount;
+	dinfo->handler.arg = dbuf;
+
 	vm_flags_set(vma, VM_DONTEXPAND | VM_DONTDUMP);
-	vma->vm_private_data	= &buf->handler;
+	vma->vm_private_data	= &dinfo->handler;
 	vma->vm_ops		= &msm_vb2_vm_dma_ops;
 
 	vma->vm_ops->open(vma);
@@ -293,12 +312,19 @@ struct msm_vb2_attachment {
 static int msm_vb2_dmabuf_ops_attach(struct dma_buf *dbuf,
 				     struct dma_buf_attachment *dbuf_attach)
 {
+	if (IS_ERR_OR_NULL(dbuf))
+		return -EINVAL;
+
 	struct msm_vb2_attachment *attach;
 	unsigned int i;
 	struct scatterlist *rd, *wr;
 	struct sg_table *sgt;
-	struct msm_vidc_buffer *buf = dbuf->priv;
+	struct msm_vidc_dma_buf_info *dinfo = dbuf->priv;
 	int ret;
+
+	if (IS_ERR_OR_NULL(dinfo))
+		return -EINVAL;
+	struct msm_vidc_buffer *buf = dinfo->buf;
 
 	attach = kzalloc(sizeof(*attach), GFP_KERNEL);
 	if (!attach)
@@ -395,8 +421,27 @@ static void msm_vb2_dmabuf_ops_unmap(struct dma_buf_attachment *db_attach,
 
 static void msm_vb2_dmabuf_ops_release(struct dma_buf *dbuf)
 {
-	/* drop reference obtained in vb2_dc_get_dmabuf */
-	msm_vb2_put(dbuf->priv);
+	if (IS_ERR_OR_NULL(dbuf) || IS_ERR_OR_NULL(dbuf->priv))
+		return;
+
+	struct msm_vidc_dma_buf_info *dinfo = dbuf->priv;
+
+	if (refcount_read(&dinfo->refcount) == 0)
+		return;
+
+	if (!refcount_dec_and_test(&dinfo->refcount)) {
+		d_vpr_l("%s: refcount decremented to %d dbuf: %pK\n", __func__,
+			refcount_read(&dinfo->refcount), dbuf);
+		return;
+	}
+	d_vpr_h("%s: dma_free_atts: device_addr %llu, size %d\n",
+		__func__, dinfo->device_addr, dinfo->buffer_size);
+
+	dma_free_attrs(dinfo->dev, dinfo->buffer_size, dinfo->kvaddr,
+		       dinfo->device_addr, dinfo->dma_attrs);
+
+	kfree(dinfo);
+	dbuf->priv = NULL;
 }
 
 static int
@@ -416,7 +461,7 @@ msm_vb2_dmabuf_ops_end_cpu_access(struct dma_buf *dbuf,
 static int msm_vb2_dmabuf_ops_mmap(struct dma_buf *dbuf,
 	struct vm_area_struct *vma)
 {
-	return msm_vb2_mmap(dbuf->priv, vma);
+	return msm_vb2_mmap((void *)dbuf, vma);
 }
 
 static const struct dma_buf_ops msm_vb2_dmabuf_ops = {
@@ -471,12 +516,26 @@ struct dma_buf *msm_vb2_get_dmabuf(struct vb2_buffer *vb,
 						.owner = THIS_MODULE };
 	struct msm_vidc_buffer *buf = buf_priv;
 	struct msm_vidc_inst *inst = buf->inst;
+	enum msm_vidc_buffer_region region;
+	struct context_bank_info *cb;
+	struct msm_vidc_dma_buf_info *dinfo = buf->dma_buf_info;
 	struct dma_buf *dbuf;
 
+	region = call_mem_op((struct msm_vidc_core *)(inst->core), buffer_region, inst, buf->type);
+	cb = msm_vidc_get_context_bank_for_region(inst->core, region);
+	if (!cb) {
+		i_vpr_e(inst, "%s: failed to get context bank device\n", __func__);
+		return NULL;
+	}
+	dinfo->dev = cb->dev;
+	dinfo->buffer_size = buf->buffer_size;
+	dinfo->kvaddr = buf->kvaddr;
+	dinfo->device_addr = buf->device_addr;
+	dinfo->dma_attrs = buf->dma_attrs;
 	exp_info.ops = &msm_vb2_dmabuf_ops;
 	exp_info.size = buf->buffer_size;
 	exp_info.flags = flags;
-	exp_info.priv = buf;
+	exp_info.priv = dinfo;
 
 	if (!buf->sg_table)
 		buf->sg_table = vb2_dc_get_base_sgt(buf);
@@ -489,10 +548,10 @@ struct dma_buf *msm_vb2_get_dmabuf(struct vb2_buffer *vb,
 		i_vpr_e(inst, "%s: failed to export dma buf\n", __func__);
 		return NULL;
 	}
-
-	/* dmabuf keeps reference to vb2 buffer */
-	refcount_inc(&buf->refcount);
-
+	buf->dmabuf = dbuf;
+	refcount_inc(&dinfo->refcount);
+	d_vpr_l("%s: refcount incremented to %d dbuf: %pK\n", __func__,
+		refcount_read(&dinfo->refcount), dbuf);
 	return dbuf;
 }
 

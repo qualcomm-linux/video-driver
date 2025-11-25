@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _MSM_VIDC_INTERNAL_H_
@@ -961,6 +961,17 @@ struct msm_vidc_mem_list {
 	struct list_head            list; // list of "struct msm_vidc_mem"
 };
 
+struct msm_vidc_dma_buf_info  {
+	u32                       buffer_size;
+	u64                       device_addr;
+	unsigned long             dma_attrs;
+	refcount_t                refcount;
+	void                      *kvaddr;
+	struct vb2_vmarea_handler handler;
+	struct  msm_vidc_buffer   *buf;
+	struct  device            *dev;
+};
+
 struct msm_vidc_buffer {
 	struct list_head                   list;
 	struct msm_vidc_inst              *inst;
@@ -986,6 +997,7 @@ struct msm_vidc_buffer {
 	u64                                fence_id;
 	u32                                start_time_ms;
 	u32                                end_time_ms;
+	struct msm_vidc_dma_buf_info       *dma_buf_info;
 };
 
 struct msm_vidc_buffers {
