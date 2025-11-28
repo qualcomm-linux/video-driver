@@ -872,10 +872,6 @@ int msm_venc_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst, INPUT_PORT);
-	if (rc)
-		goto error;
-
 	/* Decide bse vpp delay after work mode */
 	//msm_vidc_set_bse_vpp_delay(inst);
 
@@ -1001,7 +997,7 @@ int msm_venc_streamon_output(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst, PORT_NONE);
+	rc = msm_vidc_set_v4l2_properties(inst);
 	if (rc)
 		goto error;
 
