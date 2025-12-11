@@ -621,6 +621,21 @@ static int __power_off_mm_int_iris5(struct msm_vidc_core *core)
 	int rc = 0;
 	u32 value = 0, count = 0;
 
+	/* After gdsc_sw_ctrl, GDSCs are powered_on by genPD framework
+	 * So as part of power_off sequence, before accessing NOC Error
+	 * Logger registers, its recommeneded to write 0 to QREQ bit of
+	 * MM_NOC and CX_NOC registers.
+	 */
+	rc = __write_register_masked(core, WRAPPER_MVP_NOC_LPI_CONTROL_IRIS5,
+				0x0, BIT(0));
+	if (rc)
+		return rc;
+
+	rc = __write_register_masked(core, WRAPPER_MVP_NOC_CX_LPI_CONTROL_IRIS5,
+				0x0, BIT(0));
+	if (rc)
+		return rc;
+
 	/* MVP_NoC MM Q-Channel */
 	rc = __write_register_masked(core, NOC_ERL_ERRORLOGGER_MAIN_ERRORLOGGER_ERRCLR_LOW,
 			0x1, BIT(0));
