@@ -1,6 +1,5 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module", "kernel_module_group")
-load("@rules_pkg//pkg:install.bzl", "pkg_install")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
+load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 
 def _register_module_to_map(module_map, name, path, config_option, srcs, config_srcs, deps, config_deps):
     processed_config_srcs = {}
@@ -123,17 +122,15 @@ def define_target_variant_modules(target, variant, registry, modules, config_opt
         srcs = all_module_rules,
     )
 
-    pkg_files(
-        name = kernel_build + "_video_driver_modules_files",
-        srcs = ["{}_video_modules".format(kernel_build)],
-        strip_prefix = strip_prefix.from_pkg(),
-        visibility = ["//visibility:private"],
-    )
-
-    pkg_install(
+    copy_to_dist_dir(
         name = "{}_video_driver_modules_dist".format(kernel_build),
-        srcs = ["{}_video_driver_modules_files".format(kernel_build)],
-        destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+        data = [":{}_video_modules".format(kernel_build)],
+        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+        flat = True,
+        wipe_dist_dir = False,
+        allow_duplicate_filenames = False,
+        mode_overrides = {"**/*": "644"},
+        log = "info",
     )
 
 def define_lunch_target_variant_modules(target, variant, registry, modules, lunch_target = None):
@@ -240,17 +237,15 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
         srcs = all_module_rules,
     )
 
-    pkg_files(
-        name = kernel_build + "_video_driver_modules_files",
-        srcs = ["{}_video_modules".format(kernel_build)],
-        strip_prefix = strip_prefix.from_pkg(),
-        visibility = ["//visibility:private"],
-    )
-
-    pkg_install(
+    copy_to_dist_dir(
         name = dist_target_name,
-        srcs = ["{}_video_driver_modules_files".format(kernel_build)],
-        destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+        data = [":{}_video_modules".format(kernel_build)],
+        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+        flat = True,
+        wipe_dist_dir = False,
+        allow_duplicate_filenames = False,
+        mode_overrides = {"**/*": "644"},
+        log = "info",
     )
 
 def define_consolidate_gki_modules(target, registry, modules, config_options = []):
