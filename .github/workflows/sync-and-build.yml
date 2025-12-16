@@ -150,7 +150,7 @@ jobs:
           cd ..
           gzip -9 video-merged.cpio
 
-          # Cleanup
+          # Cleanups
           rm -rf temp_merge kerneltest.cpio local-kernel-ramdisk.cpio
           echo "Final archive: $workspace/combineramdisk/video-merged.cpio.gz"
           ls -lh "$workspace/combineramdisk/video-merged.cpio.gz"
@@ -281,3 +281,4 @@ jobs:
             echo "</details>"
 
           } >> "$GITHUB_STEP_SUMMARY"    
+
