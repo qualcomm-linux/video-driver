@@ -704,23 +704,9 @@ static int calculate_bandwidth_decoder_iris5(
 
 	dpb_ubwc_tile_height_pixels = ubwc_tile_h;
 
-	decoder_frame_complexity_factor =
-		(codec_input.complexity_setting == 0) ?
-		400 : ((codec_input.complexity_setting == 1) ? 266 : 100);
-
-	/*
-	 * VVC with large L1 cache, PWC reference comlexity NOT going beyond 400
-	 * VVC vs HEVC, average BW increase because of BDOF, DMVR; but <20%; here assume 15%
-	 */
-	if (codec_input.codec == CODEC_VVC)
-		decoder_frame_complexity_factor =
-			(codec_input.complexity_setting == 0) ?
-				400 : ((codec_input.complexity_setting == 1) ? 300 : 115);
+	decoder_frame_complexity_factor = codec_input.ref_frame_complexity_factor;
 
 	reconstructed_write_bw_factor_rd = (codec_input.complexity_setting == 0) ? 105 : 100;
-
-	if (codec_input.video_adv_feature == 3) // take real HW L1 cache miss ratio
-		decoder_frame_complexity_factor = codec_input.ref_frame_complexity_factor;
 
 	reference_y_read_bw_factor = llc_saving;
 
@@ -1162,10 +1148,7 @@ static int calculate_bandwidth_encoder_iris5(
 		((en_search_windows_size_horizontal + ubwc_tile_w - 1) / ubwc_tile_w) *
 		ubwc_tile_w + (frame_width - 1)) / frame_width + 100;
 
-	reference_crcb_read_bw_factor = 150;
-
-	if (codec_input.video_adv_feature == 3) // take real HW L1 cache miss ratio
-		reference_crcb_read_bw_factor = codec_input.ref_frame_complexity_factor;
+	reference_crcb_read_bw_factor = codec_input.ref_frame_complexity_factor;
 
 	codec_output->noc_bw_rd = 0;
 	codec_output->noc_bw_wr = 0;

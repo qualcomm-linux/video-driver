@@ -22,6 +22,30 @@ ddk_headers(
 )
 
 ddk_headers(
+    name = "autogvm_headers",
+    hdrs = glob([
+      "driver/platform/nordau/inc/*.h",
+    ]),
+    includes = ["driver/platform/nordau/inc"]
+)
+
+ddk_headers(
+    name = "chora_headers",
+    hdrs = glob([
+      "driver/platform/chora/inc/*.h",
+    ]),
+    includes = ["driver/platform/chora/inc"]
+)
+
+ddk_headers(
+    name = "iris2_headers",
+    hdrs = glob([
+      "driver/variant/iris2/inc/*.h",
+    ]),
+    includes = ["driver/variant/iris2/inc"]
+)
+
+ddk_headers(
     name = "niobe_headers",
     hdrs = glob([
       "driver/platform/niobe/inc/*.h",
@@ -59,6 +83,14 @@ ddk_headers(
       "driver/platform/tuna/inc/*.h",
     ]),
     includes = ["driver/platform/tuna/inc"]
+)
+
+ddk_headers(
+    name = "kera_headers",
+    hdrs = glob([
+      "driver/platform/kera/inc/*.h",
+    ]),
+    includes = ["driver/platform/kera/inc"]
 )
 
 ddk_headers(
@@ -110,6 +142,14 @@ ddk_headers(
 )
 
 ddk_headers(
+    name = "iris36_headers",
+    hdrs = glob([
+      "driver/variant/iris36/inc/*.h",
+    ]),
+    includes = ["driver/variant/iris36/inc"]
+)
+
+ddk_headers(
     name = "iris4_headers",
     hdrs = glob([
       "driver/variant/iris4/inc/*.h",
@@ -137,7 +177,7 @@ ddk_headers(
 
 ddk_headers(
     name = "video_driver_headers",
-    hdrs = [":uapi_headers", "hamoa_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "canoe_headers", "seraph_headers", "alor_headers", "art_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris4_headers", "iris5_headers", "vidc_headers"]
+    hdrs = [":uapi_headers", "autogvm_headers", "hamoa_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "kera_headers", "canoe_headers", "chora_headers", "iris2_headers", "seraph_headers", "alor_headers", "art_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris36_headers", "iris4_headers", "iris5_headers", "vidc_headers"]
 )
 
 load(":target.bzl", "define_target_modules")

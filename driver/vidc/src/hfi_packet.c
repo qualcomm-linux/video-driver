@@ -426,6 +426,9 @@ int hfi_packet_sys_init(struct msm_vidc_core *core,
 	if (rc)
 		goto err_sys_init;
 
+	if (!core->platform->data.ubwc_config)
+		goto skip_ubwc_data;
+
 	/* HFI_PROP_UBWC_MAX_CHANNELS */
 	payload = core->platform->data.ubwc_config->max_channels;
 	d_vpr_h("%s: ubwc max channels %d\n", __func__, payload);
@@ -523,6 +526,8 @@ int hfi_packet_sys_init(struct msm_vidc_core *core,
 			       sizeof(u32));
 	if (rc)
 		goto err_sys_init;
+
+skip_ubwc_data:
 
 	/* HFI_PROP_FENCE_CLIENT_DATA */
 	if (core->capabilities[SUPPORTS_SYNX_V2_FENCE].value) {

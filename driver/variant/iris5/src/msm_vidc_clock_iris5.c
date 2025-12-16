@@ -420,6 +420,8 @@ static u32 get_vpp_cycles_iris5(struct api_calculation_input codec_input)
 		else
 			i = 2;
 	}
+	if (codec_input.codec == CODEC_VVC)
+		i = 3;
 
 	if (codec_input.frame_width *
 		codec_input.frame_height >= CODEC_RESOLUTION_8KUHD_IRIS5) {

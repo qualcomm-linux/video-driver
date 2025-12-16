@@ -303,9 +303,9 @@ static struct msm_platform_inst_capability instance_cap_data_art[] = {
 
 	{SCALE_FACTOR, ENC, H264 | HEVC | APV, 1, 8, 1, 8},
 
-	{SCALE_FACTOR, DEC, H264 | HEVC | AV1 | VP9, 1, 8, 1, 8},
+	{SCALE_FACTOR, DEC, H264 | HEVC | VVC | AV1 | VP9, 1, 8, 1, 8},
 
-	{SCALE_ENABLE, DEC, H264 | HEVC | AV1 | VP9, 0, 1, 1, 0},
+	{SCALE_ENABLE, DEC, H264 | HEVC | VVC | AV1 | VP9, 0, 1, 1, 0},
 
 	{MB_CYCLES_VSP, ENC, CODECS_ALL, 25, 25, 1, 25},
 

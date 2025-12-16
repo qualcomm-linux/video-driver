@@ -473,7 +473,7 @@ static int msm_vidc_adjust_cap(struct msm_vidc_inst *inst,
 
 static int msm_vidc_set_cap(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id,
-	enum msm_vidc_port_type port_type, const char *func)
+	const char *func)
 {
 	struct msm_vidc_inst_cap *cap;
 	int rc = 0;
@@ -491,15 +491,8 @@ static int msm_vidc_set_cap(struct msm_vidc_inst *inst,
 	if (!cap->set)
 		return 0;
 
-	if (port_type == INPUT_PORT) {
-		if (cap->flags & CAP_FLAG_INPUT_PORT)
-			rc = cap->set(inst, cap_id);
-	} else if (port_type == OUTPUT_PORT) {
-		if (cap->flags & CAP_FLAG_OUTPUT_PORT)
-			rc = cap->set(inst, cap_id);
-	} else { /* PORT_NONE */
-		rc = cap->set(inst, cap_id);
-	}
+	/* call set */
+	rc = cap->set(inst, cap_id);
 	if (rc) {
 		i_vpr_e(inst, "%s: set cap failed for %s\n", func, cap_name(cap_id));
 		return rc;
@@ -638,8 +631,7 @@ error:
 	return rc;
 }
 
-static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst,
-				enum msm_vidc_port_type port_type)
+static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
 	int rc = 0;
@@ -647,7 +639,7 @@ static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst,
 	i_vpr_h(inst, "%s()\n", __func__);
 
 	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
-		rc = msm_vidc_set_cap(inst, entry->cap_id, port_type, __func__);
+		rc = msm_vidc_set_cap(inst, entry->cap_id, __func__);
 		if (rc)
 			goto error;
 
@@ -1075,7 +1067,7 @@ int msm_vidc_s_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		if (rc)
 			return rc;
 
-		rc = msm_vidc_set_dynamic_property(inst, PORT_NONE);
+		rc = msm_vidc_set_dynamic_property(inst);
 		if (rc)
 			return rc;
 	}
@@ -1219,7 +1211,7 @@ int msm_vidc_adjust_v4l2_properties(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst, enum msm_vidc_port_type port_type)
+int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
 	int rc = 0;
@@ -1228,7 +1220,7 @@ int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst, enum msm_vidc_port_
 
 	/* set all caps from caps_list */
 	list_for_each_entry_safe(entry, temp, &inst->caps_list, list) {
-		rc = msm_vidc_set_cap(inst, entry->cap_id, port_type, __func__);
+		rc = msm_vidc_set_cap(inst, entry->cap_id, __func__);
 		if (rc)
 			return rc;
 	}

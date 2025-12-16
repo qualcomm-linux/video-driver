@@ -191,7 +191,9 @@ static int msm_vidc_init_codec_input_freq(struct msm_vidc_inst *inst, u32 data_s
 	if (inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value)
 		codec_input->video_adv_feature = FEATURE_LOOKAHEAD_ENCODE;
 
-	if (inst->capabilities[ROTATION].value && codec_input->codec == CODEC_APV)
+	if ((inst->capabilities[ROTATION].value || inst->capabilities[HFLIP].value
+			|| inst->capabilities[VFLIP].value)
+			&& codec_input->codec == CODEC_APV)
 		codec_input->video_adv_feature = FEATURE_APV_ROTATION;
 
 	core = inst->core;
@@ -247,9 +249,9 @@ static int msm_vidc_init_codec_input_bus(struct msm_vidc_inst *inst, struct vidc
 
 	/*
 	 * If the calculated motion_vector_complexity is > 2 then set the
-	 * complexity_setting and refframe_complexity to be pwc(performance worst case)
-	 * values. If the motion_vector_complexity is < 2 then set the complexity_setting
-	 * and refframe_complexity to be average case values.
+	 * complexity_setting to be pwc(performance worst case) values.
+	 * If the motion_vector_complexity is < 2 then set the complexity_setting
+	 * to be average case values.
 	 */
 
 	complexity_factor_int = Q16_INT(d->complexity_factor);
@@ -257,15 +259,14 @@ static int msm_vidc_init_codec_input_bus(struct msm_vidc_inst *inst, struct vidc
 
 	if (complexity_factor_int < COMPLEXITY_THRESHOLD ||
 		(complexity_factor_int == COMPLEXITY_THRESHOLD &&
-		complexity_factor_frac == 0)) {
-		/* set as average case values */
+		complexity_factor_frac == 0))
 		codec_input->complexity_setting = COMPLEXITY_SETTING_AVG;
-		codec_input->refframe_complexity = REFFRAME_COMPLEXITY_AVG;
-	} else {
-		/* set as pwc */
+	else
 		codec_input->complexity_setting = COMPLEXITY_SETTING_PWC;
-		codec_input->refframe_complexity = REFFRAME_COMPLEXITY_PWC;
-	}
+
+	codec_input->refframe_complexity = complexity_factor_int * 100 + complexity_factor_frac;
+
+	codec_input->ref_frame_complexity_factor = codec_input->refframe_complexity;
 
 	codec_input->status_llc_onoff = d->use_sys_cache;
 

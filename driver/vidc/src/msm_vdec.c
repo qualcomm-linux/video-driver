@@ -1650,7 +1650,7 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst, PORT_NONE);
+	rc = msm_vidc_set_v4l2_properties(inst);
 	if (rc)
 		goto error;
 
@@ -1960,10 +1960,6 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 		goto error;
 
 	rc = msm_vdec_set_output_properties(inst);
-	if (rc)
-		goto error;
-
-	rc = msm_vidc_set_v4l2_properties(inst, OUTPUT_PORT);
 	if (rc)
 		goto error;
 
@@ -2879,7 +2875,8 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 	f = &inst->fmts[OUTPUT_PORT];
 	f->type = OUTPUT_MPLANE;
 	f->fmt.pix_mp.pixelformat =
-		v4l2_colorformat_from_driver(inst, MSM_VIDC_FMT_NV12C, __func__);
+		v4l2_colorformat_from_driver(inst,
+		core->inst_caps[MSM_VIDC_H264].cap[PIX_FMTS].value, __func__);
 	colorformat = v4l2_colorformat_to_driver(inst,
 		f->fmt.pix_mp.pixelformat, __func__);
 	f->fmt.pix_mp.width = video_y_stride_pix(colorformat, DEFAULT_WIDTH);

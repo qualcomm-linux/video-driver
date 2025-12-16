@@ -54,6 +54,7 @@ static inline bool is_video_device(struct device *dev)
 		of_device_is_compatible(dev->of_node, "qcom,sm8750-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,sm8750-vidc-v2") ||
 		of_device_is_compatible(dev->of_node, "qcom,tuna-vidc") ||
+		of_device_is_compatible(dev->of_node, "qcom,kera-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v2") ||
 		of_device_is_compatible(dev->of_node, "qcom,canoe-vidc-v3") ||
@@ -64,7 +65,9 @@ static inline bool is_video_device(struct device *dev)
 		of_device_is_compatible(dev->of_node, "qcom,alor-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,art-vidc") ||
 		of_device_is_compatible(dev->of_node, "qcom,x1e80100-vidc") ||
-		of_device_is_compatible(dev->of_node, "qcom,sa8775p-iris"));
+		of_device_is_compatible(dev->of_node, "qcom,sa8775p-iris") ||
+		of_device_is_compatible(dev->of_node, "qcom,chora-vidc") ||
+		of_device_is_compatible(dev->of_node, "qcom,msm-vidc-ravelin"));
 }
 
 static inline bool is_video_context_bank_device_node(struct device_node *of_node)
@@ -158,13 +161,16 @@ static const struct of_device_id msm_vidc_dt_match[] = {
 	{.compatible = "qcom,seraph-vidc"},
 	{.compatible = "qcom,seraph-vidc-v2"},
 	{.compatible = "qcom,alor-vidc"},
+	{.compatible = "qcom,chora-vidc"},
 	{.compatible = "qcom,sa8797-vidc"},
 	{.compatible = "qcom,cliffs-vidc"},
 	{.compatible = "qcom,volcano-vidc"},
 	{.compatible = "qcom,niobe-vidc"},
 	{.compatible = "qcom,tuna-vidc"},
+	{.compatible = "qcom,kera-vidc"},
 	{.compatible = "qcom,x1e80100-vidc"},
 	{.compatible = "qcom,sa8775p-iris"},
+	{.compatible = "qcom,msm-vidc-ravelin"},
 	{.compatible = "qcom,vidc,cb-ns-pxl"},
 	{.compatible = "qcom,vidc,cb-ns"},
 	{.compatible = "qcom,vidc,cb-ns-bitstream"},
@@ -982,6 +988,11 @@ static int msm_vidc_probe_video_device(struct platform_device *pdev)
 	 * match is a component_match_array and acts as a placeholder for
 	 * components added via component_add().
 	 */
+	if (!match) {
+		d_vpr_e("match is null.\n");
+		goto master_add_failed;
+	}
+
 	rc = component_master_add_with_match(&pdev->dev, &msm_vidc_component_master_ops, match);
 	if (rc) {
 		d_vpr_e("%s: component master add with match failed\n", __func__);

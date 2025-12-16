@@ -183,7 +183,7 @@ struct msm_vidc_compat_handle {
 	const char *compat;
 	int (*get_platform_data)(struct msm_vidc_core *core);
 	int (*init_platform)(struct msm_vidc_core *core);
-	int (*init_iris)(struct msm_vidc_core *core);
+	int (*init_vpu)(struct msm_vidc_core *core);
 };
 
 struct msm_vidc_csc_coeff {
@@ -222,6 +222,8 @@ enum vpu_version {
 	VPU_VERSION_IRIS5_1P, // IRIS5 1 PIPE
 	VPU_VERSION_IRIS5_2P, // IRIS5 2 PIPE
 	VPU_VERSION_IRIS5_4P, // IRIS5 4 PIPE
+	VENUS_VERSION_AR50LT_V1,
+	VENUS_VERSION_AR50LT_V2,
 };
 
 struct msm_vidc_platform_data {

@@ -27,6 +27,7 @@ static const u32 msm_venc_input_set_prop[] = {
 	HFI_PROP_CROP_OFFSETS,
 	HFI_PROP_LINEAR_STRIDE_SCANLINE,
 	HFI_PROP_SIGNAL_COLOR_INFO,
+	HFI_PROP_BUFFER_HOST_MAX_COUNT,
 };
 
 static const u32 msm_venc_output_set_prop[] = {
@@ -393,6 +394,31 @@ static int msm_venc_set_colorspace(struct msm_vidc_inst *inst,
 	return 0;
 }
 
+static int msm_vidc_set_host_max_count(struct msm_vidc_inst *inst,
+		     enum msm_vidc_port_type port)
+{
+	int rc = 0;
+	u32 host_count;
+
+	if (port != INPUT_PORT) {
+		i_vpr_e(inst, "%s: invalid port %d\n", __func__, port);
+		return -EINVAL;
+	}
+
+	host_count = inst->capabilities[INPUT_BUF_HOST_MAX_COUNT].value;
+
+	rc = venus_hfi_session_property(inst,
+			HFI_PROP_BUFFER_HOST_MAX_COUNT,
+			HFI_HOST_FLAGS_NONE,
+			get_hfi_port(inst, port),
+			HFI_PAYLOAD_U32,
+			&host_count,
+			sizeof(u32));
+	if (rc)
+		return rc;
+	return 0;
+}
+
 static int msm_venc_set_quality_mode(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -448,6 +474,7 @@ static int msm_venc_set_input_properties(struct msm_vidc_inst *inst)
 		{HFI_PROP_CROP_OFFSETS,               msm_venc_set_crop_offsets                },
 		{HFI_PROP_LINEAR_STRIDE_SCANLINE,     msm_venc_set_stride_scanline             },
 		{HFI_PROP_SIGNAL_COLOR_INFO,          msm_venc_set_colorspace                  },
+		{HFI_PROP_BUFFER_HOST_MAX_COUNT,      msm_vidc_set_host_max_count              },
 	};
 
 	i_vpr_h(inst, "%s()\n", __func__);
@@ -872,10 +899,6 @@ int msm_venc_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst, INPUT_PORT);
-	if (rc)
-		goto error;
-
 	/* Decide bse vpp delay after work mode */
 	//msm_vidc_set_bse_vpp_delay(inst);
 
@@ -1001,7 +1024,7 @@ int msm_venc_streamon_output(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst, PORT_NONE);
+	rc = msm_vidc_set_v4l2_properties(inst);
 	if (rc)
 		goto error;
 
@@ -1816,7 +1839,8 @@ int msm_venc_inst_init(struct msm_vidc_inst *inst)
 	f = &inst->fmts[INPUT_PORT];
 	f->type = INPUT_MPLANE;
 	f->fmt.pix_mp.pixelformat =
-		v4l2_colorformat_from_driver(inst, MSM_VIDC_FMT_NV12C, __func__);
+			v4l2_colorformat_from_driver(inst,
+			core->inst_caps[MSM_VIDC_H264].cap[PIX_FMTS].value, __func__);
 	f->fmt.pix_mp.width = DEFAULT_WIDTH;
 	f->fmt.pix_mp.height = DEFAULT_HEIGHT;
 	f->fmt.pix_mp.num_planes = 1;

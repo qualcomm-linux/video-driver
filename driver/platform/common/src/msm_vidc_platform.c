@@ -25,10 +25,16 @@
 #include "venus_hfi.h"
 #include "resources.h"
 
+#if defined(CONFIG_MSM_VIDC_CHORA)
+#include "msm_vidc_chora.h"
+#include "msm_vidc_iris2.h"
+#endif
+
 #if defined(CONFIG_MSM_VIDC_SUN)
 #include "msm_vidc_sun.h"
 #include "msm_vidc_iris35.h"
 #include "msm_vidc_tuna.h"
+#include "msm_vidc_kera.h"
 #include "msm_vidc_iris33.h"
 #endif
 #if defined(CONFIG_MSM_VIDC_PINEAPPLE)
@@ -63,6 +69,10 @@
 #if defined(CONFIG_MSM_VIDC_ART)
 #include "msm_vidc_art.h"
 #include "msm_vidc_iris5.h"
+#endif
+#if defined(CONFIG_MSM_VIDC_RAVELIN)
+#include "msm_vidc_ravelin.h"
+#include "msm_vidc_ar50lt.h"
 #endif
 
 #define CAP_TO_8BIT_QP(a) {          \
@@ -192,13 +202,21 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sm8650-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_pineapple,
 		.init_platform              = msm_vidc_init_platform_pineapple,
-		.init_iris                  = msm_vidc_init_iris33,
+		.init_vpu                   = msm_vidc_init_iris33,
 	},
 	{
 		.compat                     = "qcom,sm8650-vidc-v2",
 		.get_platform_data          = msm_vidc_get_platform_data_pineapple,
 		.init_platform              = msm_vidc_init_platform_pineapple,
-		.init_iris                  = msm_vidc_init_iris33,
+		.init_vpu                   = msm_vidc_init_iris33,
+	},
+#endif
+#if defined(CONFIG_MSM_VIDC_CHORA)
+	{
+		.compat                     = "qcom,chora-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_chora,
+		.init_platform              = msm_vidc_init_platform_chora,
+		.init_vpu                  = msm_vidc_init_iris2,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_SUN)
@@ -206,19 +224,25 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sm8750-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_sun,
 		.init_platform              = msm_vidc_init_platform_sun,
-		.init_iris                  = msm_vidc_init_iris35,
+		.init_vpu                   = msm_vidc_init_iris35,
 	},
 	{
 		.compat                     = "qcom,sm8750-vidc-v2",
 		.get_platform_data          = msm_vidc_get_platform_data_sun,
 		.init_platform              = msm_vidc_init_platform_sun,
-		.init_iris                  = msm_vidc_init_iris35,
+		.init_vpu                   = msm_vidc_init_iris35,
 	},
 	{
 		.compat                     = "qcom,tuna-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_tuna,
 		.init_platform              = msm_vidc_init_platform_tuna,
-		.init_iris                  = msm_vidc_init_iris33,
+		.init_vpu                  = msm_vidc_init_iris33,
+	},
+	{
+		.compat                     = "qcom,kera-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_kera,
+		.init_platform              = msm_vidc_init_platform_kera,
+		.init_vpu                  = msm_vidc_init_iris33,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_X1E80100)
@@ -226,7 +250,7 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,x1e80100-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_x1e80100,
 		.init_platform              = msm_vidc_init_platform_x1e80100,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_LEMANS)
@@ -234,13 +258,13 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sa8255-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_lemans,
 		.init_platform              = msm_vidc_init_platform_lemans,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 	{
 		.compat                     = "qcom,sa8775p-iris",
 		.get_platform_data          = msm_vidc_get_platform_data_lemans,
 		.init_platform              = msm_vidc_init_platform_lemans,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_NIOBE)
@@ -248,7 +272,7 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,niobe-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_niobe,
 		.init_platform              = msm_vidc_init_platform_niobe,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_CANOE)
@@ -256,25 +280,25 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,canoe-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_canoe,
 		.init_platform              = msm_vidc_init_platform_canoe,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 	{
 		.compat                     = "qcom,canoe-vidc-v2",
 		.get_platform_data          = msm_vidc_get_platform_data_canoe,
 		.init_platform              = msm_vidc_init_platform_canoe,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 	{
 		.compat                     = "qcom,canoe-vidc-v3",
 		.get_platform_data          = msm_vidc_get_platform_data_canoe,
 		.init_platform              = msm_vidc_init_platform_canoe,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 	{
 		.compat                     = "qcom,alor-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_alor,
 		.init_platform              = msm_vidc_init_platform_alor,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_ART)
@@ -282,7 +306,7 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,art-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_art,
 		.init_platform              = msm_vidc_init_platform_art,
-		.init_iris                  = msm_vidc_init_iris5,
+		.init_vpu                  = msm_vidc_init_iris5,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_SERAPH)
@@ -290,13 +314,13 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,seraph-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_seraph,
 		.init_platform              = msm_vidc_init_platform_seraph,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 	{
 		.compat                     = "qcom,seraph-vidc-v2",
 		.get_platform_data          = msm_vidc_get_platform_data_seraph,
 		.init_platform              = msm_vidc_init_platform_seraph,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                  = msm_vidc_init_iris4,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_NORDAU)
@@ -304,9 +328,18 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sa8797-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_nordau,
 		.init_platform              = msm_vidc_init_platform_nordau,
-		.init_iris                  = msm_vidc_init_iris36,
+		.init_vpu                   = msm_vidc_init_iris36,
 	},
 #endif
+#if defined(CONFIG_MSM_VIDC_RAVELIN)
+	{
+		.compat                     = "qcom,msm-vidc-ravelin",
+		.get_platform_data          = msm_vidc_get_platform_data_ravelin,
+		.init_platform              = msm_vidc_init_platform_ravelin,
+		.init_vpu                   = msm_vidc_init_ar50lt,
+	},
+#endif
+
 };
 
 static struct codec_info codec_data_common[] = {
@@ -665,7 +698,7 @@ static int msm_vidc_init_vpu(struct msm_vidc_core *core)
 	/* select platform based on compatible match */
 	for (i = 0; i < ARRAY_SIZE(compat_handle); i++) {
 		if (of_device_is_compatible(dev->of_node, compat_handle[i].compat)) {
-			rc = compat_handle[i].init_iris(core);
+			rc = compat_handle[i].init_vpu(core);
 			if (rc) {
 				d_vpr_e("%s: (%s) init failed with %d\n",
 					__func__, compat_handle[i].compat, rc);
