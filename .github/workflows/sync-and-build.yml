@@ -1,0 +1,286 @@
+name: Sync and Build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: Docker image to use for the build
+        required: false
+        type: string
+        default: kmake-image:ver.1.0
+      build_matrix:
+        description: Build matrix for multi target builds
+        type: string
+        required: true
+
+permissions:
+  packages: read
+
+jobs:
+  sync-and-build:
+    runs-on: 
+      group: GHA-video-Prd-SelfHosted-RG
+      labels: [self-hosted, video-prd-u2204-x64-large-od-ephem]
+
+    steps:
+      - name: Pull Docker image
+        uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
+        with:
+          image: ${{ inputs.docker_image }}
+      
+      - name: Sync codebase
+        uses: qualcomm-linux/video-driver/.github/actions/sync@video.upstream(stage)
+        with:
+          event_name: ${{ github.event_name }}
+          pr_ref: ${{ github.event.pull_request.head.ref }}
+          pr_repo: ${{ github.event.pull_request.head.repo.full_name }}
+          base_ref: ${{ github.ref_name }}
+          caller_workflow: build
+
+      - name: Build workspace
+        uses: qualcomm-linux/video-driver/.github/actions/build@video.upstream(stage)
+        with:
+          docker_image: kmake-image:ver.1.0
+          workspace_path: ${{ github.workspace }}
+
+      - name: Download iris_test_app from the s3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${{github.workspace }}/v4l-video-test-app/build/"
+          echo " syncing files from s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/iris_test_app/"
+          aws s3 sync "s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/iris_test_app/" "${{ github.workspace }}/v4l-video-test-app/build/"
+          echo " ✅ Download complete"
+          ls ${{ github.workspace }}/v4l-video-test-app/build/
+        
+      - name: Download firmware file from S3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ github.workspace }}/downloads"
+          echo "📥 Syncing files from S3 path: s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/artifacts/"
+          aws s3 sync "s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/artifacts/" "${{ github.workspace }}/downloads"
+          echo "✅ Download complete"
+          [ -f "${{ github.workspace }}/downloads/vpu20_1v.mbn" ] || { echo "❌ Missing vpu20_1v.mbn"; exit 1; }
+
+      - name: Download the video-contents for testing
+        shell: bash 
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ github.workspace }}/downloads"
+          echo "Downloading the video-content files"
+          wget -q https://github.com/qualcomm-linux/qcom-linux-testkit/releases/download/IRIS-Video-Files-v1.0/video_clips_iris.tar.gz \
+               -O "${{ github.workspace }}/downloads/video_clips_iris.tar.gz"
+          [ -f "${{ github.workspace }}/downloads/video_clips_iris.tar.gz" ] || { echo "❌ Failed to download video_clips_iris.tar.gz"; exit 1; }
+
+      - name: Prepare /data/vendor/iris_test_app and list contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          data_dir="${{ github.workspace }}/kobj/tar-install/data/vendor/iris_test_app"
+          data_dir2="${{ github.workspace }}/kobj/tar-install/data/vendor/iris_test_app/firmware"
+          mkdir -p "$data_dir"
+          mkdir -p "$data_dir2"
+          cp "v4l-video-test-app/build/iris_v4l2_test" "$data_dir/"
+          cp "${{ github.workspace }}/downloads/vpu20_1v.mbn" "$data_dir2/"
+
+          cp "${{ github.workspace }}/downloads/video_clips_iris.tar.gz" "$data_dir/"
+          echo "📂 Contents of $data_dir:"
+          ls -lh "$data_dir"
+
+      - name: Create compressed kernel ramdisk archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ github.workspace }}/kobj/tar-install"
+          find lib/modules data | cpio -o -H newc --owner=0:0 | gzip -9 > "${{ github.workspace }}/local-kernel-ramdisk.cpio.gz"
+          cd - > /dev/null
+          ls -lh "${{ github.workspace }}/local-kernel-ramdisk.cpio.gz"
+    
+      - name: Download meta-qcom stable initramfs artifacts from S3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ github.workspace }}/downloads"
+          echo "🔍 Fetching initramfs files from S3 bucket: s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/artifacts/initramfs/"
+          aws s3 cp s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/artifacts/initramfs/initramfs-kerneltest-full-image-qcom-armv8a.cpio.gz "${{ github.workspace }}/downloads/"
+          echo "Initramfs files downloaded to: ${{ github.workspace }}/downloads"
+
+      - name: Decompress ramdisk files and rename .cpio.gz files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ github.workspace }}/downloads"
+          echo " Decompressing and renaming .cpio.gz files..."
+          gunzip -c initramfs-kerneltest-full-image-qcom-armv8a.cpio.gz > kerneltest.cpio
+
+      - name: Merge and repackage initramfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "🔧 Starting repackaging process"
+
+          workspace="${{ github.workspace }}"
+          mkdir -p "$workspace/combineramdisk"
+          cp "$workspace/local-kernel-ramdisk.cpio.gz" "$workspace/combineramdisk/"
+          cd "$workspace/combineramdisk"
+           
+          # Decompress local-kernel-ramdisk
+          mv local-kernel-ramdisk.cpio.gz local-kernel-ramdisk.cpio.gz.bak
+          gunzip -c local-kernel-ramdisk.cpio.gz.bak > local-kernel-ramdisk.cpio
+
+          # Copy kerneltest from download
+          cp "$workspace/downloads/kerneltest.cpio" .
+
+          # Merge kerneltest and local-kernel-ramdisk
+          cat kerneltest.cpio local-kernel-ramdisk.cpio > video-merged.cpio
+          gzip -9 video-merged.cpio
+
+          # Create temp workspace to clean up archive
+          mkdir -p temp_merge
+          cd temp_merge
+          cpio -id --no-absolute-filenames < ../kerneltest.cpio
+          cpio -id --no-absolute-filenames < ../local-kernel-ramdisk.cpio
+          cd ..
+
+          # Remove old merged archive
+          rm -f video-merged.cpio.gz
+
+          # Repackage clean archive
+          cd temp_merge
+          find . | cpio -o -H newc --owner=0:0 > ../video-merged.cpio
+          cd ..
+          gzip -9 video-merged.cpio
+
+          # Cleanup
+          rm -rf temp_merge kerneltest.cpio local-kernel-ramdisk.cpio
+          echo "Final archive: $workspace/combineramdisk/video-merged.cpio.gz"
+          ls -lh "$workspace/combineramdisk/video-merged.cpio.gz"
+
+      - name: Validate build_matrix and jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          machines_json='${{ inputs.build_matrix }}'
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "❌ jq is not installed on this runner. Please install jq."
+            exit 1
+          fi
+          echo "$machines_json" | jq -e . >/dev/null
+          [ "$(echo "$machines_json" | jq length)" -gt 0 ] || { echo "❌ build_matrix is empty"; exit 1; }
+          echo "✅ build_matrix is valid JSON"
+
+      - name: Append artifacts to S3 upload list
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="${{ github.workspace }}"
+          file_list="$workspace/artifacts/file_list.txt"
+          mkdir -p "$workspace/artifacts"
+
+          # Fresh file_list
+          : > "$file_list"
+
+          # Package lib/modules (xz-compressed) — exclude risky symlinks
+          mod_root="$workspace/kobj/tar-install/lib/modules"
+          [ -d "$mod_root" ] || { echo "❌ Missing directory: $mod_root"; exit 1; }
+          tar -C "$workspace/kobj/tar-install" \
+              --exclude='lib/modules/*/build' \
+              --exclude='lib/modules/*/source' \
+              --numeric-owner --owner=0 --group=0 \
+              -cJf "$workspace/modules.tar.xz" lib/modules
+
+          # Safety checks on the tar
+          if tar -Jtvf "$workspace/modules.tar.xz" | grep -q ' -> '; then
+            echo "❌ Symlinks found in modules archive (should be none)"; exit 1
+          fi
+          if tar -Jtf "$workspace/modules.tar.xz" | grep -Eq '^/|(^|/)\.\.(/|$)'; then
+            echo "❌ Unsafe paths found in modules archive"; exit 1
+          fi
+
+          echo "$workspace/modules.tar.xz" >> "$file_list"
+          echo "✅ Queued for upload: $workspace/modules.tar.xz"
+
+          # Kernel Image + merged video ramdisk (no local ramdisk)
+          IMAGE_PATH="$workspace/kobj/arch/arm64/boot/Image"
+          VMLINUX_PATH="$workspace/kobj/vmlinux"
+          MERGED_PATH="$workspace/combineramdisk/video-merged.cpio.gz"
+
+          [ -f "$IMAGE_PATH" ] || { echo "❌ Missing expected file: $IMAGE_PATH"; exit 1; }
+          [ -f "$VMLINUX_PATH" ] || { echo "❌ Missing expected file: $VMLINUX_PATH"; exit 1; }
+          [ -f "$MERGED_PATH" ] || { echo "❌ Missing merged cpio: $MERGED_PATH"; exit 1; }
+
+          echo "$IMAGE_PATH" >> "$file_list"
+          echo "✅ Queued for upload: $IMAGE_PATH"
+          echo "$VMLINUX_PATH" >> "$file_list"
+          echo "✅ Queued for upload: $VMLINUX_PATH"
+          echo "$MERGED_PATH" >> "$file_list"
+          echo "✅ Queued for upload: $MERGED_PATH"
+
+          # Loop through all machines from the build_matrix input and add DTBs
+          machines='${{ inputs.build_matrix }}'
+          for machine in $(echo "$machines" | jq -r '.[].machine'); do
+            dtb="$workspace/kobj/arch/arm64/boot/dts/qcom/${machine}.dtb"
+            if [ -f "$dtb" ]; then
+              echo "$dtb" >> "$file_list"
+              echo "✅ Queued for upload: $dtb"
+            else
+              echo "❌ Missing DTB: $dtb"
+              exit 1
+            fi
+          done
+
+          echo "----- Files queued for S3 upload -----"
+          cat "$file_list"
+          
+      - name: Upload all artifacts to S3
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.upstream(stage)
+        with:
+          s3_bucket: qli-prd-video-gh-artifacts
+          local_file: ${{ github.workspace }}/artifacts/file_list.txt
+          mode: multi-upload
+          upload_location: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}
+
+      
+      - name: Clean up
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          ws="${{ github.workspace }}"
+          rm -rf "$ws/artqifacts" || true
+          rm -rf "$ws/combineramdisk" || true
+          rm -rf "$ws/downloads" || true
+          rm -rf "$ws/kobj" || true
+          rm -f "$ws/modules.tar.xz" || true
+          rm -f "$ws/local-kernel-ramdisk.cpio.gz" || true
+          
+          
+      - name: Update summary
+        if: success() || failure()
+        shell: bash
+        run: |
+          status="${{ steps.build_workspace.outcome }}"
+          if [ "$status" = "success" ]; then
+            summary=":heavy_check_mark: Build Success"
+          else
+            summary=":x: Build Failed"
+          fi
+
+          ws="${{ github.workspace }}"
+          file_list="$ws/artifacts/file_list.txt"
+
+          {
+            echo "<details><summary><i>Build Summary</i></summary>"
+            echo "$summary"
+            if [ -f "$file_list" ]; then
+              echo ""
+              echo "Artifacts queued for upload:"
+              while IFS= read -r line; do
+                echo "- $line"
+              done < "$file_list"
+            fi
+            echo "</details>"
+
+          } >> "$GITHUB_STEP_SUMMARY"    
