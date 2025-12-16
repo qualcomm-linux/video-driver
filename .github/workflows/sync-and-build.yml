@@ -141,7 +141,7 @@ jobs:
           cpio -id --no-absolute-filenames < ../local-kernel-ramdisk.cpio
           cd ..
 
-          # Remove old merged archive
+          # Remove old merged archives
           rm -f video-merged.cpio.gz
 
           # Repackage clean archive
@@ -279,4 +279,5 @@ jobs:
               done < "$file_list"
             fi
             echo "</details>"
+
           } >> "$GITHUB_STEP_SUMMARY"    
