@@ -1,0 +1,47 @@
+name: Build Workspace
+description: |
+  Builds kernel and video-driver using a Docker image.
+
+inputs:
+  docker_image:
+    description: Docker image to use
+    required: true
+  workspace_path:
+    description: Path to workspace directory
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build kernel
+      shell: bash
+      run: |
+        docker run --rm \
+          -v "${{ inputs.workspace_path }}:${{ inputs.workspace_path }}" \
+          -w "${{ inputs.workspace_path }}/kernel" \
+          --user "$(id -u):$(id -g)" \
+          ${{ inputs.docker_image }} \
+          bash -c "
+            set -e
+
+            echo 'Cleaning existing iris and venus drivers...'
+            rm -rf drivers/media/platform/qcom/iris
+            rm -rf drivers/media/platform/qcom/venus
+
+            echo 'Listing qcom drivers directory...'
+            ls -al drivers/media/platform/qcom/
+
+            echo 'Copying iris and venus from video-driver workspace...'
+            cp -r ../video-driver/iris drivers/media/platform/qcom/
+            cp -r ../video-driver/venus drivers/media/platform/qcom/
+
+            echo 'Listing qcom drivers directory after copy...'
+            ls -al drivers/media/platform/qcom/
+
+            echo 'Building kernel...'
+            make O=../kobj ARCH=arm64 defconfig &&
+            make O=../kobj -j\$(nproc) &&
+            make O=../kobj -j\$(nproc) dir-pkg INSTALL_MOD_STRIP=1
+          "
+
+   

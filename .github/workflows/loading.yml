@@ -1,0 +1,37 @@
+---
+name: _loading
+description: Load required parameters for the subsequent jobs
+
+on:
+  workflow_call:
+    outputs:
+      build_matrix:
+        description: Build matrix
+        value: ${{ jobs.loading.outputs.build_matrix }}
+      full_matrix:
+        description: Full Matrix containing lava description
+        value: ${{ jobs.loading.outputs.full_matrix }}
+
+jobs:
+  loading:
+    runs-on: ubuntu-latest
+    outputs:
+      build_matrix: ${{ steps.loading.outputs.build_matrix }}
+      full_matrix: ${{ steps.loading.outputs.full_matrix }}
+    steps:
+      - name: Sync codebase
+        uses: qualcomm-linux/video-driver/.github/actions/sync@video.upstream(stage)
+        with:
+          event_name: ${{ github.event_name }}
+          # For pull_request: github.head_ref is the source branch of the PR
+          # For push / dispatch: head_ref is empty
+          pr_ref: ${{ github.head_ref }}
+          # For non-PR events this will be empty, which is fine
+          pr_repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+          # For PR: base_ref (target branch); for others: ref_name (current branch)
+          base_ref: ${{ github.base_ref || github.ref_name }}
+          caller_workflow: loading
+
+      - name: Load Parameters
+        id: loading
+        uses: qualcomm-linux/video-driver/.github/actions/loading@video.upstream(stage)
