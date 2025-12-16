@@ -134,7 +134,7 @@ jobs:
           cat kerneltest.cpio local-kernel-ramdisk.cpio > video-merged.cpio
           gzip -9 video-merged.cpio
 
-          # Create temp workspace to clean up archive
+          # Create temp workspace to clean up archives
           mkdir -p temp_merge
           cd temp_merge
           cpio -id --no-absolute-filenames < ../kerneltest.cpio
@@ -279,4 +279,5 @@ jobs:
               done < "$file_list"
             fi
             echo "</details>"
+
           } >> "$GITHUB_STEP_SUMMARY"    
