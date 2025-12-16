@@ -1,0 +1,26 @@
+{
+  "qcs6490-rb3gen2": {
+    "machine": "qcs6490-rb3gen2",
+    "firmware": "rb3gen2",
+    "lavaname": "qcs6490",
+    "target": "qcs6490-rb3gen2",
+    "buildid": "QCM6490.LE.1.0-00376-STD.PROD-1",
+    "firmwareid": "rb3gen2"
+  },
+  "qcs9100-ride-r3": {
+    "machine": "qcs9100-ride-r3",
+    "firmware": "sa8775p-ride",
+    "lavaname": "qcs9100-ride",
+    "target": "qcs9100-ride-r3",
+    "buildid": "QCS9100.LE.1.0-00243-STD.PROD-1",
+    "firmwareid": "sa8775p-ride"
+  },
+  "qcs8300-ride": {
+    "machine": "qcs8300-ride",
+    "firmware": "qcs8300-ride",
+    "lavaname": "qcs8300-ride",
+    "target": "qcs8300-ride",
+    "buildid": "QCS8300.LE.1.0-00137-STD.PROD-1",
+    "firmwareid": "qcs8300-ride"
+  }
+}
