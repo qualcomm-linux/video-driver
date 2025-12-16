@@ -179,7 +179,7 @@ jobs:
           # Fresh file_list
           : > "$file_list"
 
-          # Package lib/modules (xz-compressed) — exclude risky symlinks
+          # Packages lib/modules (xz-compressed) — exclude risky symlinks 
           mod_root="$workspace/kobj/tar-install/lib/modules"
           [ -d "$mod_root" ] || { echo "❌ Missing directory: $mod_root"; exit 1; }
           tar -C "$workspace/kobj/tar-install" \
@@ -279,4 +279,5 @@ jobs:
               done < "$file_list"
             fi
             echo "</details>"
+
           } >> "$GITHUB_STEP_SUMMARY"    
