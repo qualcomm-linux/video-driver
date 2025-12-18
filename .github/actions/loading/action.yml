@@ -21,7 +21,7 @@ runs:
         script: |
           const fs = require('fs');
           const path = require('path');
-          const targetsPath = path.join(process.env.GITHUB_WORKSPACE, 'video-driver', 'ci', 'MACHINES.json');
+          const targetsPath = path.join(process.env.GITHUB_WORKSPACE, 'ci', 'MACHINES.json');
           let targets;
           try {
             if (!fs.existsSync(targetsPath)) {
