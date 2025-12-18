@@ -127,7 +127,7 @@ jobs:
           mv local-kernel-ramdisk.cpio.gz local-kernel-ramdisk.cpio.gz.bak
           gunzip -c local-kernel-ramdisk.cpio.gz.bak > local-kernel-ramdisk.cpio
 
-          # Copy kerneltest from downloads
+          # Copy kerneltest from download
           cp "$workspace/downloads/kerneltest.cpio" .
 
           # Merge kerneltest and local-kernel-ramdisk
@@ -279,4 +279,5 @@ jobs:
               done < "$file_list"
             fi
             echo "</details>"
+
           } >> "$GITHUB_STEP_SUMMARY"    
