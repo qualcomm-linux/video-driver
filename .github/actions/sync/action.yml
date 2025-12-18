@@ -4,7 +4,7 @@ description: Checks out the correct code depending on event and repo context.
 
 inputs:
   event_name:
-    description: Event type that triggered the workflow (e.g., pull_request_target, push, workflow_call)
+    description: Event type that triggered the workflow (e.g., pull_request, pull_request_target, push, workflow_call, workflow_dispatch)
     required: true
   pr_ref:
     description: PR branch ref (e.g., feature/my-feature)
@@ -16,15 +16,16 @@ inputs:
     description: Base branch ref (e.g., master)
     required: false
   caller_workflow:
-    description: Name of the workflow calling this actions
+    description: Name of the workflow calling this action
     required: false
     default: None
 
 runs:
   using: 'composite'
   steps:
-    - name: Checkout PR code (pull_request_target)
-      if: ${{ (inputs.event_name == 'pull_request_target' || inputs.event_name == 'workflow_call') && inputs.pr_ref != '' && inputs.pr_repo != '' }}
+    # 1) PR code checkout for pull_request / pull_request_target / workflow_call
+    - name: Checkout PR code (pull_request / pull_request_target)
+      if: ${{ (inputs.event_name == 'pull_request' || inputs.event_name == 'pull_request_target' || inputs.event_name == 'workflow_call') && inputs.pr_ref != '' && inputs.pr_repo != '' }}
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
@@ -32,22 +33,25 @@ runs:
         repository: ${{ inputs.pr_repo }}
         path: video-driver
 
-    - name: Checkout master (push)
-      if: ${{ (inputs.event_name == 'push' || inputs.event_name == 'workflow_call') && inputs.base_ref != '' }}
+    # 2) Checkout base branch for push / workflow_call (non‑PR)
+    - name: Checkout base branch (push / workflow_call)
+      if: ${{ (inputs.event_name == 'push' || inputs.event_name == 'workflow_call') && inputs.base_ref != '' && (inputs.pr_ref == '' || inputs.pr_repo == '') }}
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
         ref: ${{ inputs.base_ref }}
         path: video-driver
 
+    # 3) Fallback: current repo + ref (push / workflow_call without base_ref or pr_repo)
     - name: Checkout current repo and ref (Fallback)
-      if: ${{ (inputs.event_name == 'push' || inputs.event_name == 'workflow_call') && (inputs.base_ref == '' || inputs.pr_repo == '') }}
+      if: ${{ (inputs.event_name == 'push' || inputs.event_name == 'workflow_call') && (inputs.base_ref == '' || inputs.pr_repo == '') && inputs.pr_ref == '' }}
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
         ref: ${{ github.ref }}
         path: video-driver
 
+    # 4) workflow_dispatch – explicit base_ref
     - name: Checkout for workflow_dispatch
       if: ${{ inputs.event_name == 'workflow_dispatch' }}
       uses: actions/checkout@v5
@@ -56,6 +60,7 @@ runs:
         ref: ${{ inputs.base_ref }}
         path: video-driver
 
+    # 5) Optionally clone kernel sources when called from "build" workflow
     - name: Clone kernel sources
       if: ${{ inputs.caller_workflow == 'build' }}
       uses: actions/checkout@v5
