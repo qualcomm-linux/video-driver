@@ -21,7 +21,7 @@ runs:
         script: |
           const fs = require('fs');
           const path = require('path');
-          const targetsPath = path.join(process.env.GITHUB_WORKSPACE, 'ci', 'MACHINES.json');
+          const targetsPath = path.join(process.env.GITHUB_WORKSPACE, 'video-driver', 'ci', 'MACHINES.json');
           let targets;
           try {
             if (!fs.existsSync(targetsPath)) {
@@ -42,3 +42,4 @@ runs:
           const full_matrix = Object.values(targets).map(({ machine, firmware, lavaname }) => ({ machine, firmware, lavaname }));
           core.setOutput('full_matrix', JSON.stringify(full_matrix));
           console.log("Full Matrix:", full_matrix);
+
