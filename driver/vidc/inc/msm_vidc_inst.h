@@ -90,6 +90,7 @@ struct msm_vidc_inst {
 	struct v4l2_format                 fmts[MAX_PORT];
 	struct v4l2_ctrl_handler           ctrl_handler;
 	struct v4l2_fh                     fh;
+	struct file *fh_filp; /* save the file used with v4l2_fh_add/del (≥ 6.18) */
 	u32                                num_ctrls;
 	enum hfi_rate_control              hfi_rc_type;
 	enum hfi_layer_encoding_type       hfi_layer_type;

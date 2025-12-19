@@ -149,7 +149,7 @@ static int msm_v4l2_open(struct file *filp)
 	struct msm_vidc_inst *inst;
 
 	trace_msm_v4l2_vidc_open("START", NULL);
-	inst = msm_vidc_open(core, vid_dev->type);
+	inst = msm_vidc_open(core, vid_dev->type, filp);
 	if (!inst) {
 		d_vpr_e("Failed to create instance, type = %d\n",
 			vid_dev->type);
