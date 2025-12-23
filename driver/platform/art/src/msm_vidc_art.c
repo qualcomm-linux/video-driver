@@ -2997,6 +2997,18 @@ static const struct clk_table art_clk_table[] = {
 		  557000000,  430000000,  360000000, 225000000}, 9},
 };
 
+static const int art_corner_idx_tbl[CLK_LEVEL_MAX] = {
+	[CLK_LEVEL_LOW_SVS_D2] = 8,
+	[CLK_LEVEL_LOW_SVS_D1] = 7,
+	[CLK_LEVEL_LOW_SVS] = 6,
+	[CLK_LEVEL_SVS] = 5,
+	[CLK_LEVEL_SVS_L1] = 4,
+	[CLK_LEVEL_NOM] = 3,
+	[CLK_LEVEL_TURBO] = 2,
+	[CLK_LEVEL_TURBO_L1] = 1,
+	[CLK_LEVEL_TURBO_L3] = 0,
+};
+
 /* name, exclusive_release */
 static const struct clk_rst_table art_clk_reset_table[] = {
 	{ "video_axi0c_reset",                   0  },
@@ -3205,6 +3217,7 @@ static const struct msm_vidc_platform_data art_data = {
 	.pd_tbl_size = ARRAY_SIZE(art_pd_table),
 	.clk_tbl = art_clk_table,
 	.clk_tbl_size = ARRAY_SIZE(art_clk_table),
+	.clk_corner_idx_tbl = art_corner_idx_tbl,
 	.clk_rst_tbl = art_clk_reset_table,
 	.clk_rst_tbl_size = ARRAY_SIZE(art_clk_reset_table),
 	.subcache_tbl = art_subcache_table,
