@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/dma-buf.h>
@@ -674,7 +674,7 @@ const struct msm_vidc_memory_ops *get_mem_ops(void)
 }
 
 int msm_memory_cache_operations(struct msm_vidc_inst *inst,
-	struct dma_buf *dbuf, enum msm_memory_cache_type cache_type)
+	struct dma_buf *dbuf, enum msm_memory_cache_op_type cache_op_type)
 {
 	int rc = 0;
 
@@ -683,7 +683,7 @@ int msm_memory_cache_operations(struct msm_vidc_inst *inst,
 		return -EINVAL;
 	}
 
-	switch (cache_type) {
+	switch (cache_op_type) {
 	case MSM_MEM_CACHE_CLEAN:
 	case MSM_MEM_CACHE_CLEAN_INVALIDATE:
 		rc = dma_buf_begin_cpu_access(dbuf, DMA_TO_DEVICE);
@@ -699,7 +699,7 @@ int msm_memory_cache_operations(struct msm_vidc_inst *inst,
 		break;
 	default:
 		i_vpr_e(inst, "%s: cache (%d) operation not supported\n",
-			__func__, cache_type);
+			__func__, cache_op_type);
 		rc = -EINVAL;
 		break;
 	}

@@ -37,7 +37,7 @@
 #define H264    MSM_VIDC_H264
 #define HEVC    MSM_VIDC_HEVC
 #define VP9     MSM_VIDC_VP9
-#define CODECS_ALL     (H264 | HEVC | VP9 | HEIC)
+#define CODECS_ALL     (H264 | HEVC | VP9)
 #define MAXIMUM_OVERRIDE_VP9_FPS 200
 
 
@@ -77,11 +77,6 @@ static struct color_format_info color_format_data_malabar[] = {
 		.v4l2_color_format = V4L2_PIX_FMT_NV21,
 		.vidc_color_format = MSM_VIDC_FMT_NV21,
 		.pixfmt_name       = "NV21",
-	},
-	{
-		.v4l2_color_format = V4L2_META_FMT_VIDC,
-		.vidc_color_format = MSM_VIDC_FMT_META,
-		.pixfmt_name       = "META",
 	},
 };
 
@@ -185,8 +180,8 @@ static struct matrix_coeff_info matrix_coeff_data_malabar[] = {
  */
 static const struct msm_platform_core_capability core_data_malabar[] = {
 	/* {type, value} */
-	{ENC_CODECS, H264 | HEVC | HEIC},
-	{DEC_CODECS, H264 | HEVC | VP9 | HEIC},
+	{ENC_CODECS, H264 | HEVC},
+	{DEC_CODECS, H264 | HEVC | VP9},
 	{MAX_SESSION_COUNT, 8},
 	{MAX_NUM_720P_SESSIONS, 4},
 	{MAX_NUM_1080P_SESSIONS, 2},
@@ -274,9 +269,6 @@ static struct msm_platform_inst_capability instance_cap_data_malabar[] = {
 	/* (1920 * 1088) / 256 */
 	{MBPF, ENC | DEC, CODECS_ALL, 64, 8160, 1, 8160},
 
-	/* ((8192x8192)/256) */
-	{MBPF, ENC | DEC, HEIC, 36, 262144, 1, 262144},
-
 	/* (1920 * 1088) / 256 */
 	{LOSSLESS_MBPF, ENC, H264 | HEVC, 36, 8160, 1, 8160},
 
@@ -327,9 +319,6 @@ static struct msm_platform_inst_capability instance_cap_data_malabar[] = {
 	{MB_CYCLES_FW_VPP, ENC, CODECS_ALL, 48405, 48405, 1, 48405},
 
 	{MB_CYCLES_FW_VPP, DEC, CODECS_ALL, 66234, 66234, 1, 66234},
-
-	{ENC_RING_BUFFER_COUNT, ENC, H264,
-		0, MAX_ENC_RING_BUF_COUNT, 1, 0},
 
 	{CLIENT_ID, ENC | DEC, CODECS_ALL,
 		INVALID_CLIENT_ID, INT_MAX, 1, INVALID_CLIENT_ID,
@@ -904,7 +893,7 @@ static struct msm_platform_inst_capability instance_cap_data_malabar[] = {
 		HFI_PROP_LEVEL,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
-	{LEVEL, ENC, HEVC | HEIC,
+	{LEVEL, ENC, HEVC,
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_1,
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_6,
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_1) |
@@ -941,7 +930,7 @@ static struct msm_platform_inst_capability instance_cap_data_malabar[] = {
 		HFI_PROP_LEVEL,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
-	{LEVEL, DEC, HEVC | HEIC,
+	{LEVEL, DEC, HEVC,
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_1,
 		V4L2_MPEG_VIDEO_HEVC_LEVEL_4_1,
 		BIT(V4L2_MPEG_VIDEO_HEVC_LEVEL_1) |
@@ -1210,11 +1199,6 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_mala
 		{0},
 		NULL,
 		msm_vidc_set_q16},
-
-	{ENC_RING_BUFFER_COUNT, ENC, H264,
-		{0},
-		NULL,
-		msm_vidc_set_ring_buffer_count_malabar},
 
 	{HFLIP, ENC, CODECS_ALL,
 		{0},

@@ -84,7 +84,6 @@ static u32 msm_vidc_decoder_comv_size_iris3(struct msm_vidc_inst *inst)
 		else
 			num_comv += 7;
 	}
-	msm_vidc_update_cap_value(inst, NUM_COMV, num_comv, __func__);
 
 	if (inst->codec == MSM_VIDC_HEIC
 		&& is_thumbnail_session(inst)) {
@@ -97,6 +96,8 @@ static u32 msm_vidc_decoder_comv_size_iris3(struct msm_vidc_inst *inst)
 	}
 
 	num_comv = max(vpp_delay + 1, num_comv);
+	msm_vidc_update_cap_value(inst, NUM_COMV, num_comv, __func__);
+
 	if (inst->codec == MSM_VIDC_H264) {
 		HFI_BUFFER_COMV_H264D(size, width, height, num_comv);
 	} else if (inst->codec == MSM_VIDC_HEVC || inst->codec == MSM_VIDC_HEIC) {

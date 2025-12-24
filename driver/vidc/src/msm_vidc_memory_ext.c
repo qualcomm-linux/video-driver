@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/dma-buf.h>
@@ -156,7 +156,10 @@ static int msm_vidc_memory_alloc_ext(struct msm_vidc_core *core, struct msm_vidc
 			return -EINVAL;
 		}
 	} else {
-		heap_name = "qcom,system";
+		if (core->capabilities[CACHE_OPS_REQUIRED].value)
+			heap_name = "qcom,system-uncached";
+		else
+			heap_name = "qcom,system";
 	}
 
 	heap = dma_heap_find(heap_name);
@@ -473,6 +476,40 @@ static int msm_vidc_memory_unmap_free_ext(struct msm_vidc_core *core, struct msm
 	return rc;
 }
 
+static int msm_vidc_memory_cache_ops_ext(struct msm_vidc_inst *inst,
+	struct dma_buf *dbuf, enum msm_memory_cache_op_type cache_op_type)
+{
+	int rc = 0;
+
+	if (!inst || !dbuf) {
+		d_vpr_e("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	switch (cache_op_type) {
+	case MSM_MEM_CACHE_CLEAN:
+	case MSM_MEM_CACHE_CLEAN_INVALIDATE:
+		rc = dma_buf_begin_cpu_access(dbuf, DMA_TO_DEVICE);
+		if (rc)
+			break;
+		rc = dma_buf_end_cpu_access(dbuf, DMA_FROM_DEVICE);
+		break;
+	case MSM_MEM_CACHE_INVALIDATE:
+		rc = dma_buf_begin_cpu_access(dbuf, DMA_FROM_DEVICE);
+		if (rc)
+			break;
+		rc = dma_buf_end_cpu_access(dbuf, DMA_FROM_DEVICE);
+		break;
+	default:
+		i_vpr_e(inst, "%s: cache (%d) operation not supported\n",
+			__func__, cache_op_type);
+		rc = -EINVAL;
+		break;
+	}
+
+	return rc;
+}
+
 inline struct msm_vidc_memory_ops *get_mem_ops_ext(void)
 {
 	const struct msm_vidc_memory_ops *mem_ops = get_mem_ops();
@@ -483,6 +520,7 @@ inline struct msm_vidc_memory_ops *get_mem_ops_ext(void)
 	mem_ops_ext.memory_alloc_map  = msm_vidc_memory_alloc_map_ext;
 	mem_ops_ext.memory_unmap_free = msm_vidc_memory_unmap_free_ext;
 	mem_ops_ext.buffer_region     = msm_vidc_buffer_region_ext;
+	mem_ops_ext.memory_cache_ops  = msm_vidc_memory_cache_ops_ext;
 
 	return &mem_ops_ext;
 }

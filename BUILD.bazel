@@ -6,7 +6,7 @@ package(
 )
 
 ddk_headers(
-    name = "uapi_headers",
+    name = "video_uapi_headers",
     hdrs = glob([
         "include/uapi/vidc/media/*.h",
     ]),
@@ -177,7 +177,7 @@ ddk_headers(
 
 ddk_headers(
     name = "video_driver_headers",
-    hdrs = [":uapi_headers", "autogvm_headers", "hamoa_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "kera_headers", "canoe_headers", "chora_headers", "iris2_headers", "seraph_headers", "alor_headers", "art_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris36_headers", "iris4_headers", "iris5_headers", "vidc_headers"]
+    hdrs = [":video_uapi_headers", "autogvm_headers", "hamoa_headers", "niobe_headers", "pineapple_headers", "sun_headers", "tuna_headers", "kera_headers", "canoe_headers", "chora_headers", "iris2_headers", "seraph_headers", "alor_headers", "art_headers", "iris3_headers", "iris33_headers", "iris35_headers", "iris36_headers", "iris4_headers", "iris5_headers", "vidc_headers"]
 )
 
 load(":target.bzl", "define_target_modules")

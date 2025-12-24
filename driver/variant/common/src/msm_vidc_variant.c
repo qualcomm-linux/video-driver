@@ -809,7 +809,10 @@ int msm_vidc_init_codec_input_freq_iris5p(struct msm_vidc_inst *inst, u32 data_s
 	if (inst->capabilities[LOOKAHEAD_ENCODE_ENABLE].value)
 		codec_input->video_adv_feature = FEATURE_LOOKAHEAD_ENCODE;
 
-	if (inst->capabilities[ROTATION].value && codec_input->codec == CODEC_APV)
+	if ((codec_input->codec == CODEC_APV) &&
+			(inst->capabilities[ROTATION].value ||
+			inst->capabilities[HFLIP].value ||
+			inst->capabilities[VFLIP].value))
 		codec_input->video_adv_feature = FEATURE_APV_ROTATION;
 
 	core = inst->core;

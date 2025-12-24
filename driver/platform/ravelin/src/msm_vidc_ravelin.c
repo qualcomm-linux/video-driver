@@ -2223,21 +2223,6 @@ static const struct msm_vidc_platform_data ravelin_data = {
 	.vpu_ver = VENUS_VERSION_AR50LT_V2,
 };
 
-static int msm_vidc_ravelin_check_ddr_type(void)
-{
-	u32 ddr_type;
-
-	ddr_type = of_fdt_get_ddrtype();
-	if (ddr_type != DDR_TYPE_LPDDR5 &&
-		ddr_type != DDR_TYPE_LPDDR5X) {
-		d_vpr_e("%s: wrong ddr type %d\n", __func__, ddr_type);
-		return -EINVAL;
-	} else {
-		d_vpr_h("%s: ddr type %d\n", __func__, ddr_type);
-	}
-	return 0;
-}
-
 int msm_vidc_get_platform_data_ravelin(struct msm_vidc_core *core)
 {
 
@@ -2268,9 +2253,6 @@ int msm_vidc_init_platform_ravelin(struct msm_vidc_core *core)
 		d_vpr_e("%s: invalid resource ext ops\n", __func__);
 		return -EINVAL;
 	}
-	rc = msm_vidc_ravelin_check_ddr_type();
-	if (rc)
-		return rc;
 
 	return rc;
 }

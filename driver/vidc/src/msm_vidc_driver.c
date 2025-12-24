@@ -1201,21 +1201,43 @@ int msm_vidc_qbuf_cache_operation(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf)
 {
 	int rc = 0;
-	enum msm_memory_cache_type cache_type;
+	struct msm_vidc_core *core;
+	enum msm_memory_cache_op_type cache_op_type;
 
 	if (!inst || !buf) {
 		d_vpr_e("%s: Invalid params\n", __func__);
 		return -EINVAL;
 	}
+	core = inst->core;
 
-	if (is_decode_session(inst) || is_encode_session(inst)) {
+	/* skip cache operations on coherent systems */
+	if (!core->capabilities[CACHE_OPS_REQUIRED].value)
+		return 0;
+
+	if (is_decode_session(inst)) {
 		switch (buf->type) {
 		case MSM_VIDC_BUF_INPUT:
-			cache_type = MSM_MEM_CACHE_CLEAN_INVALIDATE;
+		case MSM_VIDC_BUF_INPUT_META:
+		case MSM_VIDC_BUF_OUTPUT_META:
+			cache_op_type = MSM_MEM_CACHE_CLEAN_INVALIDATE;
+			break;
+		case MSM_VIDC_BUF_OUTPUT:
+			cache_op_type = MSM_MEM_CACHE_INVALIDATE;
+			break;
+		default:
+			i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
+				__func__, buf->type);
+			return -EINVAL;
+		}
+	} else if (is_encode_session(inst)) {
+		switch (buf->type) {
+		case MSM_VIDC_BUF_INPUT:
+		case MSM_VIDC_BUF_INPUT_META:
+			cache_op_type = MSM_MEM_CACHE_CLEAN_INVALIDATE;
 			break;
 		case MSM_VIDC_BUF_OUTPUT:
 		case MSM_VIDC_BUF_OUTPUT_META:
-			cache_type = MSM_MEM_CACHE_INVALIDATE;
+			cache_op_type = MSM_MEM_CACHE_INVALIDATE;
 			break;
 		default:
 			i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
@@ -1227,11 +1249,9 @@ int msm_vidc_qbuf_cache_operation(struct msm_vidc_inst *inst,
 		return -EINVAL;
 	}
 
-	if (buf->dmabuf) {
-		rc = msm_memory_cache_operations(inst, buf->dmabuf, cache_type);
-		if (rc)
-			print_vidc_buffer(VIDC_ERR, "err ", "qbuf cache ops failed", inst, buf);
-	}
+	rc = call_mem_op(core, memory_cache_ops, inst, buf->dmabuf, cache_op_type);
+	if (rc)
+		print_vidc_buffer(VIDC_ERR, "err ", "qbuf cache ops failed", inst, buf);
 
 	return rc;
 }
@@ -1240,13 +1260,19 @@ int msm_vidc_dqbuf_cache_operation(struct msm_vidc_inst *inst,
 	struct msm_vidc_buffer *buf)
 {
 	int rc = 0;
-	enum msm_memory_cache_type cache_type = MSM_MEM_CACHE_INVALIDATE;
+	enum msm_memory_cache_op_type cache_op_type = MSM_MEM_CACHE_INVALIDATE;
 	bool skip = false;
+	struct msm_vidc_core *core;
 
 	if (!inst || !buf) {
 		d_vpr_e("%s: Invalid params\n", __func__);
 		return -EINVAL;
 	}
+	core = inst->core;
+
+	/* skip cache operations on coherent systems */
+	if (!core->capabilities[CACHE_OPS_REQUIRED].value)
+		return 0;
 
 	if (is_decode_session(inst) || is_encode_session(inst)) {
 		switch (buf->type) {
@@ -1254,8 +1280,9 @@ int msm_vidc_dqbuf_cache_operation(struct msm_vidc_inst *inst,
 			skip = true;
 			break;
 		case MSM_VIDC_BUF_OUTPUT:
+		case MSM_VIDC_BUF_INPUT_META:
 		case MSM_VIDC_BUF_OUTPUT_META:
-			cache_type = MSM_MEM_CACHE_INVALIDATE;
+			cache_op_type = MSM_MEM_CACHE_INVALIDATE;
 			break;
 		default:
 			i_vpr_e(inst, "%s: invalid driver buffer type %d\n",
@@ -1271,12 +1298,9 @@ int msm_vidc_dqbuf_cache_operation(struct msm_vidc_inst *inst,
 	if (skip)
 		return 0;
 
-
-	if (buf->dmabuf) {
-		rc = msm_memory_cache_operations(inst, buf->dmabuf, cache_type);
-		if (rc)
-			print_vidc_buffer(VIDC_ERR, "err ", "dqbuf cache ops failed", inst, buf);
-	}
+	rc = call_mem_op(core, memory_cache_ops, inst, buf->dmabuf, cache_op_type);
+	if (rc)
+		print_vidc_buffer(VIDC_ERR, "err ", "dqbuf cache ops failed", inst, buf);
 
 	return rc;
 }
@@ -3177,11 +3201,8 @@ static int msm_vidc_queue_buffer(struct msm_vidc_inst *inst, struct msm_vidc_buf
 	if (rc)
 		return rc;
 
-	if (buf->type == MSM_VIDC_BUF_INPUT || buf->type == MSM_VIDC_BUF_OUTPUT) {
-		rc = msm_vidc_qbuf_cache_operation(inst, buf);
-		if (rc)
-			return rc;
-	}
+	/* if cache ops fails ignore the error */
+	rc = msm_vidc_qbuf_cache_operation(inst, buf);
 
 	if (msm_vidc_is_super_buffer(inst) && is_input_buffer(buf->type))
 		rc = venus_hfi_queue_super_buffer(inst, buf, meta);
@@ -3629,6 +3650,9 @@ int msm_vidc_vb2_buffer_done(struct msm_vidc_inst *inst,
 	struct vb2_buffer *vb2;
 	struct vb2_v4l2_buffer *vbuf;
 	bool found;
+
+	/* if cache ops fails ignore the error */
+	msm_vidc_dqbuf_cache_operation(inst, buf);
 
 	type = v4l2_type_from_driver(buf->type, __func__);
 	if (!type)

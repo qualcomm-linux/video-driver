@@ -2670,7 +2670,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_x1e8
 
 /* Default UBWC config for LPDDR5 */
 static struct msm_vidc_ubwc_config_data ubwc_config_x1e80100[] = {
-	UBWC_CONFIG(8, 32, 16, 0, 1, 1, 1),
+	UBWC_CONFIG(8, 32, 17, 0, 1, 1, 1),
 };
 
 static struct msm_vidc_format_capability format_data_x1e80100 = {

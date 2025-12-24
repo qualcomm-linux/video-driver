@@ -159,7 +159,6 @@ static int msm_vidc_calc_freq_ar50lt(struct msm_vidc_inst *inst, u32 data_size)
 	i_vpr_p(inst, "%s: filled len %d, required freq %llu, fps %llu, mbpf %u\n",
 		__func__, clock_data->data_size, freq, fps, mbpf);
 
-	return msm_vidc_get_freq_corner(inst);
 	clock_data->freq = freq;
 
 	return (unsigned long) freq;

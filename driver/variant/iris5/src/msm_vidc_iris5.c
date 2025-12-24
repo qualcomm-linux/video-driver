@@ -2010,6 +2010,7 @@ struct msm_vidc_session_ops msm_session_ops = {
 	.decide_work_mode = msm_vidc_decide_work_mode_iris5p,
 	.decide_quality_mode = msm_vidc_decide_quality_mode_iris5p,
 	.decide_scaling = msm_vidc_decide_scaling_iris5p,
+	.decide_slice_max_mb = msm_vidc_encoder_decide_slice_max_mb_iris5,
 };
 
 int msm_vidc_init_iris5(struct msm_vidc_core *core)
