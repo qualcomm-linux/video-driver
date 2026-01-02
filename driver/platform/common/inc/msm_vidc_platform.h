@@ -68,6 +68,8 @@ enum clk_levels {
 	CLK_LEVEL_TURBO,
 	CLK_LEVEL_TURBO_L0,
 	CLK_LEVEL_TURBO_L1,
+	CLK_LEVEL_TURBO_L2,
+	CLK_LEVEL_TURBO_L3,
 	CLK_LEVEL_MAX
 };
 
@@ -183,7 +185,7 @@ struct msm_vidc_compat_handle {
 	const char *compat;
 	int (*get_platform_data)(struct msm_vidc_core *core);
 	int (*init_platform)(struct msm_vidc_core *core);
-	int (*init_iris)(struct msm_vidc_core *core);
+	int (*init_vpu)(struct msm_vidc_core *core);
 };
 
 struct msm_vidc_csc_coeff {
@@ -222,6 +224,8 @@ enum vpu_version {
 	VPU_VERSION_IRIS5_1P, // IRIS5 1 PIPE
 	VPU_VERSION_IRIS5_2P, // IRIS5 2 PIPE
 	VPU_VERSION_IRIS5_4P, // IRIS5 4 PIPE
+	VENUS_VERSION_AR50LT_V1,
+	VENUS_VERSION_AR50LT_V2,
 };
 
 struct msm_vidc_platform_data {
@@ -273,6 +277,8 @@ struct msm_vidc_platform_data {
 	unsigned int psc_avc_tbl_size;
 	const u32 *psc_hevc_tbl;
 	unsigned int psc_hevc_tbl_size;
+	const u32 *psc_vvc_tbl;
+	unsigned int psc_vvc_tbl_size;
 	const u32 *psc_apv_tbl;
 	unsigned int psc_apv_tbl_size;
 	const u32 *psc_vp9_tbl;
@@ -285,6 +291,8 @@ struct msm_vidc_platform_data {
 	unsigned int dec_input_prop_size_avc;
 	const u32 *dec_input_prop_hevc;
 	unsigned int dec_input_prop_size_hevc;
+	const u32 *dec_input_prop_vvc;
+	unsigned int dec_input_prop_size_vvc;
 	const u32 *dec_input_prop_apv;
 	unsigned int dec_input_prop_size_apv;
 	const u32 *dec_input_prop_vp9;
@@ -297,6 +305,8 @@ struct msm_vidc_platform_data {
 	unsigned int dec_output_prop_size_avc;
 	const u32 *dec_output_prop_hevc;
 	unsigned int dec_output_prop_size_hevc;
+	const u32 *dec_output_prop_vvc;
+	unsigned int dec_output_prop_size_vvc;
 	const u32 *dec_output_prop_apv;
 	unsigned int dec_output_prop_size_apv;
 	const u32 *dec_output_prop_vp9;
@@ -451,6 +461,8 @@ int msm_vidc_set_pipe(void *instance, enum msm_vidc_inst_capability_type cap_id)
 int msm_vidc_set_csc_custom_matrix(void *instance, enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_level(void *instance, enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_apv_level_band(void *instance, enum msm_vidc_inst_capability_type cap_id);
+int msm_vidc_set_vvc_level(void *instance, enum msm_vidc_inst_capability_type cap_id);
+int msm_vidc_set_vvc_profile(void *instance, enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_preprocess(void *instance, enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_reserve_duration(void *instance, enum msm_vidc_inst_capability_type cap_id);
 int msm_vidc_set_q16(void *instance, enum msm_vidc_inst_capability_type cap_id);

@@ -718,27 +718,27 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 		MSM_VIDC_META_ENABLE | MSM_VIDC_META_RX_INPUT,
 		0, MSM_VIDC_META_DISABLE,
 		V4L2_CID_MPEG_VIDC_METADATA_OUTPUT_TX_FENCE,
-		HFI_PROP_FENCE_OUTPUT,
+		HFI_PROP_TX_FENCE_ID_OUTPUT,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
 
 	{OUTPUT_RX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_OUTPUT_RX_FENCE_ENABLE,
-		HFI_PROP_FENCE_OUTPUT,
+		HFI_PROP_RX_FENCE_ID_OUTPUT,
 		CAP_FLAG_OUTPUT_PORT},
 
 	/* enable input rx fence feature */
 	{INPUT_RX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_INPUT_RX_FENCE_ENABLE,
-		HFI_PROP_FENCE_INPUT,
+		HFI_PROP_RX_FENCE_ID_INPUT,
 		CAP_FLAG_INPUT_PORT},
 
-	/* enable input rx fence feature */
+	/* enable input tx fence feature */
 	{INPUT_TX_FENCE_ENABLE, DEC, H264 | HEVC | VP9 | AV1,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDC_INPUT_TX_FENCE_ENABLE,
-		HFI_PROP_FENCE_INPUT,
+		HFI_PROP_TX_FENCE_ID_INPUT,
 		CAP_FLAG_INPUT_PORT},
 
 	/*
@@ -781,7 +781,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_FENCE_NONE,
 		V4L2_CID_MPEG_VIDC_INPUT_RX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_RX_FENCE_TYPE,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_MENU},
 
 	/* Fence type for input tx buffer */
@@ -791,7 +791,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_FENCE_NONE,
 		V4L2_CID_MPEG_VIDC_INPUT_TX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_TX_FENCE_TYPE,
 		CAP_FLAG_INPUT_PORT | CAP_FLAG_MENU},
 
 	{OUTPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
@@ -800,7 +800,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_FENCE_NONE,
 		V4L2_CID_MPEG_VIDC_OUTPUT_RX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_RX_FENCE_TYPE,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{OUTPUT_TX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
@@ -809,7 +809,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 			BIT(MSM_VIDC_SYNX_V2_FENCE),
 		MSM_VIDC_SW_FENCE,
 		V4L2_CID_MPEG_VIDC_OUTPUT_TX_FENCE_TYPE,
-		HFI_PROP_FENCE_TYPE,
+		HFI_PROP_TX_FENCE_TYPE,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
 	{TS_REORDER, DEC, H264 | HEVC,
@@ -2344,7 +2344,7 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 		HFI_PROP_DOLBY_RPU_METADATA,
 		CAP_FLAG_BITMASK | CAP_FLAG_META},
 
-	{META_DOLBY_RPU, DEC, H264 | HEVC,
+	{META_DOLBY_RPU, DEC, H264 | HEVC | AV1,
 		MSM_VIDC_META_DISABLE,
 		MSM_VIDC_META_ENABLE | MSM_VIDC_META_RX_OUTPUT,
 		0, MSM_VIDC_META_DISABLE,
@@ -2488,11 +2488,13 @@ static struct msm_platform_inst_capability instance_cap_data_canoe[] = {
 
 	{LOG_VIDEO_ENCODE, ENC, HEVC | APV,
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
-		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_HDR,
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_NONE) |
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_HDR),
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
 		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
 		HFI_PROP_LOG_VIDEO_ENCODE,
-		CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 };
 
 /*
@@ -2570,11 +2572,13 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v2[] = {
 
 	{LOG_VIDEO_ENCODE, ENC, HEVC,
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
-		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_HDR,
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_NONE) |
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_HDR),
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
 		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
 		HFI_PROP_LOG_VIDEO_ENCODE,
-		CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 };
 
 /*
@@ -2593,15 +2597,11 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v1[] = {
 	 *      flags}
 	 */
 
-	{FRAME_WIDTH, DEC, CODECS_ALL, 96, 4096, 1, 1920},
-
 	{FRAME_WIDTH, ENC, CODECS_ALL, 128, 4096, 1, 1920},
 
 	{FRAME_WIDTH, ENC, HEVC | APV, 96, 4096, 1, 1920},
 
 	{LOSSLESS_FRAME_WIDTH, ENC, CODECS_ALL, 128, 4096, 1, 1920},
-
-	{FRAME_HEIGHT, DEC, CODECS_ALL, 96, 7680, 1, 1080},
 
 	{FRAME_HEIGHT, ENC, CODECS_ALL, 128, 4096, 1, 1080},
 
@@ -2802,11 +2802,13 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v1[] = {
 
 	{LOG_VIDEO_ENCODE, ENC, HEVC | APV,
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
-		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_HDR,
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_NONE) |
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_HDR),
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
 		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
 		HFI_PROP_LOG_VIDEO_ENCODE,
-		CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 };
 
 /*
@@ -3032,11 +3034,13 @@ static struct msm_platform_inst_capability instance_cap_data_canoe_sku_v3[] = {
 
 	{LOG_VIDEO_ENCODE, ENC, HEVC,
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
-		MSM_VIDC_LOG_VIDEO_TYPE_COMMON, 1,
+		MSM_VIDC_LOG_VIDEO_TYPE_HDR,
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_NONE) |
+		BIT(MSM_VIDC_LOG_VIDEO_TYPE_HDR),
 		MSM_VIDC_LOG_VIDEO_TYPE_NONE,
 		V4L2_CID_MPEG_VIDC_LOG_VIDEO_ENCODE,
 		HFI_PROP_LOG_VIDEO_ENCODE,
-		CAP_FLAG_OUTPUT_PORT},
+		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 };
 
 static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_canoe[] = {
@@ -3132,22 +3136,22 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_cano
 	{INPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_input_rx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{INPUT_TX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_input_tx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{OUTPUT_TX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_output_tx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{OUTPUT_RX_FENCE_TYPE, DEC, H264 | HEVC | VP9 | AV1,
 		{0},
 		msm_vidc_adjust_dec_output_rx_fence_type,
-		NULL},
+		msm_vidc_set_u32},
 
 	{HFLIP, ENC, CODECS_ALL,
 		{0},
@@ -3909,7 +3913,7 @@ static const struct clk_table canoe_clk_table_v2[] = {
 	 (u64[]) {850000000, 630000000, 630000000, 533000000, 444000000,
 		  420000000, 338000000, 240000000}, 8},
 	{ "video_cc_mvs0c_clk_src",     VIDEO_CC_MVS0C_CLK_SRC,     1,
-	 (u64[]) {1360000000, 1360000000, 1260000000, 800000000, 666000000,
+	 (u64[]) {1260000000, 1260000000, 1104000000, 800000000, 666000000,
 		  630000000,  507000000,  360000000}, 8},
 };
 
@@ -4060,12 +4064,16 @@ static const u32 canoe_vdec_input_properties_avc[] = {
 	HFI_PROP_NO_OUTPUT,
 	HFI_PROP_SUBFRAME_INPUT,
 	HFI_PROP_DPB_LIST,
+	HFI_PROP_TX_FENCE_ID_INPUT,
+	HFI_PROP_RX_FENCE_ID_INPUT,
 };
 
 static const u32 canoe_vdec_input_properties_hevc[] = {
 	HFI_PROP_NO_OUTPUT,
 	HFI_PROP_SUBFRAME_INPUT,
 	HFI_PROP_DPB_LIST,
+	HFI_PROP_TX_FENCE_ID_INPUT,
+	HFI_PROP_RX_FENCE_ID_INPUT,
 };
 
 static const u32 canoe_vdec_input_properties_apv[] = {
@@ -4092,14 +4100,16 @@ static const u32 canoe_vdec_output_properties_avc[] = {
 	HFI_PROP_WORST_COMPLEXITY_FACTOR,
 	HFI_PROP_PICTURE_TYPE,
 	HFI_PROP_CABAC_SESSION,
-	HFI_PROP_FENCE_OUTPUT,
+	HFI_PROP_TX_FENCE_ID_OUTPUT,
+	HFI_PROP_RX_FENCE_ID_OUTPUT,
 };
 
 static const u32 canoe_vdec_output_properties_hevc[] = {
 	HFI_PROP_WORST_COMPRESSION_RATIO,
 	HFI_PROP_WORST_COMPLEXITY_FACTOR,
 	HFI_PROP_PICTURE_TYPE,
-	HFI_PROP_FENCE_OUTPUT,
+	HFI_PROP_TX_FENCE_ID_OUTPUT,
+	HFI_PROP_RX_FENCE_ID_OUTPUT,
 };
 
 static const u32 canoe_vdec_output_properties_apv[] = {

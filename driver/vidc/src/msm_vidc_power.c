@@ -378,6 +378,7 @@ int msm_vidc_scale_buses(struct msm_vidc_inst *inst)
 	vote_data->output_width = out_f->fmt.pix_mp.width;
 	vote_data->output_height = out_f->fmt.pix_mp.height;
 	vote_data->lcu_size = (inst->codec == MSM_VIDC_HEVC ||
+			inst->codec == MSM_VIDC_VVC ||
 			inst->codec == MSM_VIDC_VP9) ? 32 : 16;
 	if (inst->codec == MSM_VIDC_AV1)
 		vote_data->lcu_size =
@@ -633,6 +634,13 @@ int msm_vidc_scale_power(struct msm_vidc_inst *inst, bool scale_buses)
 				fps = fps + fps / 16;
 		}
 	}
+
+	/*
+	 * MVHEVC decode has single input buffer with 2 views,
+	 * double the FPS to match dual-view input rate for proper clock calculation.
+	 */
+	if (is_decode_session(inst) && is_multi_view_session(inst))
+		fps = fps * 2;
 	inst->max_rate = fps;
 
 	/* update current session last active ts */

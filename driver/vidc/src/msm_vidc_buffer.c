@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include "msm_media_info.h"
@@ -78,6 +78,7 @@ u32 msm_vidc_output_min_count(struct msm_vidc_inst *inst)
 	switch (inst->codec) {
 	case MSM_VIDC_H264:
 	case MSM_VIDC_HEVC:
+	case MSM_VIDC_VVC:
 	case MSM_VIDC_APV:
 		output_min_count = 4;
 		break;
@@ -198,7 +199,8 @@ u32 msm_vidc_internal_buffer_count(struct msm_vidc_inst *inst,
 			if (inst->codec == MSM_VIDC_H264 ||
 				inst->codec == MSM_VIDC_HEVC ||
 				inst->codec == MSM_VIDC_HEIC ||
-				inst->codec == MSM_VIDC_AV1)
+				inst->codec == MSM_VIDC_AV1 ||
+				inst->codec == MSM_VIDC_VVC)
 				count = 1;
 			else
 				count = 0;
@@ -265,7 +267,7 @@ u32 msm_vidc_decoder_input_size(struct msm_vidc_inst *inst)
 	 /* multiply by 10/8 (1.25) to get size for 10 bit case */
 	if (codec == MSM_VIDC_VP9 || codec == MSM_VIDC_AV1 ||
 		codec == MSM_VIDC_HEVC || codec == MSM_VIDC_HEIC ||
-		codec == MSM_VIDC_APV)
+		codec == MSM_VIDC_APV || codec == MSM_VIDC_VVC)
 		frame_size = frame_size + (frame_size >> 2);
 
 	i_vpr_h(inst, "set input buffer size to %d\n", frame_size);

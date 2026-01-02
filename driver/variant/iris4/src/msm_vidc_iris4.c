@@ -604,7 +604,7 @@ static int __power_off_iris4_hardware(struct msm_vidc_core *core)
 				__func__, core->sub_state_name);
 			goto disable_power;
 		} else {
-			d_vpr_e("%s: video hw is power ON, try power collpase hw %s\n",
+			d_vpr_h("%s: video hw is power ON, try power collpase hw %s\n",
 				__func__, core->sub_state_name);
 		}
 	}
@@ -1754,6 +1754,9 @@ static int msm_vidc_decide_scaling_iris4(struct msm_vidc_inst *inst)
 
 	if (msm_vidc_update_scaling_iris4(inst, aspect_ratio_w, aspect_ratio_h))
 		goto exit;
+
+	inst->crop.width = inst->compose.width;
+	inst->crop.height = inst->compose.height;
 
 	i_vpr_h(inst,
 		"%s: scaling enabled, input wxh: %dx%d, compose wxh: %dx%d\n",

@@ -723,6 +723,7 @@ static int __init_context_banks(struct msm_vidc_core *core)
 	struct context_bank_info *cbinfo = NULL;
 	u32 cb_count = 0, cnt = 0;
 	int rc = 0;
+	bool is_dma_coherent = false;
 
 	cbs = &core->resource->context_bank_set;
 
@@ -757,6 +758,13 @@ static int __init_context_banks(struct msm_vidc_core *core)
 		cbs->context_bank_tbl[cnt].dma_coherant = cb_tbl[cnt].dma_coherant;
 		cbs->context_bank_tbl[cnt].region = cb_tbl[cnt].region;
 		cbs->context_bank_tbl[cnt].dma_mask = cb_tbl[cnt].dma_mask;
+		if (cbs->context_bank_tbl[cnt].dma_coherant)
+			is_dma_coherent = true;
+	}
+	/* dma coherency is enabled */
+	if (is_dma_coherent) {
+		core->capabilities[CACHE_OPS_REQUIRED].value = 0;
+		d_vpr_h("%s: dma buffer cache operations not required\n", __func__);
 	}
 
 	/* print context_bank fiels */

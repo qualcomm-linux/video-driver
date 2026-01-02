@@ -145,6 +145,56 @@ static int msm_vdec_set_scale_resolution(struct msm_vidc_inst *inst)
 	return rc;
 }
 
+static int msm_vdec_set_scale_crop(struct msm_vidc_inst *inst)
+{
+	int rc = 0;
+	struct msm_vidc_core *core;
+	u32 payload[2] = {0};
+	u32 left_offset, top_offset, ds_crop_width, ds_crop_height;
+
+	if (!inst || !inst->core) {
+		i_vpr_e(inst, "%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	core = inst->core;
+	if (!core->capabilities[SUPPORTS_CROP_SCALING].value ||
+		!inst->capabilities[SCALE_ENABLE].value)
+		return 0;
+
+	left_offset = inst->crop.left;
+	top_offset = inst->crop.top;
+	ds_crop_width = inst->crop.width;
+	ds_crop_height = inst->crop.height;
+
+	if (inst->crop.width <= inst->compose.width ||
+		inst->crop.height <= inst->compose.height) {
+		payload[0] = left_offset << 16 | top_offset;
+		payload[1] = ds_crop_width << 16 | ds_crop_height;
+		i_vpr_h(inst,
+			"%s: left_offset: %d top_offset: %d ds_crop_width: %d ds_crop_height: %d\n",
+			__func__, left_offset, top_offset, ds_crop_width, ds_crop_height);
+	} else {
+		i_vpr_h(inst, "%s: DS crop resolution set to 0, skip setting this to FW\n",
+						__func__);
+		return 0;
+	}
+
+	rc = venus_hfi_session_property(inst,
+					HFI_PROP_DOWNSCALE_CROP_RECTANGLE,
+					HFI_HOST_FLAGS_NONE,
+					HFI_PORT_RAW,
+					HFI_PAYLOAD_64_PACKED,
+					&payload,
+					sizeof(u64));
+	if (rc) {
+		i_vpr_e(inst, "%s: set property failed\n", __func__);
+		return rc;
+	}
+
+	return rc;
+}
+
 static int msm_vdec_set_linear_stride_scanline(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -743,6 +793,10 @@ static int msm_vdec_set_output_properties(struct msm_vidc_inst *inst)
 	if (rc)
 		return rc;
 
+	rc = msm_vdec_set_scale_crop(inst);
+	if (rc)
+		return rc;
+
 	rc = msm_vdec_set_linear_stride_scanline(inst);
 	if (rc)
 		return rc;
@@ -967,6 +1021,9 @@ static int msm_vdec_subscribe_input_port_settings_change(struct msm_vidc_inst *i
 	} else if (inst->codec == MSM_VIDC_APV) {
 		subscribe_psc_size = core->platform->data.psc_apv_tbl_size;
 		psc = core->platform->data.psc_apv_tbl;
+	} else if (inst->codec == MSM_VIDC_VVC) {
+		subscribe_psc_size = core->platform->data.psc_vvc_tbl_size;
+		psc = core->platform->data.psc_vvc_tbl;
 	} else {
 		i_vpr_e(inst, "%s: unsupported codec: %d\n", __func__, inst->codec);
 		psc = NULL;
@@ -1045,6 +1102,9 @@ static int msm_vdec_subscribe_property(struct msm_vidc_inst *inst,
 		} else if (inst->codec == MSM_VIDC_MPEG2) {
 			subscribe_prop_size = core->platform->data.dec_input_prop_size_mpeg2;
 			subcribe_prop = core->platform->data.dec_input_prop_mpeg2;
+		} else if (inst->codec == MSM_VIDC_VVC) {
+			subscribe_prop_size = core->platform->data.dec_input_prop_size_vvc;
+			subcribe_prop = core->platform->data.dec_input_prop_vvc;
 		} else {
 			i_vpr_e(inst, "%s: unsupported codec: %d\n", __func__, inst->codec);
 			subcribe_prop = NULL;
@@ -1083,6 +1143,9 @@ static int msm_vdec_subscribe_property(struct msm_vidc_inst *inst,
 		} else if (inst->codec == MSM_VIDC_MPEG2) {
 			subscribe_prop_size = core->platform->data.dec_output_prop_size_mpeg2;
 			subcribe_prop = core->platform->data.dec_output_prop_mpeg2;
+		} else if (inst->codec == MSM_VIDC_VVC) {
+			subscribe_prop_size = core->platform->data.dec_output_prop_size_vvc;
+			subcribe_prop = core->platform->data.dec_output_prop_vvc;
 		} else {
 			i_vpr_e(inst, "%s: unsupported codec: %d\n", __func__, inst->codec);
 			subcribe_prop = NULL;
@@ -1491,14 +1554,15 @@ static int msm_vdec_read_input_subcr_params(struct msm_vidc_inst *inst)
 	/* update output port info */
 	inst->fw_min_count = subsc_params.fw_min_count;
 
+	if (subsc_params.bit_depth == BIT_DEPTH_10)
+		inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat = V4L2_PIX_FMT_QC10C;
+
 	/* decide scaling needs fw_min_count, crop, input port resolution */
 	call_session_op(core, decide_scaling, inst);
 
 	output_fmt = v4l2_colorformat_to_driver(inst,
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.pixelformat, __func__);
 	if (is_dec_scaling_enabled(inst)) {
-		inst->crop.width = inst->compose.width;
-		inst->crop.height = inst->compose.height;
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.width = inst->compose.width;
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.height = inst->compose.height;
 		inst->fmts[OUTPUT_PORT].fmt.pix_mp.plane_fmt[0].bytesperline =
@@ -1586,7 +1650,7 @@ int msm_vdec_streamon_input(struct msm_vidc_inst *inst)
 	if (rc)
 		goto error;
 
-	rc = msm_vidc_set_v4l2_properties(inst, PORT_NONE);
+	rc = msm_vidc_set_v4l2_properties(inst);
 	if (rc)
 		goto error;
 
@@ -1747,6 +1811,9 @@ static int msm_vdec_subscribe_output_port_settings_change(struct msm_vidc_inst *
 	} else if (inst->codec == MSM_VIDC_APV) {
 		subscribe_psc_size = core->platform->data.psc_apv_tbl_size;
 		psc = core->platform->data.psc_apv_tbl;
+	} else if (inst->codec == MSM_VIDC_VVC) {
+		subscribe_psc_size = core->platform->data.psc_vvc_tbl_size;
+		psc = core->platform->data.psc_vvc_tbl;
 	} else {
 		i_vpr_e(inst, "%s: unsupported codec: %d\n", __func__, inst->codec);
 		psc = NULL;
@@ -1893,10 +1960,6 @@ int msm_vdec_streamon_output(struct msm_vidc_inst *inst)
 		goto error;
 
 	rc = msm_vdec_set_output_properties(inst);
-	if (rc)
-		goto error;
-
-	rc = msm_vidc_set_v4l2_properties(inst, OUTPUT_PORT);
 	if (rc)
 		goto error;
 
@@ -2812,7 +2875,8 @@ int msm_vdec_inst_init(struct msm_vidc_inst *inst)
 	f = &inst->fmts[OUTPUT_PORT];
 	f->type = OUTPUT_MPLANE;
 	f->fmt.pix_mp.pixelformat =
-		v4l2_colorformat_from_driver(inst, MSM_VIDC_FMT_NV12C, __func__);
+		v4l2_colorformat_from_driver(inst,
+		core->inst_caps[MSM_VIDC_H264].cap[PIX_FMTS].value, __func__);
 	colorformat = v4l2_colorformat_to_driver(inst,
 		f->fmt.pix_mp.pixelformat, __func__);
 	f->fmt.pix_mp.width = video_y_stride_pix(colorformat, DEFAULT_WIDTH);

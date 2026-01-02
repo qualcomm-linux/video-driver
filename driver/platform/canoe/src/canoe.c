@@ -1721,6 +1721,16 @@ static struct msm_vidc_format_capability format_data_canoe = {
 	.matrix_coeff_info_size = ARRAY_SIZE(matrix_coeff_data_canoe),
 };
 
+/* name, start, size, secure, dma_coherant, region, dma_mask */
+const struct context_bank_table canoe_context_bank_table[] = {
+	{"qcom,canoe-iris",          0x25800000, 0xda400000, 0, 1,
+		MSM_VIDC_NON_SECURE |
+		MSM_VIDC_NON_SECURE_BITSTREAM |
+		MSM_VIDC_NON_SECURE_PIXEL,     0 },
+	{"qcom,canoe-iris",          0x01000000, 0x24800000, 1, 0,
+		MSM_VIDC_SECURE_NONPIXEL,      0 },
+};
+
 static const struct msm_vidc_platform_data canoe_data = {
 	.core_data = core_data_canoe,
 	.core_data_size = ARRAY_SIZE(core_data_canoe),
@@ -1733,6 +1743,9 @@ static const struct msm_vidc_platform_data canoe_data = {
 	.csc_data.vpe_csc_custom_limit_coeff = vpe_csc_custom_limit_coeff,
 	.ubwc_config = ubwc_config_canoe,
 	.format_data = &format_data_canoe,
+	/* populate context bank */
+	.context_bank_tbl = canoe_context_bank_table,
+	.context_bank_tbl_size = ARRAY_SIZE(canoe_context_bank_table),
 };
 
 static int msm_vidc_canoe_check_ddr_type(void)
