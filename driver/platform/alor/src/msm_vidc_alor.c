@@ -305,11 +305,9 @@ static const struct msm_platform_core_capability core_data_alor[] = {
 	{MAX_SECURE_SESSION_COUNT, 3},
 	{MAX_RT_MBPF, 138240}, /* ((8192*4320)/256)) */
 	{MAX_MBPF, 139264}, /* (4 * ((4096*2176)/256)) */
-	/* max_load 1920x1088@480fps or 3840x2176@120fps
-	 * which is greater than 8192x4320@30fps
-	 * Concurrency: UHD@30 decode + uhd@30 encode
-	 */
-	{MAX_MBPS, 3916800},
+	/* max_load is 8192x4320@30fps */
+	/* Concurrency: UHD@30 decode + uhd@30 encode */
+	{MAX_MBPS, 4147200},
 	{MAX_IMAGE_MBPF, 1048576}, /* (16384x16384)/256 */
 	{MAX_MBPF_HQ, 8160}, /* ((1920x1088)/256) */
 	{MAX_MBPS_HQ, 244800}, /* ((1920x1088)/256)@30fps */
@@ -2924,7 +2922,7 @@ static const struct clk_table alor_clk_table[] = {
 	{ "video_cc_mvs0c_clk",         VIDEO_CC_MVS0C_CLK,         0},
 	{ "video_cc_mvs0_vpp0_clk",     VIDEO_CC_MVS0_VPP0_CLK,     0},
 	{ "video_cc_mvs0_clk_src",      VIDEO_CC_MVS0_CLK_SRC,      1,
-	 (u64[]) {970000000, 800000000, 630000000, 533000000, 444000000,
+	 (u64[]) {970000000, 800000000, 630000000, 560000000, 444000000,
 		  420000000, 338000000, 240000000}, 8},
 	{ "video_cc_mvs0b_clk_src",     VIDEO_CC_MVS0B_CLK_SRC,     1,
 	 (u64[]) {800000000, 630000000, 630000000, 533000000, 444000000,

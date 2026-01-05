@@ -768,7 +768,7 @@ int msm_vidc_dqevent(struct msm_vidc_inst *inst, struct v4l2_event *event)
 	return rc;
 }
 
-void *msm_vidc_open(struct msm_vidc_core *core, u32 session_type)
+void *msm_vidc_open(struct msm_vidc_core *core, u32 session_type, struct file *filp)
 {
 	int rc = 0;
 	struct msm_vidc_inst *inst = NULL;
@@ -881,6 +881,7 @@ void *msm_vidc_open(struct msm_vidc_core *core, u32 session_type)
 	INIT_DELAYED_WORK(&inst->stats_work, msm_vidc_stats_handler);
 	INIT_WORK(&inst->stability_work, msm_vidc_stability_handler);
 
+	inst->fh_filp = filp;
 	rc = msm_vidc_v4l2_fh_init(inst);
 	if (rc)
 		goto fail_eventq_init;

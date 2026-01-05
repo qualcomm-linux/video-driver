@@ -3,6 +3,7 @@ load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 
 def _register_module_to_map(module_map, name, path, config_option, srcs, config_srcs, deps, config_deps):
     processed_config_srcs = {}
+    processed_config_deps = {}
 
     for config_src_name in config_srcs:
         config_src = config_srcs[config_src_name]
@@ -12,6 +13,14 @@ def _register_module_to_map(module_map, name, path, config_option, srcs, config_
         else:
             processed_config_srcs[config_src_name] = config_src
 
+    for config_dep_name in config_deps:
+        config_dep = config_deps[config_dep_name]
+
+        if type(config_dep) == "list":
+            processed_config_deps[config_dep_name] = {True: config_dep}
+        else:
+            processed_config_deps[config_dep_name] = config_dep
+
     module = struct(
         name = name,
         path = path,
@@ -19,6 +28,7 @@ def _register_module_to_map(module_map, name, path, config_option, srcs, config_
         config_srcs = processed_config_srcs,
         config_option = config_option,
         deps = deps,
+        config_deps = processed_config_deps,
     )
     module_map[name] = module
 
@@ -40,7 +50,8 @@ def _get_kernel_build_module_srcs(module, options, formatter):
     return globbed_srcs
 
 def _get_kernel_build_module_deps(module, options, formatter):
-    return [formatter(dep) for dep in module.deps]
+    deps = module.deps + _get_config_choices(module.config_deps, options)
+    return [formatter(dep) for dep in deps]
 
 def video_module_entry(hdrs = []):
     module_map = {}
@@ -150,6 +161,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
         "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(kernel_build),
     })
 
+    auto_deps = []
     if lunch_target != None:
         kernel_build = "{}_{}_{}".format(target, variant, lunch_target)
         print("kernel_build: " + kernel_build)
@@ -162,6 +174,20 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "CONFIG_MSM_VIDC_DMA_IOMMU_MAPPING",
             "CONFIG_MSM_VIDC_{}".format(lunch_target.upper()),
         ]
+    elif target == "autogvm":
+        dist_target_name = "{}_video_driver_modules_dist".format(kernel_build)
+        print("dist_target_name: " + dist_target_name)
+        config_options = [
+            "CONFIG_MSM_VIDC_ANDROID",
+            "CONFIG_MSM_VIDC_MINIDUMP",
+            "CONFIG_MSM_VIDC_NORDAU",
+            "CONFIG_MSM_VIDC_IRIS33_AU",
+            "MSM_VIDC_HW_VIRT",
+        ]
+        auto_deps = [
+            "//vendor/qcom/opensource/virtio-video:{}_msm_virtio_video".format(kernel_build),
+            "//vendor/qcom/opensource/virtio-video:virtio_video_driver_headers",
+        ]
     else:
         dist_target_name = "{}_video_driver_modules_dist".format(kernel_build)
         print("dist_target_name: " + dist_target_name)
@@ -173,6 +199,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             "CONFIG_MSM_VIDC_DMA_IOMMU_MAPPING",
             "CONFIG_MSM_VIDC_{}".format(target.upper()),
         ]
+
 
     modules = [registry.get(module_name) for module_name in modules]
 
@@ -199,7 +226,7 @@ def define_lunch_target_variant_modules(target, variant, registry, modules, lunc
             name = rule_name,
             srcs = module_srcs,
             out = "{}.ko".format(module.name),
-            deps = headers + all_module_deps + _get_kernel_build_module_deps(module, options, formatter),
+            deps = headers + all_module_deps + auto_deps + _get_kernel_build_module_deps(module, options, formatter),
             kernel_build = kernel_build_label,
             local_defines = options.keys(),
         )

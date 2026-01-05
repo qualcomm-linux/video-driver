@@ -184,9 +184,46 @@ static const char * const av1_tier[] = {
 	NULL,
 };
 
+static const char *const mpeg_vidc_vvc_profile[] = {
+	"Main 10",
+	"Main 10 Still Picture",
+	"Main 10 Multilayer",
+	NULL,
+};
+
+static const char *const mpeg_vidc_vvc_level[] = {
+	"VVC_LEVEL_1",
+	"VVC_LEVEL_2",
+	"VVC_LEVEL_2_1",
+	"VVC_LEVEL_3",
+	"VVC_LEVEL_3_1",
+	"VVC_LEVEL_4",
+	"VVC_LEVEL_4_1",
+	"VVC_LEVEL_5",
+	"VVC_LEVEL_5_1",
+	"VVC_LEVEL_5_2",
+	"VVC_LEVEL_6",
+	"VVC_LEVEL_6_1",
+	"VVC_LEVEL_6_2",
+	"VVC_LEVEL_6_3",
+	NULL,
+};
+
+static const char *const mpeg_vidc_vvc_tier[] = {
+	"VVC_TIER_MAIN",
+	"VVC_TIER_HIGH",
+	NULL,
+};
+
 static const char *const mpeg_video_vidc_ir_type[] = {
 	"Random",
 	"Cyclic",
+	NULL,
+};
+
+static const char *const log_video_mode_type[] = {
+	"Log_video_mode_none",
+	"Log_video_mode_hdr",
 	NULL,
 };
 
@@ -225,6 +262,8 @@ static const char * const *msm_vidc_get_qmenu_type(
 			return mpeg_vidc_apv_profile;
 		} else if (inst->codec == MSM_VIDC_AV1) {
 			return av1_profile;
+		} else if (inst->codec == MSM_VIDC_VVC) {
+			return mpeg_vidc_vvc_profile;
 		} else {
 			i_vpr_e(inst, "%s: invalid codec type %d for cap id %d\n",
 				__func__, inst->codec, cap_id);
@@ -235,6 +274,8 @@ static const char * const *msm_vidc_get_qmenu_type(
 			return av1_level;
 		} else if (inst->codec == MSM_VIDC_APV) {
 			return mpeg_vidc_apv_level;
+		} else if (inst->codec == MSM_VIDC_VVC) {
+			return mpeg_vidc_vvc_level;
 		} else {
 			i_vpr_e(inst, "%s: invalid codec type %d for cap id %d\n",
 				__func__, inst->codec, cap_id);
@@ -242,8 +283,12 @@ static const char * const *msm_vidc_get_qmenu_type(
 		}
 	case AV1_TIER:
 		return av1_tier;
+	case VVC_TIER:
+		return mpeg_vidc_vvc_tier;
 	case IR_TYPE:
 		return mpeg_video_vidc_ir_type;
+	case LOG_VIDEO_ENCODE:
+		return log_video_mode_type;
 	case INPUT_RX_FENCE_TYPE:
 	case INPUT_TX_FENCE_TYPE:
 	case OUTPUT_RX_FENCE_TYPE:
@@ -428,7 +473,7 @@ static int msm_vidc_adjust_cap(struct msm_vidc_inst *inst,
 
 static int msm_vidc_set_cap(struct msm_vidc_inst *inst,
 	enum msm_vidc_inst_capability_type cap_id,
-	enum msm_vidc_port_type port_type, const char *func)
+	const char *func)
 {
 	struct msm_vidc_inst_cap *cap;
 	int rc = 0;
@@ -446,15 +491,8 @@ static int msm_vidc_set_cap(struct msm_vidc_inst *inst,
 	if (!cap->set)
 		return 0;
 
-	if (port_type == INPUT_PORT) {
-		if (cap->flags & CAP_FLAG_INPUT_PORT)
-			rc = cap->set(inst, cap_id);
-	} else if (port_type == OUTPUT_PORT) {
-		if (cap->flags & CAP_FLAG_OUTPUT_PORT)
-			rc = cap->set(inst, cap_id);
-	} else { /* PORT_NONE */
-		rc = cap->set(inst, cap_id);
-	}
+	/* call set */
+	rc = cap->set(inst, cap_id);
 	if (rc) {
 		i_vpr_e(inst, "%s: set cap failed for %s\n", func, cap_name(cap_id));
 		return rc;
@@ -593,8 +631,7 @@ error:
 	return rc;
 }
 
-static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst,
-				enum msm_vidc_port_type port_type)
+static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
 	int rc = 0;
@@ -602,7 +639,7 @@ static int msm_vidc_set_dynamic_property(struct msm_vidc_inst *inst,
 	i_vpr_h(inst, "%s()\n", __func__);
 
 	list_for_each_entry_safe(entry, temp, &inst->firmware_list, list) {
-		rc = msm_vidc_set_cap(inst, entry->cap_id, port_type, __func__);
+		rc = msm_vidc_set_cap(inst, entry->cap_id, __func__);
 		if (rc)
 			goto error;
 
@@ -1030,7 +1067,7 @@ int msm_vidc_s_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		if (rc)
 			return rc;
 
-		rc = msm_vidc_set_dynamic_property(inst, PORT_NONE);
+		rc = msm_vidc_set_dynamic_property(inst);
 		if (rc)
 			return rc;
 	}
@@ -1174,7 +1211,7 @@ int msm_vidc_adjust_v4l2_properties(struct msm_vidc_inst *inst)
 	return rc;
 }
 
-int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst, enum msm_vidc_port_type port_type)
+int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst)
 {
 	struct msm_vidc_inst_cap_entry *entry = NULL, *temp = NULL;
 	int rc = 0;
@@ -1183,7 +1220,7 @@ int msm_vidc_set_v4l2_properties(struct msm_vidc_inst *inst, enum msm_vidc_port_
 
 	/* set all caps from caps_list */
 	list_for_each_entry_safe(entry, temp, &inst->caps_list, list) {
-		rc = msm_vidc_set_cap(inst, entry->cap_id, port_type, __func__);
+		rc = msm_vidc_set_cap(inst, entry->cap_id, __func__);
 		if (rc)
 			return rc;
 	}

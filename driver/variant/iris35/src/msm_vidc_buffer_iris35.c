@@ -84,13 +84,13 @@ static u32 msm_vidc_decoder_comv_size_iris35(struct msm_vidc_inst *inst)
 	} else {
 		num_comv = inst->buffers.output.min_count;
 	}
-	msm_vidc_update_cap_value(inst, NUM_COMV, num_comv, __func__);
 
 	if (inst->decode_vpp_delay.enable)
 		vpp_delay = inst->decode_vpp_delay.size;
 	else
 		vpp_delay = DEFAULT_BSE_VPP_DELAY;
 	num_comv = max(vpp_delay + 1, num_comv);
+	msm_vidc_update_cap_value(inst, NUM_COMV, num_comv, __func__);
 
 	if (inst->codec == MSM_VIDC_H264) {
 		HFI_BUFFER_COMV_H264D(size, width, height, num_comv);

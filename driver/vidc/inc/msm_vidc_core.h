@@ -38,6 +38,7 @@ struct msm_vidc_venus_ops {
 	int (*sw_ctrl_gdsc)(struct msm_vidc_core *core);
 	int (*scm_mem_protect)(struct msm_vidc_core *core);
 	int (*enable_intr)(struct msm_vidc_core *core);
+	int (*setup_ucregion_memmap)(struct msm_vidc_core *core);
 };
 
 struct msm_vidc_md_ops {
@@ -147,6 +148,7 @@ struct msm_vidc_core {
 	struct msm_vidc_synx_fence_data        synx_fence_data;
 	/* hw_version: distinguish chip versions: v1, v2 */
 	enum msm_vidc_hw_version               hw_version;
+	int                                    cb_count;
 };
 
 #endif // _MSM_VIDC_CORE_H_

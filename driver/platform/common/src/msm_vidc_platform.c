@@ -25,10 +25,16 @@
 #include "venus_hfi.h"
 #include "resources.h"
 
+#if defined(CONFIG_MSM_VIDC_CHORA)
+#include "msm_vidc_chora.h"
+#include "msm_vidc_iris2.h"
+#endif
+
 #if defined(CONFIG_MSM_VIDC_SUN)
 #include "msm_vidc_sun.h"
 #include "msm_vidc_iris35.h"
 #include "msm_vidc_tuna.h"
+#include "msm_vidc_kera.h"
 #include "msm_vidc_iris33.h"
 #endif
 #if defined(CONFIG_MSM_VIDC_PINEAPPLE)
@@ -63,6 +69,10 @@
 #if defined(CONFIG_MSM_VIDC_ART)
 #include "msm_vidc_art.h"
 #include "msm_vidc_iris5.h"
+#endif
+#if defined(CONFIG_MSM_VIDC_RAVELIN)
+#include "msm_vidc_ravelin.h"
+#include "msm_vidc_ar50lt.h"
 #endif
 
 #define CAP_TO_8BIT_QP(a) {          \
@@ -192,13 +202,21 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sm8650-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_pineapple,
 		.init_platform              = msm_vidc_init_platform_pineapple,
-		.init_iris                  = msm_vidc_init_iris33,
+		.init_vpu                   = msm_vidc_init_iris33,
 	},
 	{
 		.compat                     = "qcom,sm8650-vidc-v2",
 		.get_platform_data          = msm_vidc_get_platform_data_pineapple,
 		.init_platform              = msm_vidc_init_platform_pineapple,
-		.init_iris                  = msm_vidc_init_iris33,
+		.init_vpu                   = msm_vidc_init_iris33,
+	},
+#endif
+#if defined(CONFIG_MSM_VIDC_CHORA)
+	{
+		.compat                     = "qcom,chora-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_chora,
+		.init_platform              = msm_vidc_init_platform_chora,
+		.init_vpu                  = msm_vidc_init_iris2,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_SUN)
@@ -206,19 +224,25 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sm8750-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_sun,
 		.init_platform              = msm_vidc_init_platform_sun,
-		.init_iris                  = msm_vidc_init_iris35,
+		.init_vpu                   = msm_vidc_init_iris35,
 	},
 	{
 		.compat                     = "qcom,sm8750-vidc-v2",
 		.get_platform_data          = msm_vidc_get_platform_data_sun,
 		.init_platform              = msm_vidc_init_platform_sun,
-		.init_iris                  = msm_vidc_init_iris35,
+		.init_vpu                   = msm_vidc_init_iris35,
 	},
 	{
 		.compat                     = "qcom,tuna-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_tuna,
 		.init_platform              = msm_vidc_init_platform_tuna,
-		.init_iris                  = msm_vidc_init_iris33,
+		.init_vpu                  = msm_vidc_init_iris33,
+	},
+	{
+		.compat                     = "qcom,kera-vidc",
+		.get_platform_data          = msm_vidc_get_platform_data_kera,
+		.init_platform              = msm_vidc_init_platform_kera,
+		.init_vpu                  = msm_vidc_init_iris33,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_X1E80100)
@@ -226,7 +250,7 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,x1e80100-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_x1e80100,
 		.init_platform              = msm_vidc_init_platform_x1e80100,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_LEMANS)
@@ -234,13 +258,13 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sa8255-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_lemans,
 		.init_platform              = msm_vidc_init_platform_lemans,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 	{
 		.compat                     = "qcom,sa8775p-iris",
 		.get_platform_data          = msm_vidc_get_platform_data_lemans,
 		.init_platform              = msm_vidc_init_platform_lemans,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_NIOBE)
@@ -248,7 +272,7 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,niobe-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_niobe,
 		.init_platform              = msm_vidc_init_platform_niobe,
-		.init_iris                  = msm_vidc_init_iris3,
+		.init_vpu                   = msm_vidc_init_iris3,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_CANOE)
@@ -256,25 +280,25 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,canoe-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_canoe,
 		.init_platform              = msm_vidc_init_platform_canoe,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 	{
 		.compat                     = "qcom,canoe-vidc-v2",
 		.get_platform_data          = msm_vidc_get_platform_data_canoe,
 		.init_platform              = msm_vidc_init_platform_canoe,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 	{
 		.compat                     = "qcom,canoe-vidc-v3",
 		.get_platform_data          = msm_vidc_get_platform_data_canoe,
 		.init_platform              = msm_vidc_init_platform_canoe,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 	{
 		.compat                     = "qcom,alor-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_alor,
 		.init_platform              = msm_vidc_init_platform_alor,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_ART)
@@ -282,7 +306,7 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,art-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_art,
 		.init_platform              = msm_vidc_init_platform_art,
-		.init_iris                  = msm_vidc_init_iris5,
+		.init_vpu                  = msm_vidc_init_iris5,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_SERAPH)
@@ -290,7 +314,13 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,seraph-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_seraph,
 		.init_platform              = msm_vidc_init_platform_seraph,
-		.init_iris                  = msm_vidc_init_iris4,
+		.init_vpu                   = msm_vidc_init_iris4,
+	},
+	{
+		.compat                     = "qcom,seraph-vidc-v2",
+		.get_platform_data          = msm_vidc_get_platform_data_seraph,
+		.init_platform              = msm_vidc_init_platform_seraph,
+		.init_vpu                  = msm_vidc_init_iris4,
 	},
 #endif
 #if defined(CONFIG_MSM_VIDC_NORDAU)
@@ -298,9 +328,18 @@ static const struct msm_vidc_compat_handle compat_handle[] = {
 		.compat                     = "qcom,sa8797-vidc",
 		.get_platform_data          = msm_vidc_get_platform_data_nordau,
 		.init_platform              = msm_vidc_init_platform_nordau,
-		.init_iris                  = msm_vidc_init_iris36,
+		.init_vpu                   = msm_vidc_init_iris36,
 	},
 #endif
+#if defined(CONFIG_MSM_VIDC_RAVELIN)
+	{
+		.compat                     = "qcom,msm-vidc-ravelin",
+		.get_platform_data          = msm_vidc_get_platform_data_ravelin,
+		.init_platform              = msm_vidc_init_platform_ravelin,
+		.init_vpu                   = msm_vidc_init_ar50lt,
+	},
+#endif
+
 };
 
 static struct codec_info codec_data_common[] = {
@@ -313,6 +352,11 @@ static struct codec_info codec_data_common[] = {
 		.v4l2_codec  = V4L2_PIX_FMT_HEVC,
 		.vidc_codec  = MSM_VIDC_HEVC,
 		.pixfmt_name = "HEVC",
+	},
+	{
+		.v4l2_codec  = V4L2_PIX_FMT_VIDC_VVC,
+		.vidc_codec  = MSM_VIDC_VVC,
+		.pixfmt_name = "VVC",
 	},
 	{
 		.v4l2_codec  = V4L2_PIX_FMT_VP9,
@@ -654,7 +698,7 @@ static int msm_vidc_init_vpu(struct msm_vidc_core *core)
 	/* select platform based on compatible match */
 	for (i = 0; i < ARRAY_SIZE(compat_handle); i++) {
 		if (of_device_is_compatible(dev->of_node, compat_handle[i].compat)) {
-			rc = compat_handle[i].init_iris(core);
+			rc = compat_handle[i].init_vpu(core);
 			if (rc) {
 				d_vpr_e("%s: (%s) init failed with %d\n",
 					__func__, compat_handle[i].compat, rc);
@@ -909,13 +953,20 @@ int msm_vidc_v4l2_menu_to_hfi(struct msm_vidc_inst *inst,
 			*value = 1;
 			goto set_default;
 		}
-		return 0;
+		break;
+	case INPUT_TX_FENCE_TYPE:
+	case INPUT_RX_FENCE_TYPE:
+	case OUTPUT_TX_FENCE_TYPE:
+	case OUTPUT_RX_FENCE_TYPE:
+		*value = inst->capabilities[cap_id].value;
+		break;
 	default:
 		i_vpr_e(inst,
 			"%s: mapping not specified for ctrl_id: %#x\n",
 			__func__, inst->capabilities[cap_id].v4l2_id);
 		return -EINVAL;
 	}
+	return 0;
 
 set_default:
 	i_vpr_e(inst,
@@ -935,6 +986,7 @@ int msm_vidc_v4l2_to_hfi_enum(struct msm_vidc_inst *inst,
 	case PROFILE:
 	case LEVEL:
 	case HEVC_TIER:
+	case VVC_TIER:
 	case AV1_TIER:
 	case BLUR_TYPES:
 	case LOG_VIDEO_ENCODE:
@@ -1584,6 +1636,58 @@ static u32 msm_vidc_apv_level_band_v4l2_to_hfi(s64 v4l2_level)
 	}
 
 	return HFI_LEVEL_NONE;
+}
+
+static u32 msm_vidc_vvc_level_v4l2_to_hfi(s64 v4l2_level)
+{
+
+	switch (v4l2_level) {
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_1:
+		return HFI_H266_LEVEL_1;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_2:
+		return HFI_H266_LEVEL_2;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_2_1:
+		return HFI_H266_LEVEL_2_1;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_3:
+		return HFI_H266_LEVEL_3;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_3_1:
+		return HFI_H266_LEVEL_3_1;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_4:
+		return HFI_H266_LEVEL_4;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_4_1:
+		return HFI_H266_LEVEL_4_1;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_5:
+		return HFI_H266_LEVEL_5;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_5_1:
+		return HFI_H266_LEVEL_5_1;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_5_2:
+		return HFI_H266_LEVEL_5_2;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6:
+		return HFI_H266_LEVEL_6;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6_1:
+		return HFI_H266_LEVEL_6_1;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6_2:
+		return HFI_H266_LEVEL_6_2;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_LEVEL_6_3:
+		return HFI_H266_LEVEL_6_3;
+	default:
+		return HFI_LEVEL_NONE;
+	}
+}
+
+static u32 msm_vidc_vvc_profile_v4l2_to_hfi(s64 v4l2_profile)
+{
+
+	switch (v4l2_profile) {
+	case V4L2_MPEG_VIDEO_VIDC_VVC_PROFILE_MAIN_10:
+		return HFI_H266_PROFILE_MAIN_10;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_PROFILE_MAIN_10_STILL_PICTURE:
+		return HFI_H266_PROFILE_MAIN_10_STILL_PICTURE;
+	case V4L2_MPEG_VIDEO_VIDC_VVC_PROFILE_MAIN_10_MULTILAYER:
+		return HFI_H266_PROFILE_MULTILAYER_MAIN_10;
+	default:
+		return HFI_H266_PROFILE_MAIN_10;
+	}
 }
 
 static s64 msm_vidc_adjust_apv_level(struct msm_vidc_inst *inst,
@@ -4840,6 +4944,40 @@ int msm_vidc_set_apv_level_band(void *instance,
 					&hfi_value, sizeof(u32), __func__);
 
 	return rc;
+}
+
+int msm_vidc_set_vvc_level(void *instance,
+		       enum msm_vidc_inst_capability_type cap_id)
+{
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	u32 hfi_value = HFI_LEVEL_NONE;
+
+	if (cap_id != LEVEL)
+		return -EINVAL;
+
+	if (inst->capabilities[LEVEL].flags & CAP_FLAG_CLIENT_SET)
+		hfi_value = msm_vidc_vvc_level_v4l2_to_hfi(
+					inst->capabilities[LEVEL].value);
+
+	return msm_vidc_packetize_control(inst, LEVEL, HFI_PAYLOAD_U32_ENUM,
+					&hfi_value, sizeof(u32), __func__);
+}
+
+int msm_vidc_set_vvc_profile(void *instance,
+		       enum msm_vidc_inst_capability_type cap_id)
+{
+	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
+	u32 hfi_value = HFI_H266_PROFILE_MAIN_10;
+
+	if (cap_id != PROFILE)
+		return -EINVAL;
+
+	if (inst->capabilities[PROFILE].flags & CAP_FLAG_CLIENT_SET)
+		hfi_value = msm_vidc_vvc_profile_v4l2_to_hfi(
+					inst->capabilities[PROFILE].value);
+
+	return msm_vidc_packetize_control(inst, PROFILE, HFI_PAYLOAD_U32_ENUM,
+					&hfi_value, sizeof(u32), __func__);
 }
 
 int msm_vidc_set_q16(void *instance,

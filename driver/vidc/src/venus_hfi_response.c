@@ -885,7 +885,7 @@ static int handle_output_rx_fence(struct msm_vidc_inst *inst,
 	int cnt, rc = 0;
 
 	for (cnt = 0; cnt < buf->num_rx_fences; cnt++) {
-		u64 fence_id = inst->hfi_frame_info.fence_id[cnt];
+		u64 fence_id = inst->hfi_frame_info.rx_fence_id[cnt];
 
 		if ((s64)fence_id < 0) {
 			i_vpr_h(inst, "%s: skip release rx fence_id %llu\n",
@@ -954,13 +954,10 @@ static int handle_output_tx_fence(struct msm_vidc_inst *inst,
 		if (!buf->data_size)
 			signal_error = true;
 	}
-	tx_fence_count = inst->hfi_frame_info.fence_count - buf->num_rx_fences;
+	tx_fence_count = inst->hfi_frame_info.tx_fence_count;
 
 	for (cnt = 0; cnt < tx_fence_count; cnt++) {
-		/* locate TX index */
-		int idx = cnt + buf->num_rx_fences;
-
-		fence_id = inst->hfi_frame_info.fence_id[idx];
+		fence_id = inst->hfi_frame_info.tx_fence_id[cnt];
 		/* fetch fence using fence_id */
 		fence = msm_vidc_get_fence_from_id(inst, &fcontext->fence_list, fence_id);
 		if (!fence) {
@@ -1029,30 +1026,30 @@ static int msm_vidc_handle_output_fence(struct msm_vidc_inst *inst,
 	}
 
 	/* sanitize rx fence count */
-	if (inst->hfi_frame_info.fence_count < buf->num_rx_fences) {
+	if (inst->hfi_frame_info.rx_fence_count != buf->num_rx_fences) {
 		i_vpr_e(inst, "%s: invalid fence_count %d, rx_fences %d\n", __func__,
-			inst->hfi_frame_info.fence_count, buf->num_rx_fences);
+			inst->hfi_frame_info.rx_fence_count, buf->num_rx_fences);
 		rc = -EINVAL;
 		goto error;
 	}
 
 	/* sanitize tx fence count */
 	if (is_early_notify_enabled(inst)) {
-		if (inst->hfi_frame_info.fence_count +
+		if (inst->hfi_frame_info.tx_fence_count +
 			inst->output_tx_f_context.fences_per_buffer_counter
 			 < buf->num_tx_fences) {
 			i_vpr_e(inst, "%s: invalid fence_count %d, notify_count %d, tx_fences %d\n",
-				__func__, inst->hfi_frame_info.fence_count,
+				__func__, inst->hfi_frame_info.tx_fence_count,
 				inst->output_tx_f_context.fences_per_buffer_counter,
 				buf->num_tx_fences);
 			rc = -EINVAL;
 			goto error;
 		}
 	} else {
-		if (inst->hfi_frame_info.fence_count - buf->num_rx_fences != buf->num_tx_fences) {
-			i_vpr_e(inst, "%s: invalid fence_count %d, rx_fences %d, tx_fences %d\n",
-				__func__, inst->hfi_frame_info.fence_count,
-				buf->num_rx_fences, buf->num_tx_fences);
+		if (inst->hfi_frame_info.tx_fence_count != buf->num_tx_fences) {
+			i_vpr_e(inst,
+				"%s: invalid tx_fence_count %d, tx_fences %d\n",
+				__func__, inst->hfi_frame_info.tx_fence_count, buf->num_tx_fences);
 			rc = -EINVAL;
 			goto error;
 		}
@@ -1945,7 +1942,7 @@ static int handle_dpb_list_property(struct msm_vidc_inst *inst,
 	return 0;
 }
 
-static int handle_property_fence_array(struct msm_vidc_inst *inst,
+static int handle_property_output_tx_fence_array(struct msm_vidc_inst *inst,
 	struct hfi_packet *pkt)
 {
 	int i = 0, fence_count = 0;
@@ -1962,22 +1959,65 @@ static int handle_property_fence_array(struct msm_vidc_inst *inst,
 	fence_count = payload_size / sizeof(u64);
 	payload_start = (u8 *)((u8 *)pkt + sizeof(struct hfi_packet));
 
-	if (payload_size > sizeof(inst->hfi_frame_info.fence_id)) {
+	if (payload_size > sizeof(inst->hfi_frame_info.tx_fence_id)) {
 		i_vpr_e(inst,
 			"%s: fence list payload size %d exceeds expected max size %lu\n",
-			__func__, payload_size, sizeof(inst->hfi_frame_info.fence_id));
+			__func__, payload_size, sizeof(inst->hfi_frame_info.tx_fence_id));
 		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
+		return -EINVAL;
 	}
 
 	for (i = 0; i < fence_count; i++) {
 		cur_fence_id = *((u64 *)payload_start + i);
-		inst->hfi_frame_info.fence_id[i] = cur_fence_id;
-		inst->hfi_frame_info.fence_count++;
+		inst->hfi_frame_info.tx_fence_id[i] = cur_fence_id;
+		inst->hfi_frame_info.tx_fence_count++;
 	}
+
 	i_vpr_l(inst, "%s: received %d, fence_id %*ph\n", __func__,
-		inst->hfi_frame_info.fence_count,
-		(int)(inst->hfi_frame_info.fence_count * sizeof(inst->hfi_frame_info.fence_id[0])),
-		&inst->hfi_frame_info.fence_id[0]);
+		inst->hfi_frame_info.tx_fence_count,
+		(int)(inst->hfi_frame_info.tx_fence_count *
+		sizeof(inst->hfi_frame_info.tx_fence_id[0])),
+		&inst->hfi_frame_info.tx_fence_id[0]);
+
+	return 0;
+}
+
+static int handle_property_output_rx_fence_array(struct msm_vidc_inst *inst,
+	struct hfi_packet *pkt)
+{
+	int i = 0, fence_count = 0;
+	u64 cur_fence_id = 0;
+	u32 payload_size;
+	u8 *payload_start;
+
+	if (!inst || !pkt) {
+		i_vpr_e(inst, "%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+
+	payload_size = pkt->size - sizeof(struct hfi_packet);
+	fence_count = payload_size / sizeof(u64);
+	payload_start = (u8 *)((u8 *)pkt + sizeof(struct hfi_packet));
+
+	if (payload_size > sizeof(inst->hfi_frame_info.rx_fence_id)) {
+		i_vpr_e(inst,
+			"%s: fence list payload size %d exceeds expected max size %lu\n",
+			__func__, payload_size, sizeof(inst->hfi_frame_info.rx_fence_id));
+		msm_vidc_change_state(inst, MSM_VIDC_ERROR, __func__);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < fence_count; i++) {
+		cur_fence_id = *((u64 *)payload_start + i);
+		inst->hfi_frame_info.rx_fence_id[i] = cur_fence_id;
+		inst->hfi_frame_info.rx_fence_count++;
+	}
+
+	i_vpr_l(inst, "%s: received %d, fence_id %*ph\n", __func__,
+		inst->hfi_frame_info.rx_fence_count,
+		(int)(inst->hfi_frame_info.rx_fence_count *
+		sizeof(inst->hfi_frame_info.rx_fence_id[0])),
+		&inst->hfi_frame_info.rx_fence_id[0]);
 
 	return 0;
 }
@@ -2102,8 +2142,13 @@ static int handle_property_with_payload(struct msm_vidc_inst *inst,
 				"%s: fw pipe mode(%d) not matching the capability value(%lld)\n",
 				__func__,  payload_ptr[0], inst->capabilities[PIPE].value);
 		break;
-	case HFI_PROP_FENCE_OUTPUT:
-		rc = handle_property_fence_array(inst, pkt);
+	case HFI_PROP_TX_FENCE_ID_OUTPUT:
+		rc = handle_property_output_tx_fence_array(inst, pkt);
+		if (rc)
+			break;
+		break;
+	case HFI_PROP_RX_FENCE_ID_OUTPUT:
+		rc = handle_property_output_rx_fence_array(inst, pkt);
 		if (rc)
 			break;
 		break;

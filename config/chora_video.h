@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-onl
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ */
+
+#define CONFIG_MSM_VIDC_CHORA 1

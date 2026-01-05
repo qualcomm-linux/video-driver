@@ -520,9 +520,7 @@ static int calculate_bandwidth_decoder_iris4(
 
 	dpb_ubwc_tile_height_pixels = ubwc_tile_h;
 
-	decoder_frame_complexity_factor =
-		(codec_input.complexity_setting == 0) ?
-		400 : ((codec_input.complexity_setting == 1) ? 266 : 100);
+	decoder_frame_complexity_factor = codec_input.ref_frame_complexity_factor;
 
 	reconstructed_write_bw_factor_rd = (codec_input.complexity_setting == 0) ? 105 : 100;
 
@@ -935,7 +933,7 @@ static int calculate_bandwidth_encoder_iris4(
 		((en_search_windows_size_horizontal + ubwc_tile_w - 1) / ubwc_tile_w) *
 		ubwc_tile_w + (frame_width - 1)) / frame_width + 100;
 
-	reference_crcb_read_bw_factor = 150;
+	reference_crcb_read_bw_factor = codec_input.ref_frame_complexity_factor;
 
 	codec_output->noc_bw_rd = 0;
 	codec_output->noc_bw_wr = 0;
