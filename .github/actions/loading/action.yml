@@ -1,0 +1,45 @@
+---
+name: Load Parameters
+description: Load parameters for the build job
+
+outputs:
+  build_matrix:
+    description: Build matrix
+    value: ${{ steps.set-matrix.outputs.build_matrix }}
+
+  full_matrix:
+    description: full matrix containing lava devails
+    value: ${{ steps.set-matrix.outputs.full_matrix }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set Build Matrix
+      id: set-matrix
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const targetsPath = path.join(process.env.GITHUB_WORKSPACE, 'video-driver', 'ci', 'MACHINES.json');
+          let targets;
+          try {
+            if (!fs.existsSync(targetsPath)) {
+              core.setFailed(`MACHINES.json not found at ${targetsPath}`);
+              return;
+            }
+            targets = JSON.parse(fs.readFileSync(targetsPath, 'utf-8'));
+          } catch (err) {
+            core.setFailed(`Failed to load or parse MACHINES.json: ${err.message}`);
+            return;
+          }
+          // Build matrix: machine, firmware
+          const build_matrix = Object.values(targets).map(({ machine, firmware }) => ({ machine, firmware }));
+          core.setOutput('build_matrix', JSON.stringify(build_matrix));
+          console.log("Build Matrix:", build_matrix);
+
+          // Full matrix: machine, firmware, lavaname
+          const full_matrix = Object.values(targets).map(({ machine, firmware, lavaname }) => ({ machine, firmware, lavaname }));
+          core.setOutput('full_matrix', JSON.stringify(full_matrix));
+          console.log("Full Matrix:", full_matrix);
+
