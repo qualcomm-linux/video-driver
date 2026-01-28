@@ -63,26 +63,14 @@ case "$1" in
             echo "Standard DKMS installation detected, no manual cleanup needed"
         fi
 
-        # 4. Remove qcom_iris from blacklist
-        BLACKLIST_FILE="/etc/modprobe.d/blacklist.conf"
+        # 4. Remove qcom_iris blacklist file
+        BLACKLIST_FILE="/etc/modprobe.d/blacklist-video.conf"
         if [ -f "$BLACKLIST_FILE" ]; then
-            if grep -a -q "blacklist qcom_iris" "$BLACKLIST_FILE" 2>/dev/null; then
-                echo "Removing qcom_iris from module blacklist..."
-
-                # Create a temporary file without the qcom_iris blacklist entries
-                grep -a -v "blacklist qcom_iris" "$BLACKLIST_FILE" 2>/dev/null | \
-                grep -a -v "install qcom_iris /bin/true" 2>/dev/null | \
-                grep -a -v "# Added by video-driver-dkms package" 2>/dev/null > "${BLACKLIST_FILE}.tmp" || true
-
-                # Replace the original file if temp file was created successfully
-                if [ -f "${BLACKLIST_FILE}.tmp" ]; then
-                    mv "${BLACKLIST_FILE}.tmp" "$BLACKLIST_FILE" || {
-                        echo "Warning: Failed to update blacklist file"
-                        rm -f "${BLACKLIST_FILE}.tmp"
-                    }
-                else
-                    echo "Warning: Failed to process blacklist file"
-                fi
+            echo "Removing module blacklist file..."
+            if rm -f "$BLACKLIST_FILE"; then
+                echo "✓ Blacklist file removed: $BLACKLIST_FILE"
+            else
+                echo "Warning: Failed to remove blacklist file: $BLACKLIST_FILE"
             fi
         fi
         echo "video-driver-dkms pre-removal completed."

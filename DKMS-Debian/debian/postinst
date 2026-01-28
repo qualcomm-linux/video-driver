@@ -18,7 +18,7 @@ case "$1" in
         KERNEL_VERSION=$(uname -r)
         MODULE_NAME="video-driver"
         DRIVER_VERSION="1.0.0"
-        BLACKLIST_FILE="/etc/modprobe.d/blacklist.conf"
+        BLACKLIST_FILE="/etc/modprobe.d/blacklist-video.conf"
 
         # 1. First, let DKMS build the video-driver module
         echo "Building video-driver module via DKMS..."

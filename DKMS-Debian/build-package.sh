@@ -1,0 +1,73 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+set -e
+
+# Determine script location and project structure
+SCRIPT_PATH="$(realpath "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+
+# Check if we're running from DKMS-Debian directory or video-driver root
+if [[ "$SCRIPT_DIR" == */DKMS-Debian ]]; then
+    # Running from DKMS-Debian directory
+    DKMS_DEBIAN_DIR="$SCRIPT_DIR"
+    VIDEO_DRIVER_ROOT="$(dirname "$DKMS_DEBIAN_DIR")"
+else
+    # Running from video-driver root directory
+    VIDEO_DRIVER_ROOT="$SCRIPT_DIR"
+    DKMS_DEBIAN_DIR="$VIDEO_DRIVER_ROOT/DKMS-Debian"
+fi
+
+BUILD_OUTPUT="$DKMS_DEBIAN_DIR/build"
+
+echo "Building DKMS package for video-driver..."
+echo "Script location: $SCRIPT_DIR"
+echo "DKMS-Debian directory: $DKMS_DEBIAN_DIR"
+echo "Video driver root: $VIDEO_DRIVER_ROOT"
+
+# Create output directory
+mkdir -p "$BUILD_OUTPUT"
+
+# Execute build in video-driver root directory
+cd "$VIDEO_DRIVER_ROOT"
+
+echo "Preparing build environment..."
+
+# Clean up any previous build artifacts first
+echo "Cleaning up any previous build artifacts..."
+rm -rf debian dkms.conf scripts 2>/dev/null || true
+
+# Check if we need to copy files (avoid copying to same location)
+if [ "$PWD" != "$DKMS_DEBIAN_DIR" ]; then
+    # Temporarily copy DKMS-Debian files to root directory (cleanup after build)
+    echo "Copying debian configuration files..."
+    cp -r "$DKMS_DEBIAN_DIR/debian" ./
+    cp "$DKMS_DEBIAN_DIR/dkms.conf" ./
+
+    # Copy scripts directory to root directory
+    echo "Copying build scripts..."
+    cp -r "$DKMS_DEBIAN_DIR/scripts" ./
+else
+    echo "Already in DKMS-Debian directory, skipping file copy..."
+fi
+
+# Set script execution permissions
+chmod +x scripts/*.sh
+chmod +x debian/rules
+
+echo "Building debian package..."
+# Build debian package
+dpkg-buildpackage -us -uc -b
+
+echo "Moving build artifacts..."
+# Move all generated package files and build artifacts to DKMS-Debian/build
+mv ../video-driver-dkms_* "$BUILD_OUTPUT/" 2>/dev/null || true
+
+echo "Cleaning up temporary files..."
+# Clean up temporary files
+rm -rf debian dkms.conf scripts
+rm -f ../video-driver-dkms_* 2>/dev/null || true
+
+echo "Build completed successfully!"
+echo "Package available in: $BUILD_OUTPUT"
+ls -la "$BUILD_OUTPUT"
