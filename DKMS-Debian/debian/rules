@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+%:
+	dh $@ --with dkms
+
+override_dh_auto_clean:
+	# Skip auto clean for DKMS package
+
+override_dh_auto_build:
+	# Skip auto build for DKMS package
+
+override_dh_auto_test:
+	# Skip auto test for DKMS package
+
+override_dh_auto_install:
+	# Skip auto install for DKMS package
+
+override_dh_builddeb:
+	# Ensure maintainer scripts are in place before building package
+	mkdir -p debian/video-driver-dkms/DEBIAN
+	if [ -f debian/postinst ]; then \
+		install -m 755 debian/postinst debian/video-driver-dkms/DEBIAN/postinst; \
+	fi
+	if [ -f debian/prerm ]; then \
+		install -m 755 debian/prerm debian/video-driver-dkms/DEBIAN/prerm; \
+	fi
+	if [ -f debian/postrm ]; then \
+		install -m 755 debian/postrm debian/video-driver-dkms/DEBIAN/postrm; \
+	fi
+	dh_builddeb

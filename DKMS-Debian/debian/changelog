@@ -1,0 +1,13 @@
+video-driver (1.0.0-1) unstable; urgency=medium
+
+  * Initial DKMS package for MSM VIDC driver
+  * Support for multiple platforms via device tree detection
+  * Automatic platform configuration based on compatible string
+  * Cross-compilation support for ARM64 platforms
+  * Platforms supported: hamoa, lemans
+  * Auto-detection of platform from device tree compatible string
+  * Unified cross-compilation environment for all platforms
+  * Complete build isolation in DKMS-Debian directory
+  * Fixed: Proper handling of multiple compatible strings in device tree
+
+ -- Renjiang Han <renjiang@qti.qualcomm.com>  Tue, 28 Jan 2026 15:10:00 +0800
