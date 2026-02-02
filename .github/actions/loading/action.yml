@@ -6,9 +6,8 @@ outputs:
   build_matrix:
     description: Build matrix
     value: ${{ steps.set-matrix.outputs.build_matrix }}
-
   full_matrix:
-    description: full matrix containing lava devails
+    description: Full matrix containing lava details
     value: ${{ steps.set-matrix.outputs.full_matrix }}
 
 runs:
@@ -21,24 +20,49 @@ runs:
         script: |
           const fs = require('fs');
           const path = require('path');
-          const targetsPath = path.join(process.env.GITHUB_WORKSPACE, 'video-driver', 'ci', 'MACHINES.json');
-          let targets;
-          try {
-            if (!fs.existsSync(targetsPath)) {
-              core.setFailed(`MACHINES.json not found at ${targetsPath}`);
-              return;
-            }
-            targets = JSON.parse(fs.readFileSync(targetsPath, 'utf-8'));
-          } catch (err) {
-            core.setFailed(`Failed to load or parse MACHINES.json: ${err.message}`);
+
+          // 1. Define possible paths for MACHINES.json
+          // Path A: Workspace/video-driver/ci/MACHINES.json (Nested)
+          const pathNested = path.join(process.env.GITHUB_WORKSPACE, 'video-driver', 'ci', 'MACHINES.json');
+          // Path B: Workspace/ci/MACHINES.json (Root)
+          const pathRoot = path.join(process.env.GITHUB_WORKSPACE, 'ci', 'MACHINES.json');
+
+          let targetsPath = '';
+
+          // 2. Check which path exists
+          if (fs.existsSync(pathNested)) {
+            console.log(`Found config at nested path: ${pathNested}`);
+            targetsPath = pathNested;
+          } else if (fs.existsSync(pathRoot)) {
+            console.log(`Found config at root path: ${pathRoot}`);
+            targetsPath = pathRoot;
+          } else {
+            // 3. Debugging: If neither exists, list files to help us see what is happening
+            console.log('!!! Error: MACHINES.json not found in expected locations.');
+            console.log(`Checked: ${pathNested}`);
+            console.log(`Checked: ${pathRoot}`);
+            
+            console.log('--- Workspace Root Contents ---');
+            try {
+              console.log(fs.readdirSync(process.env.GITHUB_WORKSPACE));
+            } catch (e) { console.log(e.message); }
+
+            core.setFailed(`MACHINES.json not found.`);
             return;
           }
-          // Build matrix: machine, firmware
+
+          // 4. Parse the file
+          let targets;
+          try {
+            targets = JSON.parse(fs.readFileSync(targetsPath, 'utf-8'));
+          } catch (err) {
+            core.setFailed(`Failed to parse MACHINES.json: ${err.message}`);
+            return;
+          }
+
+          // 5. Generate Outputs
           const build_matrix = Object.values(targets).map(({ machine, firmware }) => ({ machine, firmware }));
           core.setOutput('build_matrix', JSON.stringify(build_matrix));
-          console.log("Build Matrix:", build_matrix);
 
-          // Full matrix: machine, firmware, lavaname
           const full_matrix = Object.values(targets).map(({ machine, firmware, lavaname }) => ({ machine, firmware, lavaname }));
           core.setOutput('full_matrix', JSON.stringify(full_matrix));
-          console.log("Full Matrix:", full_matrix);

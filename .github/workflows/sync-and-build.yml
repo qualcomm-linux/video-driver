@@ -28,7 +28,17 @@ jobs:
         uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
         with:
           image: ${{ inputs.docker_image }}
-      
+          
+      # ------------------------------------------------------------------------
+      # ✅ CRITICAL FIX: Explicitly checkout the driver code.
+      # This ensures the source code exists for Post-Merge/Scheduled runs.
+      # ------------------------------------------------------------------------
+      - name: Checkout Video Driver
+        uses: actions/checkout@v4
+        with:
+          path: video-driver
+          fetch-depth: 0     
+
       - name: Sync codebase
         uses: qualcomm-linux/video-driver/.github/actions/sync@video.qclinux.0.0
         with:
@@ -38,11 +48,19 @@ jobs:
           base_ref: ${{ github.ref_name }}
           caller_workflow: build
 
+     
       - name: Build workspace
         uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.0.0
         with:
           docker_image: kmake-image:ver.1.0
           workspace_path: ${{ github.workspace }}
+      
+      - name: Fix Workspace Ownership
+        if: always()
+        shell: bash
+        run: |
+          echo "🔧 Fixing file ownership (root -> runner user)..."
+          sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}
 
       - name: Download iris_test_app from the s3
         shell: bash
@@ -287,4 +305,4 @@ jobs:
               done < "$file_list"
             fi
             echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"    
+          } >> "$GITHUB_STEP_SUMMARY"

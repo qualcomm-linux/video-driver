@@ -2,7 +2,7 @@
   "qcs6490-rb3gen2": {
     "machine": "qcs6490-rb3gen2",
     "firmware": "rb3gen2",
-    "lavaname": "qcs6490",
+    "lavaname": "qcs6490-rb3gen2",
     "target": "qcs6490-rb3gen2",
     "buildid": "QCM6490.LE.1.0-00376-STD.PROD-1",
     "firmwareid": "rb3gen2"
