@@ -363,6 +363,7 @@ enum hfi_rate_control {
 	HFI_RC_OFF            = 0x00000003,
 	HFI_RC_CBR_VFR        = 0x00000004,
 	HFI_RC_LOSSLESS       = 0x00000005,
+	HFI_RC_MBR_CBR        = 0x00000006,
 };
 
 #define HFI_PROP_RATE_CONTROL                                   0x0300012a
