@@ -21,4 +21,4 @@ jobs:
         pr-check-emails: true              # default: true
         dependency-review: true            # default: true
     secrets:
-      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+            SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
