@@ -267,9 +267,22 @@ void msm_vb2_put(void *buf_priv)
 	if (IS_ERR_OR_NULL(buf_priv))
 		return;
 
+	if (refcount_read(&buf->refcount) == 0)
+		return;
+
 	inst = buf->inst;
 	if (!inst || !inst->core)
 		return;
+
+	if (is_decode_session(inst) && is_output_buffer(buf->type)) {
+		list_for_each_entry_safe(temp, dummy, &inst->buffers.read_only.list, list) {
+			if (temp->device_addr != buf->device_addr)
+				continue;
+			buf->kvaddr = NULL;
+			buf->device_addr = 0x0;
+			return;
+		}
+	}
 
 	core = inst->core;
 
