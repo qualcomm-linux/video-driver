@@ -961,6 +961,12 @@ int msm_vidc_close(struct msm_vidc_inst *inst, struct file *filp)
 	/* print internal buffer memory usage stats */
 	msm_vidc_print_memory_stats(inst);
 	msm_vidc_print_residency_stats(core);
+	/*
+	 * vb2_queue_deinit() must happen before session close so that
+	 * venus_hfi_stop() (called from stop_streaming vb2 callback)
+	 * can succeed with a valid inst->packet.
+	 */
+	msm_vidc_vb2_queue_deinit(inst);
 	msm_vidc_session_close(inst);
 	msm_vidc_change_state(inst, MSM_VIDC_CLOSE, __func__);
 	inst->sub_state = MSM_VIDC_SUB_STATE_NONE;

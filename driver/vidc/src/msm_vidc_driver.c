@@ -233,7 +233,7 @@ void print_vidc_buffer(u32 tag, const char *tag_str, const char *str, struct msm
 		return;
 
 	dbuf = (struct dma_buf *)vbuf->dmabuf;
-	if (dbuf && dbuf->file) {
+	if (dbuf && vbuf->dbuf_get && dbuf->file) {
 		f_inode = file_inode(dbuf->file);
 		if (f_inode) {
 			inode_num = f_inode->i_ino;
@@ -5477,7 +5477,6 @@ static void msm_vidc_close_helper(struct kref *kref)
 	 * So acquire lock before calling vb2q_deinit.
 	 */
 	inst_lock(inst, __func__);
-	msm_vidc_vb2_queue_deinit(inst);
 	msm_vidc_v4l2_fh_deinit(inst);
 	inst_unlock(inst, __func__);
 	destroy_workqueue(inst->workq);
