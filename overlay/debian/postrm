@@ -1,0 +1,60 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+# postrm script for video-driver-dkms
+# This script runs after the package is removed
+
+set -e
+
+case "$1" in
+    remove|purge)
+        echo "Completing video-driver-dkms removal..."
+
+        # 1. Update initramfs to apply blacklist removal
+        echo "Updating initramfs to remove qcom_iris blacklist..."
+        update-initramfs -u 2>/dev/null || {
+            echo "Warning: Failed to update initramfs"
+            echo "You may need to run 'sudo update-initramfs -u' manually"
+        }
+
+        # 2. Update module dependencies
+        echo "Updating module dependencies..."
+        depmod -a 2>/dev/null || true
+
+        # 3. Try to load qcom_iris module
+        echo "Attempting to restore qcom_iris module..."
+        if modprobe qcom_iris 2>/dev/null; then
+            echo "SUCCESS: qcom_iris module loaded successfully"
+            echo "Original video driver has been restored"
+        else
+            echo "Note: qcom_iris module could not be loaded automatically"
+            echo "This may be normal if:"
+            echo "  - The module is not available for this kernel"
+            echo "  - Hardware doesn't support it"
+            echo "  - System needs a reboot"
+            echo ""
+            echo "To manually load qcom_iris after reboot:"
+            echo "  sudo modprobe qcom_iris"
+        fi
+
+        # 4. Verify the restoration
+        if lsmod | grep -q "qcom_iris"; then
+            echo "Verification: qcom_iris module is now active"
+        else
+            echo "Note: qcom_iris module is not currently loaded"
+            echo "A reboot may be required to fully restore the original driver"
+        fi
+
+        echo "video-driver-dkms removal completed."
+        echo "System has been restored to use the original qcom_iris driver."
+        ;;
+
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac

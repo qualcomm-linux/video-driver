@@ -1,0 +1,228 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+# postinst script for video-driver-dkms
+# This script runs after the package is installed
+
+set -e
+
+# Source debconf library
+. /usr/share/debconf/confmodule
+
+case "$1" in
+    configure)
+        echo "Configuring video-driver-dkms..."
+
+        # Get kernel version
+        KERNEL_VERSION=$(uname -r)
+        MODULE_NAME="video-driver"
+        DRIVER_VERSION="1.0.0"
+        BLACKLIST_FILE="/etc/modprobe.d/blacklist.conf"
+
+        # 1. First, let DKMS build the video-driver module
+        echo "Building video-driver module via DKMS..."
+        DKMS_BUILD_SUCCESS=true
+        if ! dkms build -m "$MODULE_NAME" -v "$DRIVER_VERSION" -k "$KERNEL_VERSION"; then
+            echo "DKMS build failed, attempting automatic recovery..."
+            DKMS_BUILD_SUCCESS=false
+
+            # Check if module was actually built despite DKMS error
+            MODULE_PATH="/var/lib/dkms/video-driver/1.0.0/build/video/iris_vpu.ko"
+            if [ -f "$MODULE_PATH" ]; then
+                echo "Module file found, proceeding with manual installation..."
+
+                # Step 1: Create target directory (same as DKMS)
+                TARGET_DIR="/lib/modules/$KERNEL_VERSION/updates/dkms"
+                TARGET_FILE="$TARGET_DIR/iris_vpu.ko"
+                echo "Checking module directory..."
+                if [ ! -d "$TARGET_DIR" ]; then
+                    echo "Creating module directory..."
+                    if mkdir -p "$TARGET_DIR"; then
+                        echo "✓ Module directory created: $TARGET_DIR"
+                    else
+                        echo "✗ Failed to create module directory"
+                        echo "Keeping qcom_iris driver active for system stability"
+                        exit 0
+                    fi
+                else
+                    echo "✓ Module directory already exists: $TARGET_DIR"
+                fi
+
+                # Step 2: Copy module file
+                echo "Copying module file..."
+                if cp "$MODULE_PATH" "$TARGET_FILE"; then
+                    echo "✓ Module file copied successfully to: $TARGET_FILE"
+                else
+                    echo "✗ Failed to copy module file"
+                    echo "Keeping qcom_iris driver active for system stability"
+                    exit 0
+                fi
+
+                # Step 3: Update module dependencies
+                echo "Updating module dependencies..."
+                if depmod -a; then
+                    echo "✓ Module dependencies updated"
+                else
+                    echo "✗ Failed to update module dependencies"
+                    echo "Keeping qcom_iris driver active for system stability"
+                    exit 0
+                fi
+
+                # Step 4: Test module loading
+                echo "Testing module loading..."
+                if modprobe iris_vpu; then
+                    echo "✓ Module loaded successfully via manual recovery"
+                    # Unload it for now, will be loaded properly later
+                    modprobe -r iris_vpu 2>/dev/null || true
+                    DKMS_BUILD_SUCCESS=true
+                else
+                    echo "✗ Failed to load module even after manual installation"
+                    echo "Keeping qcom_iris driver active for system stability"
+                    exit 0
+                fi
+
+                echo "SUCCESS: Manual recovery completed successfully!"
+
+                # Create overlay installation flag
+                touch "/var/lib/dkms/video-driver-overlay.flag"
+                echo "✓ Overlay installation flag created"
+            else
+                echo "ERROR: Module file not found at $MODULE_PATH"
+                echo "Build completely failed, keeping qcom_iris driver active"
+                echo "Please check DKMS build logs: dkms status"
+                exit 0
+            fi
+        fi
+
+        # 2. Install the DKMS module (skip if manual recovery was used)
+        DKMS_TARGET_FILE="/lib/modules/$KERNEL_VERSION/updates/dkms/iris_vpu.ko"
+        if [ "$DKMS_BUILD_SUCCESS" = true ] && [ ! -f "$DKMS_TARGET_FILE" ]; then
+            echo "Installing video-driver module via DKMS..."
+            if ! dkms install -m "$MODULE_NAME" -v "$DRIVER_VERSION" -k "$KERNEL_VERSION"; then
+                echo "ERROR: Failed to install video-driver module"
+                echo "Keeping qcom_iris driver active for system stability"
+                echo "Please check DKMS install logs: dkms status"
+                exit 0
+            fi
+        elif [ -f "$DKMS_TARGET_FILE" ]; then
+            echo "Module already installed via manual recovery, skipping DKMS install"
+        fi
+
+        echo "SUCCESS: video-driver module built and installed successfully!"
+        echo "Now switching from qcom_iris to video-driver..."
+
+        # 3. Save current qcom_iris state for potential rollback
+        QCOM_IRIS_WAS_LOADED=false
+        if lsmod | grep -q "qcom_iris"; then
+            QCOM_IRIS_WAS_LOADED=true
+            echo "qcom_iris module is currently loaded"
+        fi
+
+        # 4. Unload qcom_iris module to free hardware resources
+        if [ "$QCOM_IRIS_WAS_LOADED" = true ]; then
+            echo "Unloading qcom_iris module to free hardware resources..."
+            if ! modprobe -r qcom_iris 2>/dev/null; then
+                echo "Warning: Failed to unload qcom_iris module"
+                echo "This may cause conflicts with video-driver"
+                echo "A reboot may be required for proper operation"
+            fi
+        fi
+
+        # 5. Add qcom_iris to blacklist to prevent auto-loading
+        echo "Adding qcom_iris to module blacklist..."
+        if [ -f "$BLACKLIST_FILE" ]; then
+            if ! grep -q "blacklist qcom_iris" "$BLACKLIST_FILE"; then
+                echo "" >> "$BLACKLIST_FILE"
+                echo "# Added by video-driver-dkms package" >> "$BLACKLIST_FILE"
+                echo "blacklist qcom_iris" >> "$BLACKLIST_FILE"
+                echo "install qcom_iris /bin/true" >> "$BLACKLIST_FILE"
+            fi
+        else
+            echo "Creating blacklist file for qcom_iris..."
+            mkdir -p /etc/modprobe.d
+            echo "# Blacklist for video-driver-dkms package" > "$BLACKLIST_FILE"
+            echo "blacklist qcom_iris" >> "$BLACKLIST_FILE"
+            echo "install qcom_iris /bin/true" >> "$BLACKLIST_FILE"
+        fi
+
+        # 6. Try to load video-driver module
+        echo "Loading video-driver module..."
+        if modprobe iris_vpu 2>/dev/null; then
+            # 7. Verify the iris_vpu module is actually loaded and working
+            if lsmod | grep -q "^iris_vpu "; then
+                echo "SUCCESS: video-driver module loaded and working!"
+
+                # Update initramfs to apply blacklist changes
+                echo "Updating initramfs to make blacklist permanent..."
+                update-initramfs -u 2>/dev/null || {
+                    echo "Warning: Failed to update initramfs"
+                    echo "Blacklist may not take effect until manual update"
+                }
+
+                # Update module dependencies
+                echo "Updating module dependencies..."
+                depmod -a 2>/dev/null || true
+
+                echo "video-driver-dkms configuration completed successfully!"
+                echo "video-driver module is now active, qcom_iris has been disabled."
+                echo ""
+                echo "To verify the installation:"
+                echo "  lsmod | grep iris_vpu"
+                echo "  dkms status"
+            else
+                echo "ERROR: iris_vpu module loaded but not detected in lsmod"
+                echo "Rolling back to qcom_iris driver..."
+                # Rollback procedure
+                modprobe -r iris_vpu 2>/dev/null || true
+                # Remove blacklist
+                if [ -f "$BLACKLIST_FILE" ]; then
+                    grep -v "blacklist qcom_iris" "$BLACKLIST_FILE" | \
+                    grep -v "install qcom_iris /bin/true" | \
+                    grep -v "# Added by video-driver-dkms package" > "${BLACKLIST_FILE}.tmp"
+                    mv "${BLACKLIST_FILE}.tmp" "$BLACKLIST_FILE"
+                fi
+                # Restore qcom_iris
+                if [ "$QCOM_IRIS_WAS_LOADED" = true ]; then
+                    modprobe qcom_iris 2>/dev/null || echo "Warning: Failed to restore qcom_iris"
+                fi
+                echo "Rollback completed. qcom_iris driver restored."
+            fi
+        else
+            echo "ERROR: Failed to load video-driver module"
+            echo "Rolling back to qcom_iris driver..."
+
+            # Rollback procedure
+            echo "Removing qcom_iris from blacklist..."
+            if [ -f "$BLACKLIST_FILE" ]; then
+                grep -v "blacklist qcom_iris" "$BLACKLIST_FILE" | \
+                grep -v "install qcom_iris /bin/true" | \
+                grep -v "# Added by video-driver-dkms package" > "${BLACKLIST_FILE}.tmp"
+                mv "${BLACKLIST_FILE}.tmp" "$BLACKLIST_FILE"
+            fi
+
+            # Restore qcom_iris if it was loaded before
+            if [ "$QCOM_IRIS_WAS_LOADED" = true ]; then
+                echo "Restoring qcom_iris module..."
+                if modprobe qcom_iris 2>/dev/null; then
+                    echo "SUCCESS: qcom_iris driver restored"
+                else
+                    echo "ERROR: Failed to restore qcom_iris driver"
+                    echo "System may need a reboot to restore video functionality"
+                fi
+            fi
+
+            echo "Rollback completed. video-driver installation failed but system is stable."
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+# dh_installdeb will replace this with shell code automatically

@@ -1,0 +1,24 @@
+Source: video-driver
+Section: kernel
+Priority: optional
+Maintainer: Renjiang Han <renjiang@qti.qualcomm.com>
+Build-Depends: debhelper-compat (= 13), dkms
+Standards-Version: 4.6.2
+Homepage: https://github.com/qualcomm-linux/video-driver
+
+Package: video-driver-dkms
+Architecture: all
+Depends: dkms (>= 2.6), kmod, ${misc:Depends}
+Conflicts: qcom-iris-dkms
+Description: DKMS package for MSM VIDC driver (out-of-tree)
+ This package installs source for the 'video' kernel module and builds
+ it via DKMS on the target machine using /lib/modules/${kernelver}/build.
+ .
+ DKMS packaging for MSM VIDC driver (out-of-tree).
+ Build occurs on install via /lib/modules/${kernelver}/build.
+ .
+ The driver supports multiple platforms and automatically detects the
+ platform from device tree compatible string to enable appropriate
+ configuration macros.
+ .
+ Supported platforms: hamoa, lemans.

@@ -1,0 +1,99 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+# prerm script for video-driver-dkms
+# This script runs before the package is removed
+
+# Note: Removed 'set -e' to handle errors gracefully without script termination
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        echo "Preparing to remove video-driver-dkms..."
+
+        # Get kernel version
+        KERNEL_VERSION=$(uname -r)
+        MODULE_NAME="video-driver"
+        DRIVER_VERSION="1.0.0"
+
+        # 1. Unload iris_vpu module if it's loaded
+        if lsmod | grep -q "^iris_vpu "; then
+            echo "Unloading iris_vpu module..."
+            modprobe -r iris_vpu 2>/dev/null || {
+                echo "Warning: Failed to unload iris_vpu module"
+                echo "You may need to reboot to complete the removal"
+            }
+        fi
+
+        # 2. Remove DKMS module (standard installation)
+        if dkms status | grep -q "$MODULE_NAME.*$DRIVER_VERSION"; then
+            echo "Removing video-driver DKMS module..."
+            dkms remove -m "$MODULE_NAME" -v "$DRIVER_VERSION" --all 2>/dev/null || {
+                echo "Warning: Failed to remove DKMS module"
+            }
+        fi
+
+        # 3. Check for overlay installation and clean up manually installed files
+        OVERLAY_FLAG="/var/lib/dkms/video-driver-overlay.flag"
+        if [ -f "$OVERLAY_FLAG" ]; then
+            echo "Detected overlay installation, cleaning up manually installed files..."
+            MANUAL_MODULE_FILE="/lib/modules/$KERNEL_VERSION/updates/dkms/iris_vpu.ko"
+            if [ -f "$MANUAL_MODULE_FILE" ]; then
+                if rm -f "$MANUAL_MODULE_FILE" 2>/dev/null; then
+                    echo "✓ Manually installed module file removed"
+                else
+                    echo "Warning: Failed to remove manually installed module file"
+                fi
+            fi
+
+            # Remove overlay flag
+            if rm -f "$OVERLAY_FLAG" 2>/dev/null; then
+                echo "✓ Overlay installation flag removed"
+            else
+                echo "Warning: Failed to remove overlay flag"
+            fi
+
+            # Clean up empty directories if they exist
+            DKMS_DIR="/lib/modules/$KERNEL_VERSION/updates/dkms"
+            if [ -d "$DKMS_DIR" ] && [ -z "$(ls -A "$DKMS_DIR" 2>/dev/null)" ]; then
+                echo "Removing empty DKMS directory..."
+                rmdir "$DKMS_DIR" 2>/dev/null || true
+            fi
+        else
+            echo "Standard DKMS installation detected, no manual cleanup needed"
+        fi
+
+        # 4. Remove qcom_iris from blacklist
+        BLACKLIST_FILE="/etc/modprobe.d/blacklist.conf"
+        if [ -f "$BLACKLIST_FILE" ]; then
+            if grep -a -q "blacklist qcom_iris" "$BLACKLIST_FILE" 2>/dev/null; then
+                echo "Removing qcom_iris from module blacklist..."
+
+                # Create a temporary file without the qcom_iris blacklist entries
+                grep -a -v "blacklist qcom_iris" "$BLACKLIST_FILE" 2>/dev/null | \
+                grep -a -v "install qcom_iris /bin/true" 2>/dev/null | \
+                grep -a -v "# Added by video-driver-dkms package" 2>/dev/null > "${BLACKLIST_FILE}.tmp" || true
+
+                # Replace the original file if temp file was created successfully
+                if [ -f "${BLACKLIST_FILE}.tmp" ]; then
+                    mv "${BLACKLIST_FILE}.tmp" "$BLACKLIST_FILE" || {
+                        echo "Warning: Failed to update blacklist file"
+                        rm -f "${BLACKLIST_FILE}.tmp"
+                    }
+                else
+                    echo "Warning: Failed to process blacklist file"
+                fi
+            fi
+        fi
+        echo "video-driver-dkms pre-removal completed."
+        ;;
+
+    failed-upgrade)
+        ;;
+    *)
+        echo "prerm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
