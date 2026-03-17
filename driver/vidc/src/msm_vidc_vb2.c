@@ -139,6 +139,11 @@ static void *msm_vb2_alloc(struct vb2_buffer *vb, struct device *dev,
 	}
 
 	dinfo->buf = buf;
+	dinfo->dev = cb->dev;
+	dinfo->buffer_size = buf->buffer_size;
+	dinfo->kvaddr = buf->kvaddr;
+	dinfo->device_addr = buf->device_addr;
+	dinfo->dma_attrs = buf->dma_attrs;
 	refcount_set(&dinfo->refcount, 1);
 	i_vpr_l(inst, "%s: refcount set to %d\n", __func__,
 		refcount_read(&dinfo->refcount));
@@ -301,23 +306,22 @@ void msm_vb2_put(void *buf_priv)
 	}
 }
 
-int msm_vb2_mmap(void *dma_buf, struct vm_area_struct *vma)
+int msm_vb2_mmap(void *buf_priv, struct vm_area_struct *vma)
 {
+	struct msm_vidc_buffer *buf = buf_priv;
 	struct msm_vidc_dma_buf_info *dinfo;
-	struct dma_buf *dbuf;
 	int ret;
 
-	if (IS_ERR_OR_NULL(dma_buf))
+	if (IS_ERR_OR_NULL(buf_priv))
 		return -EINVAL;
 
-	dbuf = dma_buf;
-
-	if (IS_ERR_OR_NULL(dbuf->priv)) {
-		d_vpr_e("%s: Invalid dma_buf priv data\n", __func__);
+	if (IS_ERR_OR_NULL(buf) || IS_ERR_OR_NULL(buf->dma_buf_info)) {
+		d_vpr_e("%s: Invalid buffer or dma_buf_info\n", __func__);
 		return -EINVAL;
 	}
 
-	dinfo = dbuf->priv;
+	dinfo = buf->dma_buf_info;
+
 	ret = dma_mmap_attrs(dinfo->dev, vma, dinfo->kvaddr, dinfo->device_addr,
 			     dinfo->buffer_size, dinfo->dma_attrs);
 	if (ret) {
@@ -326,7 +330,7 @@ int msm_vb2_mmap(void *dma_buf, struct vm_area_struct *vma)
 	}
 
 	dinfo->handler.refcount = &dinfo->refcount;
-	dinfo->handler.arg = dbuf;
+	dinfo->handler.arg = (void *)buf;
 
 	vm_flags_set(vma, VM_DONTEXPAND | VM_DONTDUMP);
 	vma->vm_private_data = &dinfo->handler;
@@ -334,6 +338,7 @@ int msm_vb2_mmap(void *dma_buf, struct vm_area_struct *vma)
 
 	vma->vm_ops->open(vma);
 
+	d_vpr_l("%s: Direct mmap path (reqbuf->mmap)\n", __func__);
 	return 0;
 }
 
@@ -502,10 +507,37 @@ msm_vb2_dmabuf_ops_end_cpu_access(struct dma_buf *dbuf,
 	return 0;
 }
 
-static int msm_vb2_dmabuf_ops_mmap(struct dma_buf *dbuf,
+static int msm_dmabuf_ops_mmap(struct dma_buf *dbuf,
 	struct vm_area_struct *vma)
 {
-	return msm_vb2_mmap((void *)dbuf, vma);
+	struct msm_vidc_dma_buf_info *dinfo;
+	int ret;
+
+	if (IS_ERR_OR_NULL(dbuf) || IS_ERR_OR_NULL(dbuf->priv)) {
+		d_vpr_e("%s: Invalid dma_buf or priv data\n", __func__);
+		return -EINVAL;
+	}
+
+	dinfo = dbuf->priv;
+
+	ret = dma_mmap_attrs(dinfo->dev, vma, dinfo->kvaddr, dinfo->device_addr,
+			     dinfo->buffer_size, dinfo->dma_attrs);
+	if (ret) {
+		d_vpr_e("Remapping memory failed, error: %d\n", ret);
+		return ret;
+	}
+
+	dinfo->handler.refcount = &dinfo->refcount;
+	dinfo->handler.arg = (void *)dbuf;
+
+	vm_flags_set(vma, VM_DONTEXPAND | VM_DONTDUMP);
+	vma->vm_private_data = &dinfo->handler;
+	vma->vm_ops = &msm_vb2_vm_dma_ops;
+
+	vma->vm_ops->open(vma);
+
+	d_vpr_l("%s: Export->mmap path (export->mmap)\n", __func__);
+	return 0;
 }
 
 static const struct dma_buf_ops msm_vb2_dmabuf_ops = {
@@ -515,7 +547,7 @@ static const struct dma_buf_ops msm_vb2_dmabuf_ops = {
 	.unmap_dma_buf = msm_vb2_dmabuf_ops_unmap,
 	.begin_cpu_access = msm_vb2_dmabuf_ops_begin_cpu_access,
 	.end_cpu_access = msm_vb2_dmabuf_ops_end_cpu_access,
-	.mmap = msm_vb2_dmabuf_ops_mmap,
+	.mmap = msm_dmabuf_ops_mmap,
 	.release = msm_vb2_dmabuf_ops_release,
 };
 
@@ -562,22 +594,9 @@ static struct dma_buf *msm_vb2_get_dmabuf(struct vb2_buffer *vb,
 	};
 	struct msm_vidc_buffer *buf = buf_priv;
 	struct msm_vidc_inst *inst = buf->inst;
-	enum msm_vidc_buffer_region region;
-	struct context_bank_info *cb;
 	struct msm_vidc_dma_buf_info *dinfo = buf->dma_buf_info;
 	struct dma_buf *dbuf;
 
-	region = call_mem_op((struct msm_vidc_core *)(inst->core), buffer_region, inst, buf->type);
-	cb = msm_vidc_get_context_bank_for_region(inst->core, region);
-	if (!cb) {
-		i_vpr_e(inst, "%s: failed to get context bank device\n", __func__);
-		return NULL;
-	}
-	dinfo->dev = cb->dev;
-	dinfo->buffer_size = buf->buffer_size;
-	dinfo->kvaddr = buf->kvaddr;
-	dinfo->device_addr = buf->device_addr;
-	dinfo->dma_attrs = buf->dma_attrs;
 	exp_info.ops = &msm_vb2_dmabuf_ops;
 	exp_info.size = buf->buffer_size;
 	exp_info.flags = flags;
