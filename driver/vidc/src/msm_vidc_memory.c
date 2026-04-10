@@ -388,7 +388,6 @@ static struct sg_table *msm_vidc_dma_buf_map_attachment(
 
 static int msm_vidc_memory_alloc_map(struct msm_vidc_core *core, struct msm_vidc_mem *mem)
 {
-	int size = 0;
 	struct context_bank_info *cb = NULL;
 
 	if (!mem) {
@@ -396,7 +395,7 @@ static int msm_vidc_memory_alloc_map(struct msm_vidc_core *core, struct msm_vidc
 		return -EINVAL;
 	}
 
-	size = ALIGN(mem->size, SZ_4K);
+	mem->size = ALIGN(mem->size, SZ_4K);
 	mem->attrs = DMA_ATTR_WRITE_COMBINE;
 
 	cb = msm_vidc_get_context_bank_for_region(core, mem->region);
@@ -406,7 +405,7 @@ static int msm_vidc_memory_alloc_map(struct msm_vidc_core *core, struct msm_vidc
 		return -EIO;
 	}
 
-	mem->kvaddr = dma_alloc_attrs(cb->dev, size, &mem->device_addr, GFP_KERNEL,
+	mem->kvaddr = dma_alloc_attrs(cb->dev, mem->size, &mem->device_addr, GFP_KERNEL,
 		mem->attrs);
 	if (!mem->kvaddr) {
 		d_vpr_e("%s: dma_alloc_attrs returned NULL\n", __func__);
