@@ -26,7 +26,9 @@
 
 extern struct msm_vidc_core *g_core;
 
-static struct sg_table *vb2_dc_get_base_sgt(struct msm_vidc_buffer *buf);
+static struct sg_table *msm_vidc_get_sg_table(struct msm_vidc_buffer *buf);
+static void msm_vidc_put_sg_table(struct msm_vidc_buffer *buf);
+
 static void msm_vb2_vm_open(struct vm_area_struct *vma);
 static void msm_vb2_vm_close(struct vm_area_struct *vma);
 static void msm_vb2_put(void *buf_priv);
@@ -124,7 +126,7 @@ static void *msm_vb2_alloc(struct vb2_buffer *vb, struct device *dev,
 		goto error_inst;
 	}
 
-	buf->sg_table = vb2_dc_get_base_sgt(buf);
+	buf->sg_table = msm_vidc_get_sg_table(buf);
 	if (!buf->sg_table) {
 		print_vidc_buffer(VIDC_ERR, "err ", "sg table build failed", inst, buf);
 		rc = -ENOMEM;
@@ -152,8 +154,7 @@ static void *msm_vb2_alloc(struct vb2_buffer *vb, struct device *dev,
 	return buf;
 
 error_free_sgtable:
-	kfree(buf->sg_table);
-	buf->sg_table = NULL;
+	msm_vidc_put_sg_table(buf);
 error_free_attrs:
 	dma_free_attrs(cb->dev, buf->buffer_size, buf->kvaddr,
 		       buf->device_addr, buf->dma_attrs);
@@ -286,6 +287,13 @@ void msm_vb2_put(void *buf_priv)
 				__func__, buf->device_addr, buf->buffer_size);
 			dma_free_attrs(cb->dev, buf->buffer_size, buf->kvaddr,
 				       buf->device_addr, buf->dma_attrs);
+			/* free the base sg_table allocated in msm_vb2_alloc via
+			 * msm_vidc_get_sg_table(); without this the sg_table and its
+			 * scatter list entries are leaked every time a meta buffer
+			 * is destroyed.
+			 */
+			if (buf->sg_table_alloc)
+				msm_vidc_put_sg_table(buf);
 			kfree(buf->dma_buf_info);
 			buf->dma_buf_info = NULL;
 		} else {
@@ -469,11 +477,13 @@ static void msm_vb2_dmabuf_ops_unmap(struct dma_buf_attachment *db_attach,
 static void msm_vb2_dmabuf_ops_release(struct dma_buf *dbuf)
 {
 	struct msm_vidc_dma_buf_info *dinfo;
+	struct msm_vidc_buffer *buf;
 
 	if (IS_ERR_OR_NULL(dbuf) || IS_ERR_OR_NULL(dbuf->priv))
 		return;
 
 	dinfo = dbuf->priv;
+	buf = dinfo->buf;
 
 	if (refcount_read(&dinfo->refcount) == 0)
 		return;
@@ -488,6 +498,9 @@ static void msm_vb2_dmabuf_ops_release(struct dma_buf *dbuf)
 
 	dma_free_attrs(dinfo->dev, dinfo->buffer_size, dinfo->kvaddr,
 		       dinfo->device_addr, dinfo->dma_attrs);
+
+	if (buf && buf->sg_table_alloc)
+		msm_vidc_put_sg_table(buf);
 
 	kfree(dinfo);
 	dbuf->priv = NULL;
@@ -551,7 +564,7 @@ static const struct dma_buf_ops msm_vb2_dmabuf_ops = {
 	.release = msm_vb2_dmabuf_ops_release,
 };
 
-static struct sg_table *vb2_dc_get_base_sgt(struct msm_vidc_buffer *buf)
+static struct sg_table *msm_vidc_get_sg_table(struct msm_vidc_buffer *buf)
 {
 	struct msm_vidc_inst *inst = buf->inst;
 	struct msm_vidc_core *core = inst->core;
@@ -570,6 +583,7 @@ static struct sg_table *vb2_dc_get_base_sgt(struct msm_vidc_buffer *buf)
 	cb = msm_vidc_get_context_bank_for_region(inst->core, region);
 	if (!cb) {
 		i_vpr_e(inst, "%s: failed to get context bank device\n", __func__);
+		kfree(sgt);
 		return NULL;
 	}
 
@@ -581,7 +595,21 @@ static struct sg_table *vb2_dc_get_base_sgt(struct msm_vidc_buffer *buf)
 		return NULL;
 	}
 
+	buf->sg_table_alloc = true;
 	return sgt;
+}
+
+static void msm_vidc_put_sg_table(struct msm_vidc_buffer *buf)
+{
+	if (!buf->sg_table_alloc)
+		return;
+
+	if (buf->sg_table) {
+		sg_free_table(buf->sg_table);
+		kfree(buf->sg_table);
+		buf->sg_table = NULL;
+		buf->sg_table_alloc = false;
+	}
 }
 
 static struct dma_buf *msm_vb2_get_dmabuf(struct vb2_buffer *vb,
@@ -603,7 +631,7 @@ static struct dma_buf *msm_vb2_get_dmabuf(struct vb2_buffer *vb,
 	exp_info.priv = dinfo;
 
 	if (!buf->sg_table)
-		buf->sg_table = vb2_dc_get_base_sgt(buf);
+		buf->sg_table = msm_vidc_get_sg_table(buf);
 
 	if (WARN_ON(!buf->sg_table))
 		return NULL;
