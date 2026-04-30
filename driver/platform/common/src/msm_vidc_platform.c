@@ -902,6 +902,8 @@ int msm_vidc_adjust_bitrate_mode(void *instance, struct v4l2_ctrl *ctrl)
 			hfi_value = HFI_RC_CBR_CFR;
 	} else if (bitrate_mode == V4L2_MPEG_VIDEO_BITRATE_MODE_CQ) {
 		hfi_value = HFI_RC_CQ;
+	} else if (bitrate_mode == V4L2_MPEG_VIDEO_BITRATE_MODE_MBR) {
+		hfi_value = HFI_RC_MBR_CFR;
 	}
 
 update:
