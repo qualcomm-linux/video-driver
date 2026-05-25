@@ -19,14 +19,14 @@ override_dh_auto_install:
 
 override_dh_builddeb:
 	# Ensure maintainer scripts are in place before building package
-	mkdir -p debian/video-driver-dkms/DEBIAN
+	mkdir -p debian/iris-vpu-dkms/DEBIAN
 	if [ -f debian/postinst ]; then \
-		install -m 755 debian/postinst debian/video-driver-dkms/DEBIAN/postinst; \
+		install -m 755 debian/postinst debian/iris-vpu-dkms/DEBIAN/postinst; \
 	fi
 	if [ -f debian/prerm ]; then \
-		install -m 755 debian/prerm debian/video-driver-dkms/DEBIAN/prerm; \
+		install -m 755 debian/prerm debian/iris-vpu-dkms/DEBIAN/prerm; \
 	fi
 	if [ -f debian/postrm ]; then \
-		install -m 755 debian/postrm debian/video-driver-dkms/DEBIAN/postrm; \
+		install -m 755 debian/postrm debian/iris-vpu-dkms/DEBIAN/postrm; \
 	fi
 	dh_builddeb

@@ -1,13 +1,13 @@
-# Video Driver pkg-video-driver
+# Video Driver pkg-iris-vpu
 
-This pkg-video-driver directory contains all scripts and configuration files needed
+This pkg-iris-vpu directory contains all scripts and configuration files needed
 to create Ubuntu DKMS packages for video-driver with intelligent automatic
 driver management and recovery capabilities.
 
 ## Directory Structure
 
 ```
-pkg-video-driver/
+pkg-iris-vpu/
 ├── debian/                       # Debian package configuration files
 │   ├── control                   # Package control file
 │   ├── rules                     # Build rules (debhelper + dkms)
@@ -19,7 +19,7 @@ pkg-video-driver/
 │   │                             #   (intelligent cleanup with overlay detection)
 │   ├── postrm                    # Post-removal script
 │   │                             #   (driver restoration + initramfs update)
-│   └── video-driver-dkms.install # Installation file list
+│   └── iris-vpu-dkms.install # Installation file list
 ├── scripts/                      # Build and utility scripts
 │   ├── detect-platform.sh        # Platform detection from device tree
 │   ├── set-build-env.sh          # Build environment setup
@@ -50,9 +50,9 @@ pkg-video-driver/
 ### **🛡️ Advanced Driver Management**
 
 - **Safe Driver Switching**: Only disables the upstream `qcom_iris` module if
-  video-driver successfully builds and loads
+  iris-vpu successfully builds and loads
 - **Automatic Rollback**: Restores the upstream `qcom_iris` module if
-  video-driver fails at any stage
+  iris-vpu fails at any stage
 - **Hardware Conflict Prevention**: Properly unloads the upstream `qcom_iris`
   driver before switching
 - **State Preservation**: Remembers original driver state for accurate
@@ -81,12 +81,12 @@ tree compatible strings (iris format only):
 ### 1. Build DKMS Debian Package
 
 ```bash
-cd pkg-video-driver
+cd pkg-iris-vpu
 ./build-package.sh
 ```
 
 After build completion, package files will be available in the
-`pkg-video-driver/build/` directory.
+`pkg-iris-vpu/build/` directory.
 
 ### 2. Install DKMS Package
 
@@ -96,7 +96,7 @@ sudo apt update
 sudo apt install -y dkms linux-headers-$(uname -r)
 
 # Install generated package
-sudo dpkg -i build/video-driver-dkms_*.deb
+sudo dpkg -i build/iris-vpu-dkms_*.deb
 
 # If dependency issues occur, run:
 sudo apt -f install -y
@@ -120,7 +120,7 @@ lsmod | grep iris_vpu
 modinfo iris_vpu
 
 # Check installation method (exists if overlay recovery was used)
-ls -la /var/lib/dkms/video-driver-overlay.flag
+ls -la /var/lib/dkms/iris-vpu-overlay.flag
 ```
 
 ### 4. Uninstall and Cleanup
@@ -145,10 +145,10 @@ ls -la /var/lib/dkms/video-driver-overlay.flag
 
 ```bash
 # Uninstall DKMS package (automatically restores upstream qcom_iris driver)
-sudo dpkg -r video-driver-dkms
+sudo dpkg -r iris-vpu-dkms
 
 # Or complete purge (removes configuration files)
-sudo dpkg --purge video-driver-dkms
+sudo dpkg --purge iris-vpu-dkms
 
 # Update module dependencies
 sudo depmod -a
@@ -167,7 +167,7 @@ automatically:
    - Checks if module was actually built despite DKMS error
      (at `build/video/iris_vpu.ko`)
    - Creates overlay installation flag
-     (`/var/lib/dkms/video-driver-overlay.flag`)
+     (`/var/lib/dkms/iris-vpu-overlay.flag`)
    - Manually installs module to `/lib/modules/$(uname -r)/updates/dkms/`
    - Updates module dependencies and tests loading
 4. **Smart Cleanup**: During uninstall, detects overlay flag and performs
@@ -178,13 +178,13 @@ automatically:
 ```bash
 # When DKMS fails, the system automatically:
 # 1. Checks for built module (in video/ subdirectory)
-ls -l /var/lib/dkms/video-driver/1.0.0/build/video/iris_vpu.ko
+ls -l /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko
 
 # 2. Creates target directory (if needed)
 mkdir -p /lib/modules/$(uname -r)/updates/dkms
 
 # 3. Installs module manually
-cp /var/lib/dkms/video-driver/1.0.0/build/video/iris_vpu.ko \
+cp /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko \
    /lib/modules/$(uname -r)/updates/dkms/
 
 # 4. Updates dependencies
@@ -194,7 +194,7 @@ depmod -a
 modprobe iris_vpu
 
 # 6. Creates overlay flag
-touch /var/lib/dkms/video-driver-overlay.flag
+touch /var/lib/dkms/iris-vpu-overlay.flag
 ```
 
 ### **Installation Scenarios**
@@ -209,7 +209,7 @@ touch /var/lib/dkms/video-driver-overlay.flag
 - DKMS build fails with apport error
 - Module actually built successfully (found at `build/video/iris_vpu.ko`)
 - Overlay recovery installs module manually
-- Overlay flag created: `/var/lib/dkms/video-driver-overlay.flag`
+- Overlay flag created: `/var/lib/dkms/iris-vpu-overlay.flag`
 - Smart cleanup during uninstall removes both module and flag
 
 **Scenario 3: Complete Build Failure**
@@ -226,12 +226,12 @@ The package implements sophisticated driver management:
 
 ```
 # Installation Process:
-1. Build video-driver module via DKMS (with automatic recovery)
+1. Build iris-vpu module via DKMS (with automatic recovery)
 2. Only if build succeeds:
    - Save qcom_iris state for rollback
    - Unload qcom_iris module
    - Add qcom_iris to blacklist (/etc/modprobe.d/blacklist-video.conf)
-   - Load video-driver module (iris_vpu)
+   - Load iris-vpu module (iris_vpu)
    - Verify module is working via lsmod
    - Update initramfs to make blacklist permanent
 3. If any step fails: automatic rollback to qcom_iris
@@ -290,13 +290,13 @@ Use the cross-compilation script for development testing. Run from the
 
 ```bash
 # Auto-detect platform and cross-compile
-./pkg-video-driver/scripts/cross-compile.sh
+./pkg-iris-vpu/scripts/cross-compile.sh
 
 # Specify platform (use iris-format compatible string)
-./pkg-video-driver/scripts/cross-compile.sh --compatible qcom,sa8775p-iris
+./pkg-iris-vpu/scripts/cross-compile.sh --compatible qcom,sa8775p-iris
 
 # Full configuration
-./pkg-video-driver/scripts/cross-compile.sh \
+./pkg-iris-vpu/scripts/cross-compile.sh \
     --compatible qcom,x1e80100-iris \
     --arch arm64 \
     --cross-compile aarch64-linux-gnu- \
@@ -304,10 +304,10 @@ Use the cross-compilation script for development testing. Run from the
     --output-dir /path/to/output
 
 # Clean build artifacts
-./pkg-video-driver/scripts/cross-compile.sh --clean
+./pkg-iris-vpu/scripts/cross-compile.sh --clean
 
 # View help
-./pkg-video-driver/scripts/cross-compile.sh --help
+./pkg-iris-vpu/scripts/cross-compile.sh --help
 ```
 
 > **Note**: Only iris-format compatible strings are supported
@@ -320,11 +320,11 @@ Use the cross-compilation script for development testing. Run from the
 1. `build-package.sh` copies configuration files to video-driver root directory
 2. `dpkg-buildpackage` builds debian package with maintainer scripts
 3. DKMS configuration and scripts are packaged into Debian package file
-4. Clean temporary files, keep package in `pkg-video-driver/build/` directory
+4. Clean temporary files, keep package in `pkg-iris-vpu/build/` directory
 
 ### DKMS Installation Build Process
 
-1. DKMS installs source to `/usr/src/video-driver-1.0.0/`
+1. DKMS installs source to `/usr/src/iris-vpu-1.0.0/`
 2. Calls `scripts/dkms-build-wrapper.sh` (as configured in `dkms.conf`
    `MAKE` directive)
 3. `detect-platform.sh` detects compatible string from device tree
@@ -341,7 +341,7 @@ Use the cross-compilation script for development testing. Run from the
 
 ```
 # After DKMS build, module is located at:
-/var/lib/dkms/video-driver/1.0.0/build/video/iris_vpu.ko
+/var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko
 
 # After installation (both DKMS and overlay), module is installed to:
 /lib/modules/$(uname -r)/updates/dkms/iris_vpu.ko
@@ -353,7 +353,7 @@ Use the cross-compilation script for development testing. Run from the
 
 ```bash
 # Install package
-sudo dpkg -i build/video-driver-dkms_*.deb
+sudo dpkg -i build/iris-vpu-dkms_*.deb
 
 # Fix dependency issues after installation
 sudo apt -f install -y
@@ -363,42 +363,42 @@ sudo apt -f install -y
 
 ```bash
 # Remove package (keeps configuration files)
-sudo dpkg -r video-driver-dkms
+sudo dpkg -r iris-vpu-dkms
 
 # Complete purge (removes all files including configuration)
-sudo dpkg --purge video-driver-dkms
+sudo dpkg --purge iris-vpu-dkms
 
 # Force removal if package is in broken state
-sudo dpkg --force-remove-reinstreq --purge video-driver-dkms
+sudo dpkg --force-remove-reinstreq --purge iris-vpu-dkms
 ```
 
 ### **Package Information Commands**
 
 ```bash
 # List package files
-sudo dpkg -L video-driver-dkms
+sudo dpkg -L iris-vpu-dkms
 
 # Check package status
-dpkg -s video-driver-dkms
+dpkg -s iris-vpu-dkms
 
 # List all installed packages matching pattern
-dpkg -l | grep video-driver
+dpkg -l | grep iris-vpu
 ```
 
 ### **DKMS Management Commands**
 
 ```bash
 # Remove DKMS module completely
-sudo dkms remove video-driver/1.0.0 --all
+sudo dkms remove iris-vpu/1.0.0 --all
 
 # Check DKMS status
 sudo dkms status
 
 # Build DKMS module manually
-sudo dkms build video-driver/1.0.0
+sudo dkms build iris-vpu/1.0.0
 
 # Install DKMS module manually
-sudo dkms install video-driver/1.0.0
+sudo dkms install iris-vpu/1.0.0
 ```
 
 ## Troubleshooting
@@ -407,16 +407,16 @@ sudo dkms install video-driver/1.0.0
 
 ```bash
 # Check package status
-dpkg -l | grep video-driver
+dpkg -l | grep iris-vpu
 
 # Check module status
 lsmod | grep -E "(iris_vpu|qcom_iris)"
 
 # Check DKMS status
-dkms status | grep video-driver
+dkms status | grep iris-vpu
 
 # Check installation method (overlay recovery used if exists)
-ls -la /var/lib/dkms/video-driver-overlay.flag
+ls -la /var/lib/dkms/iris-vpu-overlay.flag
 
 # Check blacklist status
 grep qcom_iris /etc/modprobe.d/blacklist-video.conf
@@ -425,9 +425,9 @@ grep qcom_iris /etc/modprobe.d/blacklist-video.conf
 ### 2. Common Installation Scenarios
 
 **Package Status Meanings:**
-- `ii video-driver-dkms` — Successfully installed and configured
-- `pi video-driver-dkms` — Package marked for purge but still installed
-- `rc video-driver-dkms` — Package removed but configuration files remain
+- `ii iris-vpu-dkms` — Successfully installed and configured
+- `pi iris-vpu-dkms` — Package marked for purge but still installed
+- `rc iris-vpu-dkms` — Package removed but configuration files remain
 
 **Driver Status Scenarios:**
 
@@ -436,7 +436,7 @@ grep qcom_iris /etc/modprobe.d/blacklist-video.conf
 ```bash
 lsmod | grep iris_vpu   # Should show iris_vpu loaded
 lsmod | grep qcom_iris  # Should show nothing (unloaded)
-ls /var/lib/dkms/video-driver-overlay.flag  # Should not exist
+ls /var/lib/dkms/iris-vpu-overlay.flag  # Should not exist
 ```
 
 *Successful Overlay Recovery Installation:*
@@ -444,7 +444,7 @@ ls /var/lib/dkms/video-driver-overlay.flag  # Should not exist
 ```bash
 lsmod | grep iris_vpu   # Should show iris_vpu loaded
 lsmod | grep qcom_iris  # Should show nothing (unloaded)
-ls /var/lib/dkms/video-driver-overlay.flag  # Should exist
+ls /var/lib/dkms/iris-vpu-overlay.flag  # Should exist
 ```
 
 *Failed Installation (System Protected):*
@@ -460,17 +460,17 @@ If automatic recovery fails, you can perform manual recovery:
 
 ```bash
 # Check if module was built (in video/ subdirectory)
-ls -la /var/lib/dkms/video-driver/1.0.0/build/video/iris_vpu.ko
+ls -la /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko
 
 # Manual installation steps
 sudo mkdir -p /lib/modules/$(uname -r)/updates/dkms
-sudo cp /var/lib/dkms/video-driver/1.0.0/build/video/iris_vpu.ko \
+sudo cp /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko \
         /lib/modules/$(uname -r)/updates/dkms/
 sudo depmod -a
 sudo modprobe iris_vpu
 
 # Create overlay flag for proper cleanup
-sudo touch /var/lib/dkms/video-driver-overlay.flag
+sudo touch /var/lib/dkms/iris-vpu-overlay.flag
 ```
 
 ### 4. Custom Kernel Issues
@@ -502,7 +502,7 @@ ls -la /lib/modules/$(uname -r)/build
 sudo apt install linux-headers-$(uname -r)
 
 # View build logs
-cat /var/lib/dkms/video-driver/1.0.0/build/make.log
+cat /var/lib/dkms/iris-vpu/1.0.0/build/make.log
 ```
 
 ### 5. Platform Detection Issues
@@ -534,10 +534,10 @@ PLATFORM_OVERRIDE=qcom,x1e80100-iris ./scripts/detect-platform.sh
 
 ```bash
 # Force complete removal
-sudo dpkg --force-remove-reinstreq --purge video-driver-dkms
+sudo dpkg --force-remove-reinstreq --purge iris-vpu-dkms
 
 # Manual cleanup if needed
-sudo rm -f /var/lib/dkms/video-driver-overlay.flag
+sudo rm -f /var/lib/dkms/iris-vpu-overlay.flag
 sudo rm -f /lib/modules/$(uname -r)/updates/dkms/iris_vpu.ko
 sudo depmod -a
 ```
@@ -563,21 +563,21 @@ cat /etc/modprobe.d/blacklist-video.conf
 ```bash
 # 1. Check initial system status
 lsmod | grep -E "(iris_vpu|qcom_iris)"
-dkms status | grep video-driver
-dpkg -l | grep video-driver
+dkms status | grep iris-vpu
+dpkg -l | grep iris-vpu
 
 # 2. Build and install package
 ./build-package.sh
-sudo dpkg -i build/video-driver-dkms_*.deb
+sudo dpkg -i build/iris-vpu-dkms_*.deb
 
 # 3. Verify installation result
 lsmod | grep -E "(iris_vpu|qcom_iris)"
-dkms status | grep video-driver
-dpkg -l | grep video-driver
-ls -la /var/lib/dkms/video-driver-overlay.flag  # Check installation method
+dkms status | grep iris-vpu
+dpkg -l | grep iris-vpu
+ls -la /var/lib/dkms/iris-vpu-overlay.flag  # Check installation method
 
 # 4. Test removal and restoration
-sudo dpkg -r video-driver-dkms
+sudo dpkg -r iris-vpu-dkms
 
 # 5. Verify qcom_iris restoration
 lsmod | grep -E "(iris_vpu|qcom_iris)"
@@ -606,7 +606,7 @@ lsmod | grep -E "(iris_vpu|qcom_iris)"
 
 ### **DKMS Configuration (`dkms.conf`)**
 
-- `PACKAGE_NAME="video-driver"`, `PACKAGE_VERSION="1.0.0"`
+- `PACKAGE_NAME="iris-vpu"`, `PACKAGE_VERSION="1.0.0"`
 - `BUILT_MODULE_NAME[0]="iris_vpu"` — module name to install
 - `BUILT_MODULE_LOCATION[0]="."` — DKMS searches for module in build root
 - `MAKE[0]="scripts/dkms-build-wrapper.sh"` — custom build script
@@ -620,11 +620,11 @@ lsmod | grep -E "(iris_vpu|qcom_iris)"
 
 - `DKMS_DISABLE_APPORT=1` — disables DKMS error reporting for custom kernels
 - `IGNORE_CC_MISMATCH=1` — ignores compiler version mismatches
-- `VIDEO_ROOT` — set to the video-driver source root directory
+- `VIDEO_ROOT` — set to the iris-vpu source root directory
 
 ### **Overlay Flag System**
 
-- **Flag File**: `/var/lib/dkms/video-driver-overlay.flag`
+- **Flag File**: `/var/lib/dkms/iris-vpu-overlay.flag`
 - **Purpose**: Marks installations that used overlay recovery
 - **Cleanup**: Automatically removed during uninstall (prerm script)
 - **Detection**: Used by prerm script to determine cleanup method
@@ -642,9 +642,9 @@ lsmod | grep -E "(iris_vpu|qcom_iris)"
 
 ## Notes
 
-1. **Non-intrusive**: pkg-video-driver system will not modify any existing files
+1. **Non-intrusive**: pkg-iris-vpu system will not modify any existing files
    in video-driver directory
-2. **Build isolation**: all build artifacts are in `pkg-video-driver/build/`
+2. **Build isolation**: all build artifacts are in `pkg-iris-vpu/build/`
    directory
 3. **Temporary files**: during build process, `debian/`, `dkms.conf` and
    `scripts/` will be temporarily created in root directory, automatically
@@ -669,9 +669,9 @@ lsmod | grep -E "(iris_vpu|qcom_iris)"
 Ensure scripts have execute permissions:
 
 ```bash
-chmod +x pkg-video-driver/scripts/*.sh
-chmod +x pkg-video-driver/build-package.sh
-chmod +x pkg-video-driver/cleanup.sh
+chmod +x pkg-iris-vpu/scripts/*.sh
+chmod +x pkg-iris-vpu/build-package.sh
+chmod +x pkg-iris-vpu/cleanup.sh
 ```
 
 ## Advanced Usage
@@ -693,17 +693,17 @@ export CROSS_COMPILE=aarch64-custom-linux-gnu-
 ```bash
 # Enable verbose output during build
 export DKMS_DEBUG=1
-sudo dpkg -i build/video-driver-dkms_*.deb
+sudo dpkg -i build/iris-vpu-dkms_*.deb
 
 # Check detailed logs
 journalctl -u dkms
-cat /var/lib/dkms/video-driver/1.0.0/build/make.log
+cat /var/lib/dkms/iris-vpu/1.0.0/build/make.log
 ```
 
 ### Manual Driver Management
 
 ```bash
-# Manually switch to video-driver (if available)
+# Manually switch to iris-vpu (if available)
 sudo modprobe -r qcom_iris
 sudo modprobe iris_vpu
 
@@ -719,13 +719,13 @@ lsmod | grep -E "(iris_vpu|qcom_iris)"
 
 ```bash
 # Check detailed package status
-dpkg -s video-driver-dkms
+dpkg -s iris-vpu-dkms
 
 # List package files
-sudo dpkg -L video-driver-dkms
+sudo dpkg -L iris-vpu-dkms
 
 # Force package reconfiguration
-sudo dpkg-reconfigure video-driver-dkms
+sudo dpkg-reconfigure iris-vpu-dkms
 
 # Fix broken package states
 sudo dpkg --configure -a

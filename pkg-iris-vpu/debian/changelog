@@ -1,4 +1,4 @@
-video-driver (1.0.0-1) unstable; urgency=medium
+iris-vpu (1.0.0-1) unstable; urgency=medium
 
   * Initial DKMS package for MSM VIDC driver
   * Support for multiple platforms via device tree detection
@@ -7,7 +7,7 @@ video-driver (1.0.0-1) unstable; urgency=medium
   * Platforms supported: hamoa, lemans
   * Auto-detection of platform from device tree compatible string
   * Unified cross-compilation environment for all platforms
-  * Complete build isolation in pkg-video-driver directory
+  * Complete build isolation in pkg-iris-vpu directory
   * Fixed: Proper handling of multiple compatible strings in device tree
 
  -- Renjiang Han <renjiang@qti.qualcomm.com>  Tue, 28 Jan 2026 15:10:00 +0800

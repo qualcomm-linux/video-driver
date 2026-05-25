@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
-# postrm script for video-driver-dkms
+# postrm script for iris-vpu-dkms
 # This script runs after the package is removed
 
 set -e
 
 case "$1" in
     remove|purge)
-        echo "Completing video-driver-dkms removal..."
+        echo "Completing iris-vpu-dkms removal..."
 
         # 1. Update initramfs to apply blacklist removal
         echo "Updating initramfs to remove qcom_iris blacklist..."
@@ -46,7 +46,7 @@ case "$1" in
             echo "A reboot may be required to fully restore the original driver"
         fi
 
-        echo "video-driver-dkms removal completed."
+        echo "iris-vpu-dkms removal completed."
         echo "System has been restored to use the original qcom_iris driver."
         ;;
 

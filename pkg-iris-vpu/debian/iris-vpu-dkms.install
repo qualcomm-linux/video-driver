@@ -1,0 +1,8 @@
+dkms.conf                              usr/src/iris-vpu-1.0.0/
+Makefile                               usr/src/iris-vpu-1.0.0/
+Kbuild                                 usr/src/iris-vpu-1.0.0/
+driver/                                usr/src/iris-vpu-1.0.0/
+video/                                 usr/src/iris-vpu-1.0.0/
+include/                               usr/src/iris-vpu-1.0.0/
+config/                                usr/src/iris-vpu-1.0.0/
+scripts/                               usr/src/iris-vpu-1.0.0/

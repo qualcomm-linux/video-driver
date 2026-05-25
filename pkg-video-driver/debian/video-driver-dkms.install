@@ -1,8 +1,0 @@
-dkms.conf                              usr/src/video-driver-1.0.0/
-Makefile                               usr/src/video-driver-1.0.0/
-Kbuild                                 usr/src/video-driver-1.0.0/
-driver/                                usr/src/video-driver-1.0.0/
-video/                                 usr/src/video-driver-1.0.0/
-include/                               usr/src/video-driver-1.0.0/
-config/                                usr/src/video-driver-1.0.0/
-scripts/                               usr/src/video-driver-1.0.0/

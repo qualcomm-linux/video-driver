@@ -4,7 +4,7 @@
 
 set -e
 
-echo "Starting DKMS build for video driver..."
+echo "Starting DKMS build for iris-vpu..."
 
 # Get kernel information
 KERNEL_VERSION=$(uname -r)
