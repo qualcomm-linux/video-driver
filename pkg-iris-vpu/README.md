@@ -19,7 +19,8 @@ pkg-iris-vpu/
 │   │                             #   (intelligent cleanup with overlay detection)
 │   ├── postrm                    # Post-removal script
 │   │                             #   (driver restoration + initramfs update)
-│   └── iris-vpu-dkms.install # Installation file list
+│   ├── iris-vpu-dkms.install.in  # Installation file list template (@VERSION@ placeholder)
+│   └── iris-vpu-dkms.install     # Generated at build time (do not edit)
 ├── scripts/                      # Build and utility scripts
 │   ├── detect-platform.sh        # Platform detection from device tree
 │   ├── set-build-env.sh          # Build environment setup
@@ -178,13 +179,13 @@ automatically:
 ```bash
 # When DKMS fails, the system automatically:
 # 1. Checks for built module (in video/ subdirectory)
-ls -l /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko
+ls -l /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko
 
 # 2. Creates target directory (if needed)
 mkdir -p /lib/modules/$(uname -r)/updates/dkms
 
 # 3. Installs module manually
-cp /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko \
+cp /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko \
    /lib/modules/$(uname -r)/updates/dkms/
 
 # 4. Updates dependencies
@@ -324,7 +325,7 @@ Use the cross-compilation script for development testing. Run from the
 
 ### DKMS Installation Build Process
 
-1. DKMS installs source to `/usr/src/iris-vpu-1.0.0/`
+1. DKMS installs source to `/usr/src/iris-vpu-<version>/` (version from `debian/changelog`)
 2. Calls `scripts/dkms-build-wrapper.sh` (as configured in `dkms.conf`
    `MAKE` directive)
 3. `detect-platform.sh` detects compatible string from device tree
@@ -340,8 +341,8 @@ Use the cross-compilation script for development testing. Run from the
 ### Module File Location
 
 ```
-# After DKMS build, module is located at:
-/var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko
+# After DKMS build, module is located at (replace <version> with actual version):
+/var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko
 
 # After installation (both DKMS and overlay), module is installed to:
 /lib/modules/$(uname -r)/updates/dkms/iris_vpu.ko
@@ -388,17 +389,17 @@ dpkg -l | grep iris-vpu
 ### **DKMS Management Commands**
 
 ```bash
-# Remove DKMS module completely
-sudo dkms remove iris-vpu/1.0.0 --all
+# Remove DKMS module completely (replace <version> with actual version, e.g. 1.0.9)
+sudo dkms remove iris-vpu/<version> --all
 
 # Check DKMS status
 sudo dkms status
 
 # Build DKMS module manually
-sudo dkms build iris-vpu/1.0.0
+sudo dkms build iris-vpu/<version>
 
 # Install DKMS module manually
-sudo dkms install iris-vpu/1.0.0
+sudo dkms install iris-vpu/<version>
 ```
 
 ## Troubleshooting
@@ -459,12 +460,12 @@ lsmod | grep qcom_iris  # Should show qcom_iris loaded (preserved)
 If automatic recovery fails, you can perform manual recovery:
 
 ```bash
-# Check if module was built (in video/ subdirectory)
-ls -la /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko
+# Check if module was built (replace <version> with actual version, e.g. 1.0.9)
+ls -la /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko
 
 # Manual installation steps
 sudo mkdir -p /lib/modules/$(uname -r)/updates/dkms
-sudo cp /var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko \
+sudo cp /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko \
         /lib/modules/$(uname -r)/updates/dkms/
 sudo depmod -a
 sudo modprobe iris_vpu
@@ -501,8 +502,8 @@ ls -la /lib/modules/$(uname -r)/build
 # Install if missing
 sudo apt install linux-headers-$(uname -r)
 
-# View build logs
-cat /var/lib/dkms/iris-vpu/1.0.0/build/make.log
+# View build logs (replace <version> with actual version, e.g. 1.0.9)
+cat /var/lib/dkms/iris-vpu/<version>/build/make.log
 ```
 
 ### 5. Platform Detection Issues
@@ -606,7 +607,7 @@ lsmod | grep -E "(iris_vpu|qcom_iris)"
 
 ### **DKMS Configuration (`dkms.conf`)**
 
-- `PACKAGE_NAME="iris-vpu"`, `PACKAGE_VERSION="1.0.0"`
+- `PACKAGE_NAME="iris-vpu"`, `PACKAGE_VERSION` — set dynamically from git tag by `build-package.sh`
 - `BUILT_MODULE_NAME[0]="iris_vpu"` — module name to install
 - `BUILT_MODULE_LOCATION[0]="."` — DKMS searches for module in build root
 - `MAKE[0]="scripts/dkms-build-wrapper.sh"` — custom build script
@@ -695,9 +696,9 @@ export CROSS_COMPILE=aarch64-custom-linux-gnu-
 export DKMS_DEBUG=1
 sudo dpkg -i build/iris-vpu-dkms_*.deb
 
-# Check detailed logs
+# Check detailed logs (replace <version> with actual version, e.g. 1.0.9)
 journalctl -u dkms
-cat /var/lib/dkms/iris-vpu/1.0.0/build/make.log
+cat /var/lib/dkms/iris-vpu/<version>/build/make.log
 ```
 
 ### Manual Driver Management

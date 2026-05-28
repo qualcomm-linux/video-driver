@@ -2,8 +2,19 @@
 # SPDX-License-Identifier: GPL-2.0-only
 # Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
+include /usr/share/dpkg/pkg-info.mk
+
 %:
 	dh $@ --with dkms
+
+override_dh_install:
+	sed "s/@VERSION@/$(DEB_VERSION_UPSTREAM)/g" \
+		debian/iris-vpu-dkms.install.in > debian/iris-vpu-dkms.install
+	dh_install
+
+override_dh_clean:
+	rm -f debian/iris-vpu-dkms.install
+	dh_clean
 
 override_dh_auto_clean:
 	# Skip auto clean for DKMS package
@@ -16,17 +27,3 @@ override_dh_auto_test:
 
 override_dh_auto_install:
 	# Skip auto install for DKMS package
-
-override_dh_builddeb:
-	# Ensure maintainer scripts are in place before building package
-	mkdir -p debian/iris-vpu-dkms/DEBIAN
-	if [ -f debian/postinst ]; then \
-		install -m 755 debian/postinst debian/iris-vpu-dkms/DEBIAN/postinst; \
-	fi
-	if [ -f debian/prerm ]; then \
-		install -m 755 debian/prerm debian/iris-vpu-dkms/DEBIAN/prerm; \
-	fi
-	if [ -f debian/postrm ]; then \
-		install -m 755 debian/postrm debian/iris-vpu-dkms/DEBIAN/postrm; \
-	fi
-	dh_builddeb

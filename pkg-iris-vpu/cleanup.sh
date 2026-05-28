@@ -6,9 +6,15 @@
 
 set -e
 
-SCRIPT_DIR="$(dirname "$0")"
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 PACKAGE_NAME="iris-vpu"
-PACKAGE_VERSION="1.0.0"
+
+# Resolve package version from git tag (single source of truth)
+GIT_TAG=$(git -C "$(dirname "$SCRIPT_DIR")" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+if [ -z "$GIT_TAG" ]; then
+    GIT_TAG=$(grep 'PACKAGE_VERSION=' "$SCRIPT_DIR/dkms.conf" 2>/dev/null | cut -d'"' -f2)
+fi
+PACKAGE_VERSION="${GIT_TAG:-1.0.0}"
 
 show_help() {
     cat << EOF

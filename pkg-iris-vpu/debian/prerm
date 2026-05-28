@@ -14,7 +14,7 @@ case "$1" in
         # Get kernel version
         KERNEL_VERSION=$(uname -r)
         MODULE_NAME="iris-vpu"
-        DRIVER_VERSION="1.0.0"
+        DRIVER_VERSION=$(dpkg-query -W -f='${Version}' iris-vpu-dkms 2>/dev/null | sed 's/-.*//')
 
         # 1. Unload iris_vpu module if it's loaded
         if lsmod | grep -q "^iris_vpu "; then

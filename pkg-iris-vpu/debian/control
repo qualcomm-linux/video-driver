@@ -2,8 +2,8 @@ Source: iris-vpu
 Section: kernel
 Priority: optional
 Maintainer: Renjiang Han <renjiang@qti.qualcomm.com>
-Build-Depends: debhelper-compat (= 13), dkms
-Standards-Version: 4.6.2
+Build-Depends: debhelper-compat (= 13), dh-sequence-dkms
+Standards-Version: 4.7.2
 Homepage: https://github.com/qualcomm-linux/video-driver
 
 Package: iris-vpu-dkms

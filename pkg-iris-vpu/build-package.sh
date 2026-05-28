@@ -25,6 +25,17 @@ echo "Script location: $SCRIPT_DIR"
 echo "pkg-iris-vpu directory: $DKMS_DEBIAN_DIR"
 echo "Video driver root: $VIDEO_DRIVER_ROOT"
 
+# Resolve package version from git tag (single source of truth)
+cd "$VIDEO_DRIVER_ROOT"
+GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+if [ -z "$GIT_TAG" ]; then
+    # Fallback: use PACKAGE_VERSION from dkms.conf
+    GIT_TAG=$(grep 'PACKAGE_VERSION=' "$DKMS_DEBIAN_DIR/dkms.conf" | cut -d'"' -f2)
+    echo "No git tag found, using dkms.conf version: $GIT_TAG"
+else
+    echo "Package version from git tag: $GIT_TAG"
+fi
+
 # Create output directory
 mkdir -p "$BUILD_OUTPUT"
 
@@ -50,6 +61,13 @@ if [ "$PWD" != "$DKMS_DEBIAN_DIR" ]; then
 else
     echo "Already in pkg-iris-vpu directory, skipping file copy..."
 fi
+
+# Sync version from git tag into dkms.conf and debian/changelog
+echo "Syncing version $GIT_TAG into dkms.conf and debian/changelog..."
+sed -i "s/PACKAGE_VERSION=\"[^\"]*\"/PACKAGE_VERSION=\"${GIT_TAG}\"/" dkms.conf
+sed -i "s/^iris-vpu ([^)]*)/iris-vpu (${GIT_TAG}-1)/" debian/changelog
+echo "  dkms.conf PACKAGE_VERSION -> $GIT_TAG"
+echo "  debian/changelog version  -> ${GIT_TAG}-1"
 
 # Set script execution permissions
 chmod +x scripts/*.sh

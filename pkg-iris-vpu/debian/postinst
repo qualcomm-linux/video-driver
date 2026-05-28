@@ -17,7 +17,7 @@ case "$1" in
         # Get kernel version
         KERNEL_VERSION=$(uname -r)
         MODULE_NAME="iris-vpu"
-        DRIVER_VERSION="1.0.0"
+        DRIVER_VERSION=$(dpkg-query -W -f='${Version}' iris-vpu-dkms 2>/dev/null | sed 's/-.*//')
         BLACKLIST_FILE="/etc/modprobe.d/blacklist-video.conf"
 
         # 1. First, let DKMS build the iris-vpu module
@@ -28,7 +28,7 @@ case "$1" in
             DKMS_BUILD_SUCCESS=false
 
             # Check if module was actually built despite DKMS error
-            MODULE_PATH="/var/lib/dkms/iris-vpu/1.0.0/build/video/iris_vpu.ko"
+            MODULE_PATH="/var/lib/dkms/iris-vpu/$DRIVER_VERSION/build/video/iris_vpu.ko"
             if [ -f "$MODULE_PATH" ]; then
                 echo "Module file found, proceeding with manual installation..."
 
