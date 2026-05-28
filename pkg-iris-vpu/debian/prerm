@@ -63,7 +63,22 @@ case "$1" in
             echo "Standard DKMS installation detected, no manual cleanup needed"
         fi
 
-        # 4. Remove qcom_iris blacklist file
+        # 4. Remove iris_vpu boot autoload configuration
+        if [ -f /etc/modules-load.d/iris-vpu.conf ]; then
+            rm -f /etc/modules-load.d/iris-vpu.conf
+            echo "✓ /etc/modules-load.d/iris-vpu.conf removed"
+        fi
+        # Also clean up legacy /etc/modules entry if present
+        sed -i '/^iris_vpu$/d' /etc/modules 2>/dev/null || true
+
+        # Remove iris_vpu from initramfs modules
+        if [ -f /etc/initramfs-tools/modules ]; then
+            sed -i '/^iris_vpu$/d' /etc/initramfs-tools/modules
+            echo "✓ iris_vpu removed from /etc/initramfs-tools/modules"
+            update-initramfs -u 2>/dev/null || true
+        fi
+
+        # 5. Remove qcom_iris blacklist file
         BLACKLIST_FILE="/etc/modprobe.d/blacklist-video.conf"
         if [ -f "$BLACKLIST_FILE" ]; then
             echo "Removing module blacklist file..."

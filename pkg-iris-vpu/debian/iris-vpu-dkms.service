@@ -1,0 +1,11 @@
+[Unit]
+Description=Load iris_vpu kernel module
+After=local-fs.target systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/iris-vpu-dkms/iris-vpu-load.sh
+
+[Install]
+WantedBy=multi-user.target

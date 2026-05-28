@@ -20,7 +20,11 @@ case "$1" in
         DRIVER_VERSION=$(dpkg-query -W -f='${Version}' iris-vpu-dkms 2>/dev/null | sed 's/-.*//')
         BLACKLIST_FILE="/etc/modprobe.d/blacklist-video.conf"
 
-        # 1. First, let DKMS build the iris-vpu module
+        # 1. Register module source with DKMS
+        echo "Registering iris-vpu module source with DKMS..."
+        dkms add -m "$MODULE_NAME" -v "$DRIVER_VERSION" 2>/dev/null || true
+
+        # 2. Build the iris-vpu module via DKMS
         echo "Building iris-vpu module via DKMS..."
         DKMS_BUILD_SUCCESS=true
         if ! dkms build -m "$MODULE_NAME" -v "$DRIVER_VERSION" -k "$KERNEL_VERSION"; then
@@ -95,7 +99,7 @@ case "$1" in
             fi
         fi
 
-        # 2. Install the DKMS module (skip if manual recovery was used)
+        # 3. Install the DKMS module (skip if manual recovery was used)
         DKMS_TARGET_FILE="/lib/modules/$KERNEL_VERSION/extra/dkms/iris_vpu.ko"
         if [ "$DKMS_BUILD_SUCCESS" = true ] && [ ! -f "$DKMS_TARGET_FILE" ]; then
             echo "Installing iris-vpu module via DKMS..."
@@ -112,14 +116,14 @@ case "$1" in
         echo "SUCCESS: iris-vpu module built and installed successfully!"
         echo "Now switching from qcom_iris to iris-vpu..."
 
-        # 3. Save current qcom_iris state for potential rollback
+        # 4. Save current qcom_iris state for potential rollback
         QCOM_IRIS_WAS_LOADED=false
         if lsmod | grep -q "qcom_iris"; then
             QCOM_IRIS_WAS_LOADED=true
             echo "qcom_iris module is currently loaded"
         fi
 
-        # 4. Unload qcom_iris module to free hardware resources
+        # 5. Unload qcom_iris module to free hardware resources
         if [ "$QCOM_IRIS_WAS_LOADED" = true ]; then
             echo "Unloading qcom_iris module to free hardware resources..."
             if ! modprobe -r qcom_iris 2>/dev/null; then
@@ -129,7 +133,7 @@ case "$1" in
             fi
         fi
 
-        # 5. Add qcom_iris to blacklist to prevent auto-loading
+        # 6. Add qcom_iris to blacklist to prevent auto-loading
         echo "Adding qcom_iris to module blacklist..."
         if [ -f "$BLACKLIST_FILE" ]; then
             if ! grep -q "blacklist qcom_iris" "$BLACKLIST_FILE"; then
@@ -146,18 +150,32 @@ case "$1" in
             echo "install qcom_iris /bin/true" >> "$BLACKLIST_FILE"
         fi
 
-        # 6. Try to load iris-vpu module
+        # 7. Try to load iris-vpu module
         echo "Loading iris-vpu module..."
         if modprobe iris_vpu 2>/dev/null; then
-            # 7. Verify the iris_vpu module is actually loaded and working
+            # 8. Verify the iris_vpu module is actually loaded and working
             if lsmod | grep -q "^iris_vpu "; then
                 echo "SUCCESS: iris-vpu module loaded and working!"
 
-                # Update initramfs to apply blacklist changes
-                echo "Updating initramfs to make blacklist permanent..."
+                # Add iris_vpu to /etc/modules-load.d/ for automatic loading at boot
+                echo "iris_vpu" > /etc/modules-load.d/iris-vpu.conf
+                echo "✓ iris_vpu added to /etc/modules-load.d/iris-vpu.conf for boot autoload"
+                # Remove legacy /etc/modules entry if present
+                sed -i '/^iris_vpu$/d' /etc/modules 2>/dev/null || true
+
+                # Add iris_vpu to initramfs modules for persistent loading across reboots
+                if [ -f /etc/initramfs-tools/modules ]; then
+                    if ! grep -q "^iris_vpu$" /etc/initramfs-tools/modules; then
+                        echo "iris_vpu" >> /etc/initramfs-tools/modules
+                        echo "✓ iris_vpu added to /etc/initramfs-tools/modules"
+                    fi
+                fi
+
+                # Update initramfs to apply blacklist and module changes
+                echo "Updating initramfs to make changes permanent..."
                 update-initramfs -u 2>/dev/null || {
                     echo "Warning: Failed to update initramfs"
-                    echo "Blacklist may not take effect until manual update"
+                    echo "Changes may not take effect until manual update"
                 }
 
                 # Update module dependencies

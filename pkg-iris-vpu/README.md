@@ -1,73 +1,59 @@
 # Video Driver pkg-iris-vpu
 
 This pkg-iris-vpu directory contains all scripts and configuration files needed
-to create Ubuntu DKMS packages for video-driver with intelligent automatic
-driver management and recovery capabilities.
+to create Debian DKMS packages for iris-vpu (MSM VIDC out-of-tree driver).
 
 ## Directory Structure
 
 ```
 pkg-iris-vpu/
-├── debian/                       # Debian package configuration files
-│   ├── control                   # Package control file
-│   ├── rules                     # Build rules (debhelper + dkms)
-│   ├── changelog                 # Change log
-│   ├── copyright                 # Copyright information
-│   ├── postinst                  # Post-installation script
-│   │                             #   (DKMS build + recovery + driver switching)
-│   ├── prerm                     # Pre-removal script
-│   │                             #   (intelligent cleanup with overlay detection)
-│   ├── postrm                    # Post-removal script
-│   │                             #   (driver restoration + initramfs update)
-│   ├── iris-vpu-dkms.install.in  # Installation file list template (@VERSION@ placeholder)
-│   └── iris-vpu-dkms.install     # Generated at build time (do not edit)
-├── scripts/                      # Build and utility scripts
-│   ├── detect-platform.sh        # Platform detection from device tree
-│   ├── set-build-env.sh          # Build environment setup
-│   │                             #   (platform config + cross-compile)
-│   ├── dkms-build-wrapper.sh     # DKMS build wrapper
-│   │                             #   (called by dkms.conf MAKE directive)
-│   ├── build-wrapper.sh          # Build wrapper script
-│   └── cross-compile.sh          # Cross-compilation development/testing script
-├── dkms.conf                     # DKMS configuration file
-├── build-package.sh              # Debian package build script
-├── cleanup.sh                    # Cleanup and uninstall script
-├── build/                        # Build output directory (generated)
-└── README.md                     # This file
+├── debian/                           # Debian package configuration files
+│   ├── control                       # Package control file
+│   ├── rules                         # Build rules (debhelper + dkms)
+│   ├── changelog                     # Change log (version managed by build-package.sh)
+│   ├── copyright                     # Copyright information
+│   ├── iris-vpu-dkms.dkms            # DKMS configuration (PACKAGE_VERSION auto-set)
+│   ├── iris-vpu-dkms.install.in      # Installation file list template (@VERSION@)
+│   ├── iris-vpu-dkms.service         # systemd service for auto-loading iris_vpu
+│   ├── iris-vpu-load.sh              # Module load script (called by service)
+│   ├── modprobe.d/
+│   │   └── iris-vpu-dkms.conf        # Blacklist qcom_iris (in /usr/lib/modprobe.d/)
+│   ├── postinst                      # Post-install: enable service, update initramfs
+│   ├── prerm                         # Pre-remove: disable service, clean initramfs
+│   ├── postrm                        # Post-remove: rebuild initramfs
+│   └── source/
+├── scripts/                          # DKMS build scripts
+│   ├── detect-platform.sh            # Platform detection from device tree
+│   ├── set-build-env.sh              # Build environment setup
+│   ├── dkms-build-wrapper.sh         # DKMS build wrapper (called by dkms.conf)
+│   ├── build-wrapper.sh              # Build wrapper script
+│   └── cross-compile.sh              # Cross-compilation development/testing script
+├── dkms.conf                         # DKMS configuration (version updated at build time)
+├── build-package.sh                  # Debian package build script
+├── cleanup.sh                        # Cleanup and uninstall script
+├── build/                            # Build output directory (generated)
+└── README.md                         # This file
 ```
 
 ## Key Features
 
-### **🚀 Intelligent Automatic Recovery System**
+### **Version Management**
 
-- **DKMS Failure Detection**: Automatically detects DKMS apport errors and
-  build failures
-- **Overlay Installation**: When DKMS fails, automatically performs manual
-  recovery installation
-- **Smart Cleanup**: Uses overlay flag system to distinguish between DKMS and
-  manual installations
-- **Zero User Intervention**: Handles common DKMS issues transparently
+Package version is derived from the git tag (single source of truth):
+- `build-package.sh` reads `git describe --tags --abbrev=0` (e.g., `v1.0.9` → `1.0.9`)
+- Updates `dkms.conf` `PACKAGE_VERSION` and `debian/changelog` before building
+- `dh_dkms` uses `debian/iris-vpu-dkms.dkms` with `PACKAGE_VERSION="#MODULE_VERSION#"`
+  to install the correct `dkms.conf` into the package
 
-### **🛡️ Advanced Driver Management**
+### **Driver Management**
 
-- **Safe Driver Switching**: Only disables the upstream `qcom_iris` module if
-  iris-vpu successfully builds and loads
-- **Automatic Rollback**: Restores the upstream `qcom_iris` module if
-  iris-vpu fails at any stage
-- **Hardware Conflict Prevention**: Properly unloads the upstream `qcom_iris`
-  driver before switching
-- **State Preservation**: Remembers original driver state for accurate
-  restoration
+- `debian/modprobe.d/iris-vpu-dkms.conf` installed to `/usr/lib/modprobe.d/`:
+  - Blacklists `qcom_iris` (in-tree driver)
+  - Package-managed: automatically removed on `dpkg --remove`
+  - Included in initramfs by `initramfs-tools` automatically
+- `iris-vpu-dkms.service` loads `iris_vpu` at boot via systemd
 
-### **🔧 Custom Kernel Support**
-
-- **Development Kernel Compatibility**: Handles kernels with "-dirty" and "rc"
-  versions
-- **Apport Error Mitigation**: Built-in fixes for common DKMS apport issues
-- **Compiler Mismatch Handling**: Automatically handles compiler version
-  mismatches
-
-## Supported Platforms
+### **Supported Platforms**
 
 Automatically detect and enable corresponding configuration based on device
 tree compatible strings (iris format only):
@@ -86,6 +72,11 @@ cd pkg-iris-vpu
 ./build-package.sh
 ```
 
+The script automatically:
+1. Reads version from git tag (e.g., `v1.0.9` → `1.0.9`)
+2. Updates `dkms.conf` and `debian/changelog` with the correct version
+3. Builds the Debian package via `dpkg-buildpackage`
+
 After build completion, package files will be available in the
 `pkg-iris-vpu/build/` directory.
 
@@ -103,10 +94,15 @@ sudo dpkg -i build/iris-vpu-dkms_*.deb
 sudo apt -f install -y
 ```
 
-> **Note**: This package replaces the upstream `qcom_iris` kernel module
-> (in-tree driver). The installation process automatically unloads `qcom_iris`
-> and adds it to the module blacklist. Upon package removal, the original
-> `qcom_iris` driver is restored automatically.
+**What happens on install:**
+1. DKMS registers, builds, and installs `iris_vpu.ko`
+2. `iris-vpu-dkms.service` is enabled for boot autoload
+3. `iris_vpu` is added to `/etc/initramfs-tools/modules`
+4. `initramfs` is rebuilt for all kernels (includes blacklist + module)
+
+**After reboot:**
+- `qcom_iris` is blacklisted (from `/usr/lib/modprobe.d/iris-vpu-dkms.conf`)
+- `iris_vpu` is loaded by `iris-vpu-dkms.service`
 
 ### 3. Verify Installation
 
@@ -117,11 +113,11 @@ sudo dkms status
 # Check if module is loaded
 lsmod | grep iris_vpu
 
-# View module information
-modinfo iris_vpu
+# Check service status
+systemctl status iris-vpu-dkms.service
 
-# Check installation method (exists if overlay recovery was used)
-ls -la /var/lib/dkms/iris-vpu-overlay.flag
+# Check blacklist is in place
+cat /usr/lib/modprobe.d/iris-vpu-dkms.conf
 ```
 
 ### 4. Uninstall and Cleanup
@@ -142,124 +138,47 @@ ls -la /var/lib/dkms/iris-vpu-overlay.flag
 ./cleanup.sh --clean-build
 ```
 
-**Manual uninstall method:**
+**Manual uninstall:**
 
 ```bash
-# Uninstall DKMS package (automatically restores upstream qcom_iris driver)
+# Uninstall package (automatically removes blacklist, disables service)
 sudo dpkg -r iris-vpu-dkms
 
-# Or complete purge (removes configuration files)
-sudo dpkg --purge iris-vpu-dkms
-
-# Update module dependencies
-sudo depmod -a
+# After removal, reboot to restore qcom_iris
+sudo reboot
 ```
 
-## Automatic Recovery System
+**What happens on uninstall:**
+1. `iris-vpu-dkms.service` is stopped and disabled
+2. `iris_vpu` is removed from `/etc/initramfs-tools/modules`
+3. DKMS removes the module
+4. `/usr/lib/modprobe.d/iris-vpu-dkms.conf` is removed (package file)
+5. `initramfs` is rebuilt (blacklist and module no longer included)
+6. After reboot: `qcom_iris` loads normally
 
-### **How It Works**
+## Build Process Details
 
-The package includes an intelligent recovery system that handles DKMS failures
-automatically:
+### DKMS Package Build Process
 
-1. **Normal DKMS Build**: Attempts standard DKMS build process
-2. **Failure Detection**: Detects DKMS apport errors or build failures
-3. **Automatic Recovery**:
-   - Checks if module was actually built despite DKMS error
-     (at `build/video/iris_vpu.ko`)
-   - Creates overlay installation flag
-     (`/var/lib/dkms/iris-vpu-overlay.flag`)
-   - Manually installs module to `/lib/modules/$(uname -r)/updates/dkms/`
-   - Updates module dependencies and tests loading
-4. **Smart Cleanup**: During uninstall, detects overlay flag and performs
-   appropriate cleanup
+1. `build-package.sh` reads version from git tag
+2. Updates `dkms.conf` `PACKAGE_VERSION` and `debian/changelog`
+3. Copies `debian/`, `dkms.conf`, `scripts/` to video-driver root
+4. `dpkg-buildpackage` runs:
+   - `dh_dkms` processes `debian/iris-vpu-dkms.dkms`, replaces
+     `#MODULE_VERSION#` with `DEB_VERSION_UPSTREAM`, installs as `dkms.conf`
+   - `override_dh_install` copies source files and installs:
+     - `/usr/lib/modprobe.d/iris-vpu-dkms.conf`
+     - `/usr/lib/systemd/system/iris-vpu-dkms.service`
+     - `/usr/lib/iris-vpu-dkms/iris-vpu-load.sh`
+5. Cleans up temporary files
 
-### **Recovery Process Details**
+### DKMS Installation Build Process
 
-```bash
-# When DKMS fails, the system automatically:
-# 1. Checks for built module (in video/ subdirectory)
-ls -l /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko
-
-# 2. Creates target directory (if needed)
-mkdir -p /lib/modules/$(uname -r)/updates/dkms
-
-# 3. Installs module manually
-cp /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko \
-   /lib/modules/$(uname -r)/updates/dkms/
-
-# 4. Updates dependencies
-depmod -a
-
-# 5. Tests module loading
-modprobe iris_vpu
-
-# 6. Creates overlay flag
-touch /var/lib/dkms/iris-vpu-overlay.flag
-```
-
-### **Installation Scenarios**
-
-**Scenario 1: DKMS Success**
-- Standard DKMS installation
-- Module installed to `/lib/modules/$(uname -r)/updates/dkms/iris_vpu.ko`
-- No overlay flag created
-- Standard DKMS cleanup during uninstall
-
-**Scenario 2: DKMS Failure + Successful Recovery**
-- DKMS build fails with apport error
-- Module actually built successfully (found at `build/video/iris_vpu.ko`)
-- Overlay recovery installs module manually
-- Overlay flag created: `/var/lib/dkms/iris-vpu-overlay.flag`
-- Smart cleanup during uninstall removes both module and flag
-
-**Scenario 3: Complete Build Failure**
-- DKMS build fails and no module built
-- Recovery detects missing module file
-- Installation fails gracefully
-- `qcom_iris` driver remains active (system stability preserved)
-
-## Advanced Driver Management
-
-### **Smart Driver Switching Logic**
-
-The package implements sophisticated driver management:
-
-```
-# Installation Process:
-1. Build iris-vpu module via DKMS (with automatic recovery)
-2. Only if build succeeds:
-   - Save qcom_iris state for rollback
-   - Unload qcom_iris module
-   - Add qcom_iris to blacklist (/etc/modprobe.d/blacklist-video.conf)
-   - Load iris-vpu module (iris_vpu)
-   - Verify module is working via lsmod
-   - Update initramfs to make blacklist permanent
-3. If any step fails: automatic rollback to qcom_iris
-
-# Removal Process (prerm + postrm):
-1. Unload iris_vpu module
-2. Remove DKMS module (standard installation)
-3. Detect installation method (DKMS vs overlay flag):
-   - Overlay: Manual file cleanup + flag removal
-4. Remove qcom_iris blacklist file (`/etc/modprobe.d/blacklist-video.conf`)
-5. Update initramfs (postrm)
-6. Restore qcom_iris module (postrm)
-7. Update module dependencies
-```
-
-### **Safety Features**
-
-- **No System Breakage**: Always ensures at least one video driver is available
-- **Intelligent Fallback**: Automatically handles build failures and hardware
-  incompatibilities
-- **State Preservation**: Remembers original driver state for accurate
-  restoration
-- **Detailed Logging**: Provides clear status messages for troubleshooting
-- **Overlay Detection**: Distinguishes between installation methods for proper
-  cleanup
-- **Upstream Driver Replacement**: Safely replaces the upstream `qcom_iris`
-  module with proper blacklist management and automatic restoration on removal
+1. DKMS installs source to `/usr/src/iris-vpu-<version>/`
+2. Calls `scripts/dkms-build-wrapper.sh` (as configured in `dkms.conf`)
+3. `detect-platform.sh` detects compatible string from device tree
+4. `set-build-env.sh` sets environment variables and cross-compilation
+5. Kernel module built to `video/iris_vpu.ko`
 
 ## Cross-compilation Support
 
@@ -282,388 +201,47 @@ sudo apt install gcc-aarch64-linux-gnu
 aarch64-linux-gnu-gcc --version
 ```
 
-## Development and Testing
-
-### Cross-compilation Development Script
-
-Use the cross-compilation script for development testing. Run from the
-**video-driver root directory**:
-
-```bash
-# Auto-detect platform and cross-compile
-./pkg-iris-vpu/scripts/cross-compile.sh
-
-# Specify platform (use iris-format compatible string)
-./pkg-iris-vpu/scripts/cross-compile.sh --compatible qcom,sa8775p-iris
-
-# Full configuration
-./pkg-iris-vpu/scripts/cross-compile.sh \
-    --compatible qcom,x1e80100-iris \
-    --arch arm64 \
-    --cross-compile aarch64-linux-gnu- \
-    --kernel-src /path/to/kernel \
-    --output-dir /path/to/output
-
-# Clean build artifacts
-./pkg-iris-vpu/scripts/cross-compile.sh --clean
-
-# View help
-./pkg-iris-vpu/scripts/cross-compile.sh --help
-```
-
-> **Note**: Only iris-format compatible strings are supported
-> (e.g., `qcom,x1e80100-iris`, `qcom,sa8775p-iris`).
-
-## Build Process
-
-### DKMS Package Build Process
-
-1. `build-package.sh` copies configuration files to video-driver root directory
-2. `dpkg-buildpackage` builds debian package with maintainer scripts
-3. DKMS configuration and scripts are packaged into Debian package file
-4. Clean temporary files, keep package in `pkg-iris-vpu/build/` directory
-
-### DKMS Installation Build Process
-
-1. DKMS installs source to `/usr/src/iris-vpu-<version>/` (version from `debian/changelog`)
-2. Calls `scripts/dkms-build-wrapper.sh` (as configured in `dkms.conf`
-   `MAKE` directive)
-3. `detect-platform.sh` detects compatible string from device tree
-4. `set-build-env.sh` sets environment variables and cross-compilation
-   based on compatible
-5. Execute kernel module build:
-   `make -C /lib/modules/$(uname -r)/build M=$(pwd) modules`
-6. Module is built to `video/iris_vpu.ko` within the build directory
-7. **Automatic Recovery**: If DKMS fails, `postinst` attempts overlay
-   installation
-8. **Smart Driver Management**: Only switch drivers if build and load succeed
-
-### Module File Location
-
-```
-# After DKMS build, module is located at (replace <version> with actual version):
-/var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko
-
-# After installation (both DKMS and overlay), module is installed to:
-/lib/modules/$(uname -r)/updates/dkms/iris_vpu.ko
-```
-
-## Common Package Management Commands
-
-### **Installation Commands**
-
-```bash
-# Install package
-sudo dpkg -i build/iris-vpu-dkms_*.deb
-
-# Fix dependency issues after installation
-sudo apt -f install -y
-```
-
-### **Removal Commands**
-
-```bash
-# Remove package (keeps configuration files)
-sudo dpkg -r iris-vpu-dkms
-
-# Complete purge (removes all files including configuration)
-sudo dpkg --purge iris-vpu-dkms
-
-# Force removal if package is in broken state
-sudo dpkg --force-remove-reinstreq --purge iris-vpu-dkms
-```
-
-### **Package Information Commands**
-
-```bash
-# List package files
-sudo dpkg -L iris-vpu-dkms
-
-# Check package status
-dpkg -s iris-vpu-dkms
-
-# List all installed packages matching pattern
-dpkg -l | grep iris-vpu
-```
-
-### **DKMS Management Commands**
-
-```bash
-# Remove DKMS module completely (replace <version> with actual version, e.g. 1.0.9)
-sudo dkms remove iris-vpu/<version> --all
-
-# Check DKMS status
-sudo dkms status
-
-# Build DKMS module manually
-sudo dkms build iris-vpu/<version>
-
-# Install DKMS module manually
-sudo dkms install iris-vpu/<version>
-```
-
-## Troubleshooting
-
-### 1. Check Installation Status
-
-```bash
-# Check package status
-dpkg -l | grep iris-vpu
-
-# Check module status
-lsmod | grep -E "(iris_vpu|qcom_iris)"
-
-# Check DKMS status
-dkms status | grep iris-vpu
-
-# Check installation method (overlay recovery used if exists)
-ls -la /var/lib/dkms/iris-vpu-overlay.flag
-
-# Check blacklist status
-grep qcom_iris /etc/modprobe.d/blacklist-video.conf
-```
-
-### 2. Common Installation Scenarios
-
-**Package Status Meanings:**
-- `ii iris-vpu-dkms` — Successfully installed and configured
-- `pi iris-vpu-dkms` — Package marked for purge but still installed
-- `rc iris-vpu-dkms` — Package removed but configuration files remain
-
-**Driver Status Scenarios:**
-
-*Successful Standard Installation:*
-
-```bash
-lsmod | grep iris_vpu   # Should show iris_vpu loaded
-lsmod | grep qcom_iris  # Should show nothing (unloaded)
-ls /var/lib/dkms/iris-vpu-overlay.flag  # Should not exist
-```
-
-*Successful Overlay Recovery Installation:*
-
-```bash
-lsmod | grep iris_vpu   # Should show iris_vpu loaded
-lsmod | grep qcom_iris  # Should show nothing (unloaded)
-ls /var/lib/dkms/iris-vpu-overlay.flag  # Should exist
-```
-
-*Failed Installation (System Protected):*
-
-```bash
-lsmod | grep iris_vpu   # Should show nothing
-lsmod | grep qcom_iris  # Should show qcom_iris loaded (preserved)
-```
-
-### 3. Manual Recovery Commands
-
-If automatic recovery fails, you can perform manual recovery:
-
-```bash
-# Check if module was built (replace <version> with actual version, e.g. 1.0.9)
-ls -la /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko
-
-# Manual installation steps
-sudo mkdir -p /lib/modules/$(uname -r)/updates/dkms
-sudo cp /var/lib/dkms/iris-vpu/<version>/build/video/iris_vpu.ko \
-        /lib/modules/$(uname -r)/updates/dkms/
-sudo depmod -a
-sudo modprobe iris_vpu
-
-# Create overlay flag for proper cleanup
-sudo touch /var/lib/dkms/iris-vpu-overlay.flag
-```
-
-### 4. Custom Kernel Issues
-
-**Common Errors:**
-
-*DKMS Apport Error (Automatically Handled):*
-
-```
-ERROR (dkms apport): kernel package linux-headers-6.x.0-rc5-dirty not supported
-```
-
-**Solution**: The system automatically detects this and performs overlay
-recovery.
-
-*Build Dependency Error:*
-
-```
-Error! Build of ./iris_vpu.ko failed for: 6.x.0-rc5-dirty (aarch64)
-```
-
-**Solution**: Check build logs and ensure kernel headers are available:
-
-```bash
-# Check kernel headers
-ls -la /lib/modules/$(uname -r)/build
-
-# Install if missing
-sudo apt install linux-headers-$(uname -r)
-
-# View build logs (replace <version> with actual version, e.g. 1.0.9)
-cat /var/lib/dkms/iris-vpu/<version>/build/make.log
-```
-
-### 5. Platform Detection Issues
-
-```bash
-# Test platform detection
-./scripts/detect-platform.sh
-
-# The script tries the following device tree paths in order:
-#   /proc/device-tree/soc@0/video-codec@aa00000/compatible
-#   /proc/device-tree/soc/video-codec@aa00000/compatible
-#   /proc/device-tree/video-codec@aa00000/compatible
-#   /proc/device-tree/soc@0/qcom,vidc@aa00000/compatible
-#   /proc/device-tree/soc/qcom,vidc@aa00000/compatible
-#   /proc/device-tree/qcom,vidc@aa00000/compatible
-
-# Check device tree manually
-cat /proc/device-tree/soc@0/video-codec@aa00000/compatible 2>/dev/null | strings
-cat /proc/device-tree/soc@0/qcom,vidc@aa00000/compatible 2>/dev/null | strings
-
-# Override platform detection (iris format only)
-PLATFORM_OVERRIDE=qcom,sa8775p-iris ./scripts/detect-platform.sh
-PLATFORM_OVERRIDE=qcom,x1e80100-iris ./scripts/detect-platform.sh
-```
-
-### 6. Uninstall Issues
-
-**Package Stuck in 'pi' State:**
-
-```bash
-# Force complete removal
-sudo dpkg --force-remove-reinstreq --purge iris-vpu-dkms
-
-# Manual cleanup if needed
-sudo rm -f /var/lib/dkms/iris-vpu-overlay.flag
-sudo rm -f /lib/modules/$(uname -r)/updates/dkms/iris_vpu.ko
-sudo depmod -a
-```
-
-**Upstream `qcom_iris` Module Still Loaded After Installation:**
-
-```bash
-# Check if qcom_iris is still loaded
-lsmod | grep qcom_iris
-
-# Manually unload and blacklist if needed
-sudo modprobe -r qcom_iris
-sudo modprobe iris_vpu
-
-# Verify blacklist was created
-cat /etc/modprobe.d/blacklist-video.conf
-```
-
-## Testing and Verification
-
-### Manual Testing Workflow
-
-```bash
-# 1. Check initial system status
-lsmod | grep -E "(iris_vpu|qcom_iris)"
-dkms status | grep iris-vpu
-dpkg -l | grep iris-vpu
-
-# 2. Build and install package
-./build-package.sh
-sudo dpkg -i build/iris-vpu-dkms_*.deb
-
-# 3. Verify installation result
-lsmod | grep -E "(iris_vpu|qcom_iris)"
-dkms status | grep iris-vpu
-dpkg -l | grep iris-vpu
-ls -la /var/lib/dkms/iris-vpu-overlay.flag  # Check installation method
-
-# 4. Test removal and restoration
-sudo dpkg -r iris-vpu-dkms
-
-# 5. Verify qcom_iris restoration
-lsmod | grep -E "(iris_vpu|qcom_iris)"
-```
-
-### Expected Behavior
-
-**Successful Installation:**
-- `iris_vpu` module loaded and working
-- `qcom_iris` module unloaded and blacklisted
-- Package status: `ii` (installed and configured)
-- Overlay flag may or may not exist depending on installation method
-
-**Failed Installation (build failure):**
-- `qcom_iris` module remains active (system stability preserved)
-- No blacklist entries for `qcom_iris`
-- Package status: `ii` but `iris_vpu` not functional
-
-**Successful Removal:**
-- `iris_vpu` module unloaded and removed
-- `qcom_iris` module restored and active
-- Blacklist entries removed
-- Overlay flag cleaned up (if existed)
-
 ## Technical Details
 
-### **DKMS Configuration (`dkms.conf`)**
+### **DKMS Configuration (`dkms.conf` / `debian/iris-vpu-dkms.dkms`)**
 
-- `PACKAGE_NAME="iris-vpu"`, `PACKAGE_VERSION` — set dynamically from git tag by `build-package.sh`
-- `BUILT_MODULE_NAME[0]="iris_vpu"` — module name to install
-- `BUILT_MODULE_LOCATION[0]="."` — DKMS searches for module in build root
+- `PACKAGE_NAME="iris-vpu"`, `PACKAGE_VERSION` set from git tag at build time
+- `BUILT_MODULE_NAME[0]="iris_vpu"` — module name
 - `MAKE[0]="scripts/dkms-build-wrapper.sh"` — custom build script
-- `DEST_MODULE_LOCATION[0]="/updates/dkms"` — installation path under
-  `/lib/modules/$(uname -r)/`
-- `NO_WEAK_MODULES="yes"` — disables apport error reporting for custom kernels
-- `REMAKE_INITRD="no"` — skips initrd regeneration to avoid issues
+- `DEST_MODULE_LOCATION[0]="/extra/dkms"` — installation path
+- `NO_WEAK_MODULES="yes"` — disables apport error reporting
+- `REMAKE_INITRD="no"` — skips DKMS initrd regeneration (handled by postinst)
 - `AUTOINSTALL="yes"` — automatically rebuild on kernel update
 
-### **Environment Variables (set automatically)**
+### **Driver Switching Mechanism**
 
-- `DKMS_DISABLE_APPORT=1` — disables DKMS error reporting for custom kernels
-- `IGNORE_CC_MISMATCH=1` — ignores compiler version mismatches
-- `VIDEO_ROOT` — set to the iris-vpu source root directory
+```
+/usr/lib/modprobe.d/iris-vpu-dkms.conf:
+  blacklist qcom_iris          ← prevents qcom_iris from loading
+  install qcom_iris /bin/true  ← blocks any modprobe qcom_iris attempt
 
-### **Overlay Flag System**
+iris-vpu-dkms.service:
+  ExecStart=/usr/lib/iris-vpu-dkms/iris-vpu-load.sh
+  → modprobe iris_vpu          ← loads iris_vpu instead
+```
 
-- **Flag File**: `/var/lib/dkms/iris-vpu-overlay.flag`
-- **Purpose**: Marks installations that used overlay recovery
-- **Cleanup**: Automatically removed during uninstall (prerm script)
-- **Detection**: Used by prerm script to determine cleanup method
-
-### **Driver Management Features**
-
-- Intelligent build validation before driver switching
-- Automatic rollback on failure
-- Hardware resource conflict prevention
-- Upstream `qcom_iris` driver replacement: unload, blacklist
-  (`/etc/modprobe.d/blacklist-video.conf` created on install,
-  deleted on removal), and restore on removal
-- Overlay installation detection and cleanup
-- initramfs integration to make blacklist changes persistent across reboots
+Both the blacklist and `iris_vpu.ko` are included in the initramfs,
+so the switch happens during early boot.
 
 ## Notes
 
 1. **Non-intrusive**: pkg-iris-vpu system will not modify any existing files
    in video-driver directory
 2. **Build isolation**: all build artifacts are in `pkg-iris-vpu/build/`
-   directory
-3. **Temporary files**: during build process, `debian/`, `dkms.conf` and
-   `scripts/` will be temporarily created in root directory, automatically
-   cleaned after build completion
-4. **Platform detection**: must detect compatible string from device tree,
-   no default values supported (iris format only)
-5. **Cross-compilation**: all platforms use unified ARM64 cross-compilation
-   configuration
-6. **Smart driver management**: ensures system stability by maintaining at
-   least one working video driver
-7. **Automatic recovery**: prevents system breakage by handling DKMS failures
-   transparently
-8. **Overlay detection**: distinguishes between installation methods for
-   proper cleanup
-9. **Path consistency**: all module installations use
-   `/lib/modules/$(uname -r)/updates/dkms/` for consistency
-10. **Module subdirectory**: the kernel module is built into
-    `video/iris_vpu.ko` within the build tree
+3. **Temporary files**: `debian/`, `dkms.conf`, `scripts/` are temporarily
+   created in root directory during build, automatically cleaned after
+4. **Platform detection**: must detect compatible string from device tree
+   (iris format only, e.g., `qcom,x1e80100-iris`)
+5. **Version management**: git tag is the single source of truth for version
+6. **Package-managed blacklist**: `/usr/lib/modprobe.d/iris-vpu-dkms.conf`
+   is automatically removed on `dpkg --remove` (no `--purge` needed)
+7. **initramfs persistence**: blacklist and module are in initramfs,
+   surviving overlay `/etc` filesystems
 
 ## File Permissions
 
@@ -673,61 +251,3 @@ Ensure scripts have execute permissions:
 chmod +x pkg-iris-vpu/scripts/*.sh
 chmod +x pkg-iris-vpu/build-package.sh
 chmod +x pkg-iris-vpu/cleanup.sh
-```
-
-## Advanced Usage
-
-### Custom Build Configuration
-
-```bash
-# Build with specific kernel source
-export KERNEL_SRC=/path/to/kernel/source
-./build-package.sh
-
-# Build with custom cross-compiler
-export CROSS_COMPILE=aarch64-custom-linux-gnu-
-./build-package.sh
-```
-
-### Debug Mode
-
-```bash
-# Enable verbose output during build
-export DKMS_DEBUG=1
-sudo dpkg -i build/iris-vpu-dkms_*.deb
-
-# Check detailed logs (replace <version> with actual version, e.g. 1.0.9)
-journalctl -u dkms
-cat /var/lib/dkms/iris-vpu/<version>/build/make.log
-```
-
-### Manual Driver Management
-
-```bash
-# Manually switch to iris-vpu (if available)
-sudo modprobe -r qcom_iris
-sudo modprobe iris_vpu
-
-# Manually switch back to qcom_iris
-sudo modprobe -r iris_vpu
-sudo modprobe qcom_iris
-
-# Check current driver status
-lsmod | grep -E "(iris_vpu|qcom_iris)"
-```
-
-### Package Status Management
-
-```bash
-# Check detailed package status
-dpkg -s iris-vpu-dkms
-
-# List package files
-sudo dpkg -L iris-vpu-dkms
-
-# Force package reconfiguration
-sudo dpkg-reconfigure iris-vpu-dkms
-
-# Fix broken package states
-sudo dpkg --configure -a
-sudo apt --fix-broken install

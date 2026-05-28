@@ -11,19 +11,21 @@ override_dh_install:
 	sed "s/@VERSION@/$(DEB_VERSION_UPSTREAM)/g" \
 		debian/iris-vpu-dkms.install.in > debian/iris-vpu-dkms.install
 	dh_install
+	# Install dkms.conf with correct version
+	sed "s/PACKAGE_VERSION=\"[^\"]*\"/PACKAGE_VERSION=\"$(DEB_VERSION_UPSTREAM)\"/" \
+		dkms.conf > debian/iris-vpu-dkms/usr/src/iris-vpu-$(DEB_VERSION_UPSTREAM)/dkms.conf
+	# Install modprobe blacklist to /usr/lib/modprobe.d/ (package-managed, included in initramfs)
+	mkdir -p debian/iris-vpu-dkms/usr/lib/modprobe.d
+	install -m 644 debian/modprobe.d/iris-vpu-dkms.conf debian/iris-vpu-dkms/usr/lib/modprobe.d/iris-vpu-dkms.conf
+	# Install load script (service file handled by dh_installsystemd)
+	mkdir -p debian/iris-vpu-dkms/usr/lib/iris-vpu-dkms
+	install -m 755 debian/iris-vpu-load.sh debian/iris-vpu-dkms/usr/lib/iris-vpu-dkms/iris-vpu-load.sh
 
 override_dh_clean:
 	rm -f debian/iris-vpu-dkms.install
 	dh_clean
 
-override_dh_auto_clean:
-	# Skip auto clean for DKMS package
+# Prevent dh_dkms from running automatically (we install dkms.conf manually above)
+override_dh_dkms:
 
-override_dh_auto_build:
-	# Skip auto build for DKMS package
-
-override_dh_auto_test:
-	# Skip auto test for DKMS package
-
-override_dh_auto_install:
-	# Skip auto install for DKMS package
+override_dh_auto_clean override_dh_auto_build override_dh_auto_test override_dh_auto_install:

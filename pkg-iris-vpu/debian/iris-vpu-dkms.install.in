@@ -1,4 +1,3 @@
-dkms.conf                              usr/src/iris-vpu-@VERSION@/
 Makefile                               usr/src/iris-vpu-@VERSION@/
 Kbuild                                 usr/src/iris-vpu-@VERSION@/
 driver/                                usr/src/iris-vpu-@VERSION@/
