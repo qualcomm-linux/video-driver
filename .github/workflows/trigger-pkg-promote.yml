@@ -1,0 +1,42 @@
+name: Trigger Package Promote on Tag Release
+
+on:
+  push:
+    tags:
+      - 'v*'    # Matches tags like v1.0.10, v1.1.0, etc.
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-promote:
+    name: Trigger Promote New Upstream Version in packaging repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Promote New Upstream Version (Suites)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.DEB_PKG_BOT_CI_TOKEN }}
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            console.log(`New upstream tag detected: ${tag}`);
+
+            const pkgRepo = '${{ vars.PKG_REPO_GITHUB_NAME }}';
+            const [owner, repo] = pkgRepo.split('/');
+
+            // Trigger promote-upstream-suites.yml which promotes all three
+            // packaging suites (qcom/debian/latest, qcom/debian/trixie,
+            // qcom/ubuntu/resolute) in a single workflow run.
+            // The ref must point to the branch that contains the workflow file.
+            // promote-upstream-suites.yml lives on the 'main' branch of
+            // pkg-video-driver (the default/control branch).
+            await github.rest.actions.createWorkflowDispatch({
+              owner: owner,
+              repo: repo,
+              workflow_id: 'promote-upstream-suites.yml',
+              ref: 'main',
+              inputs: {
+                'upstream-tag': tag
+              }
+            });
+            console.log(`Successfully triggered Promote New Upstream Version (Suites) for tag: ${tag} in ${pkgRepo}`);
