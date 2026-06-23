@@ -1,5 +1,5 @@
 name: IRIS Injection
-description: Inject IRIS app into rootfs image
+description: Inject IRIS app and video content tarball into rootfs image
 
 inputs:
   machine:
@@ -80,7 +80,6 @@ runs:
             ls -l /dev/loop* || true
             losetup -a || true
 
-            # Try to expose more loop devices in the container
             modprobe loop max_loop=64 || true
             for i in $(seq 0 63); do
               [ -b /dev/loop$i ] || mknod -m 660 /dev/loop$i b 7 "$i" || true
@@ -124,11 +123,15 @@ runs:
             mkdir -p /tmp/rootfs/data/vendor/iris_test_app/input
             mkdir -p /tmp/rootfs/data/vendor/iris_test_app/output
 
-            echo "📥 Copying iris-test-app payload from workspace..."
+            echo "📥 Copying IRIS app payload from workspace..."
             cp -a "${WORKSPACE}/v4l-video-test-app/build/." /tmp/rootfs/data/vendor/iris_test_app/
+
+            echo "📥 Copying video tarball into rootfs (no extraction)..."
+            cp -a "${WORKSPACE}/downloads/video_clips_iris.tar.gz" /tmp/rootfs/data/vendor/iris_test_app/
 
             echo "🔍 Verifying injected files..."
             ls -larth /tmp/rootfs/data/vendor/iris_test_app
+            ls -larth /tmp/rootfs/data/vendor/iris_test_app/input
 
             echo "📤 Syncing changes..."
             sync

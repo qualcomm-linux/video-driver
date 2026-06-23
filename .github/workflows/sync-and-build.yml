@@ -92,6 +92,25 @@ jobs:
           echo "✅ Download complete"
           ls -la "${{ github.workspace }}/v4l-video-test-app/build/"
 
+      - name: Download the video-contents for testing
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ github.workspace }}/downloads"
+          echo "Downloading the video-content files"
+          wget -q \
+            "https://github.com/qualcomm-linux/qcom-linux-testkit/releases/download/IRIS-Video-Files-v1.0/video_clips_iris.tar.gz" \
+            -O "${{ github.workspace }}/downloads/video_clips_iris.tar.gz"
+
+          [ -f "$WORKSPACE/downloads/video_clips_iris.tar.gz" ] || {
+            echo "❌ Failed to download video_clips_iris.tar.gz"
+            exit 1
+          }
+
+          ls -la "${{ github.workspace }}/downloads/"
+
       - name: Inject Iris test app to rootfs
         uses: qualcomm-linux/video-driver/.github/actions/inject@meta-qcom_full-build
         with:
@@ -139,7 +158,7 @@ jobs:
 
           echo "✅ Tarball created: $tarball"
 
-      - name: Upload artifacts to S3
+      - name:
         id: upload-artifacts
         uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@meta-qcom_full-build
         with:
