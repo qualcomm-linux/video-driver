@@ -23,3 +23,11 @@ jobs:
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
       docker_image: kmake-image:ver.1.0
+  
+  lava-test:
+    needs: [loading, build]
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+    with:
+      build_matrix: ${{ needs.loading.outputs.build_matrix }}
+      docker_image: kmake-image:ver.1.0

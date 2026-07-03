@@ -1,27 +1,33 @@
 {
   "qcs9100-ride-sx": {
     "machine": "qcs9100-ride-sx",
-    "kas_file": "../meta-qcom/ci/qcs9100-ride-sx.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs9100-ride-sx.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs9100-ride"
   },
   "qcs8300-ride-sx": {
     "machine": "qcs8300-ride-sx",
-    "kas_file": "../meta-qcom/ci/qcs8300-ride-sx.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs8300-ride-sx.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs8300-ride"
   },
   "qcs6490-rb3gen2-core-kit": {
     "machine": "rb3gen2-core-kit",
-    "kas_file": "../meta-qcom/ci/qcs6490-rb3gen2-core-kit.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs6490-rb3gen2-core-kit.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs6490-rb3gen2"
   },
   "qcs615-ride": {
     "machine": "qcs615-ride",
-    "kas_file": "../meta-qcom/ci/qcs615-ride.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs615-ride.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs615-ride"
   },
   "sm8750-mtp": {
     "machine": "sm8750-mtp",
-    "kas_file": "../meta-qcom/ci/sm8750-mtp.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/sm8750-mtp.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "sm8750-mtp"
   },
   "kaanapali-mtp": {
     "machine": "kaanapali-mtp",
-    "kas_file": "../meta-qcom/ci/kaanapali-mtp.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/kaanapali-mtp.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "kaanapali-mtp"
   },
   "linux-yocto-dev": {
     "machine": "qcom-armv8a",
@@ -33,22 +39,27 @@
   },
   "qcs6490-rb3gen2-core-kit-linux-qcom-6.18": {
     "machine": "rb3gen2-core-kit",
-    "kas_file": "../meta-qcom/ci/qcs6490-rb3gen2-core-kit.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs6490-rb3gen2-core-kit.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs6490-rb3gen2"
   },
   "qcs9100-ride-sx-linux-qcom-6.18": {
     "machine": "qcs9100-ride-sx",
-    "kas_file": "../meta-qcom/ci/qcs9100-ride-sx.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs9100-ride-sx.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs9100-ride"
   },
   "qcs615-ride-linux-qcom-6.18": {
     "machine": "qcs615-ride",
-    "kas_file": "../meta-qcom/ci/qcs615-ride.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs615-ride.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs615-ride"
   },
   "qcs8300-ride-sx-linux-qcom-6.18": {
     "machine": "qcs8300-ride-sx",
-    "kas_file": "../meta-qcom/ci/qcs8300-ride-sx.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/qcs8300-ride-sx.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "qcs8300-ride"
   },
   "sm8750-mtp-linux-qcom-6.18": {
     "machine": "sm8750-mtp",
-    "kas_file": "../meta-qcom/ci/sm8750-mtp.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/sm8750-mtp.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "sm8750-mtp"
   }
 }

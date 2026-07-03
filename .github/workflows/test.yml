@@ -1,0 +1,409 @@
+name: _test
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: Docker image
+        type: string
+        required: true
+      build_matrix:
+        description: Build matrix (stringified JSON)
+        type: string
+        required: true
+
+jobs:
+  test:
+    runs-on:
+      group: GHA-video-Prd-SelfHosted-RG
+      labels: [self-hosted, video-prd-u2204-x64-large-od-ephem]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        build_matrix: ${{ fromJson(inputs.build_matrix) }}
+
+    # Skip machines that have no lavaname (build-only entries)
+    if: ${{ fromJson(inputs.build_matrix)[0].lavaname != '' }}
+
+    steps:
+      - name: Skip if no lavaname
+        if: ${{ !matrix.build_matrix.lavaname }}
+        run: |
+          echo "⏭️  No lavaname for ${{ matrix.build_matrix.machine }} — skipping LAVA test"
+          exit 0
+
+      - name: Checkout code
+        if: ${{ matrix.build_matrix.lavaname }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Pull Docker image
+        if: ${{ matrix.build_matrix.lavaname }}
+        uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
+        with:
+          image: ${{ inputs.docker_image }}
+          registry: artifacts.codelinaro.org/clo-420-qli-registry
+
+      - name: Retag Docker image
+        if: ${{ matrix.build_matrix.lavaname }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker tag \
+            "artifacts.codelinaro.org/clo-420-qli-registry/${{ inputs.docker_image }}" \
+            "${{ inputs.docker_image }}" || true
+
+      - name: Download machine-scoped presigned URLs
+        if: ${{ matrix.build_matrix.lavaname }}
+        uses: actions/download-artifact@v4
+        with:
+          name: presigned-urls-${{ matrix.build_matrix.machine }}
+          path: ${{ github.workspace }}
+
+      - name: Verify presigned_urls.json
+        if: ${{ matrix.build_matrix.lavaname }}
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          MACHINE:   ${{ matrix.build_matrix.machine }}
+        run: |
+          set -euo pipefail
+          PRESIGNED="$WORKSPACE/presigned_urls.json"
+          if [ ! -f "$PRESIGNED" ]; then
+            echo "❌ presigned_urls.json not found at: $PRESIGNED"
+            ls -la "$WORKSPACE/"
+            exit 1
+          fi
+          echo "=== presigned_urls.json keys ==="
+          jq -r 'keys[]' "$PRESIGNED"
+
+      - name: Clone LAVA job render scripts
+        if: ${{ matrix.build_matrix.lavaname }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ..
+          rm -rf job_render
+          git clone --depth 1 https://github.com/Manigurr/job_render
+          echo "✅ Cloned Manigurr/job_render"
+          echo "=== flasher.jinja2 timeout check ==="
+          grep -A2 "timeout:" ../job_render/templates/boot/flasher.jinja2 || true
+
+      - name: Render LAVA job definition
+        if: ${{ matrix.build_matrix.lavaname }}
+        id: render
+        uses: qualcomm-linux/video-driver/.github/actions/lava_job_render@meta-qcom_full-build
+        with:
+          docker_image: ${{ inputs.docker_image }}
+          machine: ${{ matrix.build_matrix.machine }}
+          lavaname: ${{ matrix.build_matrix.lavaname }}
+          presigned_urls_file: ${{ github.workspace }}/presigned_urls.json
+
+      - name: Submit LAVA job
+        if: ${{ matrix.build_matrix.lavaname }}
+        id: submit_job
+        shell: bash
+        env:
+          DOCKER_IMAGE:   ${{ inputs.docker_image }}
+          LAVA_OSS_TOKEN: ${{ secrets.LAVA_OSS_TOKEN }}
+          LAVA_OSS_USER:  ${{ secrets.LAVA_OSS_USER }}
+        run: |
+          set -euo pipefail
+          JOB_RENDER_DIR="$(dirname "${{ github.workspace }}")/job_render"
+
+          job_id="$(
+            docker run -i --rm \
+              --workdir="$JOB_RENDER_DIR" \
+              -v "$(dirname "$JOB_RENDER_DIR"):$(dirname "$JOB_RENDER_DIR")" \
+              "$DOCKER_IMAGE" \
+              bash -c "
+                set -euo pipefail
+                lavacli identities add \
+                  --token \"$LAVA_OSS_TOKEN\" \
+                  --uri https://lava-oss.qualcomm.com/RPC2 \
+                  --username \"$LAVA_OSS_USER\" production \
+                && lavacli -i production jobs submit \
+                     ./renders/lava_job_definition.yaml
+              "
+          )"
+
+          job_url="https://lava-oss.qualcomm.com/scheduler/job/${job_id}"
+          echo "job_id=$job_id"   >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+          echo "JOB_ID=$job_id"   >> "$GITHUB_ENV"
+          echo "🚀 LAVA Job submitted: $job_url"
+
+      - name: Save Job ID for reporting
+        if: ${{ matrix.build_matrix.lavaname && always() }}
+        shell: bash
+        env:
+          MACHINE: ${{ matrix.build_matrix.machine }}
+        run: |
+          set -euo pipefail
+          printf '{"id":"%s","machine":"%s"}\n' \
+            "${JOB_ID:-unknown}" "$MACHINE" \
+            > "lava-job-${MACHINE}.json"
+
+      - name: Upload Job ID artifact
+        if: ${{ matrix.build_matrix.lavaname && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lava-job-data-${{ matrix.build_matrix.machine }}
+          path: lava-job-${{ matrix.build_matrix.machine }}.json
+
+      - name: Poll LAVA job until finished
+        if: ${{ matrix.build_matrix.lavaname }}
+        id: check_job
+        shell: bash
+        env:
+          DOCKER_IMAGE:   ${{ inputs.docker_image }}
+          LAVA_OSS_TOKEN: ${{ secrets.LAVA_OSS_TOKEN }}
+          LAVA_OSS_USER:  ${{ secrets.LAVA_OSS_USER }}
+        run: |
+          set -euo pipefail
+
+          JOB_RENDER_DIR="$(dirname "${{ github.workspace }}")/job_render"
+          STATE=""
+          HEALTH=""
+          START_TIME=$(date +%s)
+          TIMEOUT_SECONDS=$((4 * 60 * 60))
+
+          get_lava_field() {
+            local content="$1" field="$2"
+            printf '%s\n' "$content" \
+              | sed -nE \
+                "s/^[[:space:]]*-?[[:space:]]*${field}[[:space:]]*:[[:space:]]*(.*)[[:space:]]*$/\1/pI" \
+              | head -n 1 | xargs
+          }
+
+          echo "⏳ Waiting for LAVA job $JOB_ID to finish..."
+
+          while [ "$STATE" != "Finished" ]; do
+            JOB_INFO="$(
+              docker run -i --rm \
+                --workdir="$JOB_RENDER_DIR" \
+                -v "$(dirname "$JOB_RENDER_DIR"):$(dirname "$JOB_RENDER_DIR")" \
+                "$DOCKER_IMAGE" \
+                bash -c "
+                  set -euo pipefail
+                  lavacli identities add \
+                    --token \"$LAVA_OSS_TOKEN\" \
+                    --uri https://lava-oss.qualcomm.com/RPC2 \
+                    --username \"$LAVA_OSS_USER\" production \
+                    >/dev/null 2>&1 || true
+                  lavacli -i production jobs show \"$JOB_ID\"
+                "
+            )"
+
+            STATE=$(get_lava_field  "$JOB_INFO" "state")
+            HEALTH=$(get_lava_field "$JOB_INFO" "Health")
+            echo "  State: ${STATE:-UNKNOWN}  Health: ${HEALTH:-UNKNOWN}"
+
+            [ "$STATE" = "Finished" ] && break
+
+            ELAPSED=$(( $(date +%s) - START_TIME ))
+            if [ "$ELAPSED" -ge "$TIMEOUT_SECONDS" ]; then
+              echo "::error::Timeout reached (4 hours). Job $JOB_ID did not finish."
+              exit 1
+            fi
+
+            sleep 30
+          done
+
+          if [ "${HEALTH:-}" != "Complete" ]; then
+            echo "::error::Job $JOB_ID health=$HEALTH (expected Complete)"
+            echo "summary=:warning: LAVA Job $HEALTH" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "📋 Fetching results for job $JOB_ID..."
+          docker run -i --rm \
+            --workdir="$JOB_RENDER_DIR" \
+            -v "$(dirname "$JOB_RENDER_DIR"):$(dirname "$JOB_RENDER_DIR")" \
+            "$DOCKER_IMAGE" \
+            bash -c "
+              set -euo pipefail
+              lavacli identities add \
+                --token \"$LAVA_OSS_TOKEN\" \
+                --uri https://lava-oss.qualcomm.com/RPC2 \
+                --username \"$LAVA_OSS_USER\" production \
+                >/dev/null 2>&1 || true
+              lavacli -i production results \"$JOB_ID\"
+            " > lava_results.txt
+
+          echo "=== Raw LAVA results ==="
+          cat lava_results.txt
+
+          RESULTS="$(
+            grep -E \
+              '^\* 0_video_pre-merge-tests\.Video_V4L2_Runner \[(pass|fail)\]' \
+              lava_results.txt || true
+          )"
+
+          if [ -z "$RESULTS" ]; then
+            echo "::error::Testcase Video_V4L2_Runner not found in results!"
+            echo "summary=:x: Video_V4L2_Runner result not found" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "Found: $RESULTS"
+
+          if echo "$RESULTS" | grep -q '\[fail\]'; then
+            echo "::error::Video_V4L2_Runner FAILED"
+            echo "summary=:x: Video_V4L2_Runner Failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "✅ Video_V4L2_Runner PASSED"
+          echo "summary=:heavy_check_mark: Video_V4L2_Runner Passed" >> "$GITHUB_OUTPUT"
+
+  generate-summary:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all Job ID artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: lava-job-data-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y jq curl
+
+      - name: Generate LAVA test summary
+        shell: bash
+        env:
+          LAVA_URL:     https://lava-oss.qualcomm.com
+          LAVA_TOKEN:   ${{ secrets.LAVA_OSS_TOKEN }}
+          SUMMARY_FILE: step-summary.md
+        run: |
+          set -euo pipefail
+
+          INPUT="$(
+            find artifacts -name 'lava-job-*.json' -print0 \
+            | while IFS= read -r -d '' TESTJOB; do
+                JOB_ID=$(jq -r '.id' "$TESTJOB")
+                AUTH="Authorization: Token $LAVA_TOKEN"
+
+                DETAILS=$(curl -sf -H "$AUTH" \
+                  "$LAVA_URL/api/v0.2/jobs/$JOB_ID/")
+                STATE=$(echo       "$DETAILS" | jq -r '.state // empty')
+                DEVICE_TYPE=$(echo "$DETAILS" | \
+                  jq -r '.requested_device_type // empty')
+                [ -n "$DEVICE_TYPE" ] && [ "$DEVICE_TYPE" != "null" ] \
+                  || DEVICE_TYPE="unknown-$JOB_ID"
+
+                TEST_RESULTS="{}"
+
+                if [ "$STATE" = "Finished" ]; then
+                  SUITES=$(curl -sf -H "$AUTH" \
+                    "$LAVA_URL/api/v0.2/jobs/$JOB_ID/suites/")
+
+                  TEST_RESULTS="$(
+                    echo "$SUITES" | jq -c '.results[]?' \
+                    | while IFS= read -r SUITE; do
+                        SNAME=$(echo "$SUITE" | jq -r '.name')
+                        SID=$(echo   "$SUITE" | jq -r '.id')
+                        if [ "$SNAME" != "lava" ]; then
+                          TESTS=$(curl -sf -H "$AUTH" \
+                            "$LAVA_URL/api/v0.2/jobs/$JOB_ID/suites/$SID/tests/")
+                          echo "$TESTS" | jq -c '.results[]?' \
+                          | while IFS= read -r T; do
+                              TNAME=$(echo   "$T" | jq -r '.name')
+                              TRESULT=$(echo "$T" | jq -r '.result')
+                              TURL="$LAVA_URL/results/$JOB_ID/$SID"
+                              [ -n "$TNAME" ] && [ "$TNAME" != "null" ] \
+                                || continue
+                              jq -nc \
+                                --arg k "$TNAME" \
+                                --arg u "$TURL" \
+                                --arg r "$TRESULT" \
+                                '{key:$k, value:{url:$u, result:$r}}'
+                            done
+                        else
+                          jq -nc \
+                            --arg k "boot" \
+                            --arg u "$LAVA_URL/results/$JOB_ID" \
+                            --arg r "pass" \
+                            '{key:$k, value:{url:$u, result:$r}}'
+                        fi
+                      done | jq -s -c 'from_entries'
+                  )"
+                fi
+
+                jq -nc \
+                  --arg k "$DEVICE_TYPE" \
+                  --argjson v "$TEST_RESULTS" \
+                  '{key:$k, value:$v}'
+              done \
+            | jq -s -c \
+                'reduce .[] as $i
+                  ({}; .[$i.key] = ((.[$i.key] // {}) + $i.value))'
+          )"
+
+          DEVICES=$(echo "$INPUT" | jq -r 'keys[]'      | sort)
+          RESULTS=$(echo "$INPUT" | jq -r '.[]|keys[]?' | sort -u)
+
+          {
+            echo "### LAVA Test Summary"
+            echo ""
+            printf "| Test Case |"
+            for D in $DEVICES; do printf " %s |" "$D"; done
+            echo ""
+            printf "| :--- |"
+            for _ in $DEVICES; do printf " :---: |"; done
+            echo ""
+
+            for R in $RESULTS; do
+              printf "| **%s** |" "$R"
+              for D in $DEVICES; do
+                VAL=$(echo "$INPUT" | jq -r \
+                  --arg d "$D" --arg r "$R" '.[$d][$r].result // ""')
+                URL=$(echo "$INPUT" | jq -r \
+                  --arg d "$D" --arg r "$R" '.[$d][$r].url // ""')
+                ICON=":no_entry_sign:"
+                [ "$VAL" = "pass" ] && ICON=":white_check_mark:"
+                [ "$VAL" = "fail" ] && ICON=":x:"
+                [ "$VAL" = "skip" ] && ICON=":warning:"
+                if [ -n "$URL" ] && [ "$URL" != "null" ]; then
+                  printf " [%s](%s) |" "$ICON" "$URL"
+                else
+                  printf " %s |" "$ICON"
+                fi
+              done
+              echo ""
+            done
+
+            echo ""
+            echo "#### Job Details"
+            echo "| Job ID | Device | State | Health | Link |"
+            echo "| :--- | :--- | :--- | :--- | :--- |"
+
+            find artifacts -name 'lava-job-*.json' -print0 \
+            | while IFS= read -r -d '' TESTJOB; do
+                JOB_ID=$(jq -r '.id' "$TESTJOB")
+                AUTH="Authorization: Token $LAVA_TOKEN"
+                D=$(curl -sf -H "$AUTH" \
+                  "$LAVA_URL/api/v0.2/jobs/$JOB_ID/")
+                printf "| %s | %s | %s | %s | [View](%s) |\n" \
+                  "$JOB_ID" \
+                  "$(echo "$D" | jq -r '.requested_device_type')" \
+                  "$(echo "$D" | jq -r '.state')" \
+                  "$(echo "$D" | jq -r '.health')" \
+                  "$LAVA_URL/results/$JOB_ID"
+              done
+          } | tee "$SUMMARY_FILE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lava-summary-report
+          path: step-summary.md

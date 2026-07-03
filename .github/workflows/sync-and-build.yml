@@ -123,6 +123,7 @@ jobs:
           set -euo pipefail
           workspace="${{ github.workspace }}"
           machine="${{ matrix.build_matrix.machine }}"
+
           symlink_path="$workspace/build/tmp/deploy/images/$machine/qcom-multimedia-proprietary-image-${machine}.rootfs.qcomflash"
 
           if [ ! -L "$symlink_path" ]; then
@@ -137,28 +138,46 @@ jobs:
             exit 1
           fi
 
-          cd "$resolved_dir"
-          ls -larth
-
-          mkdir -p "$workspace/artifacts"
-          : > "$workspace/artifacts/file_list.txt"
-          : > "$workspace/artifacts/tar_list.txt"
-
-          find "$resolved_dir" -type f -exec realpath {} \; > "$workspace/artifacts/tar_list.txt"
-
-          if [ ! -s "$workspace/artifacts/tar_list.txt" ]; then
-            echo "⚠️ No files found to archive."
+          ROOTFS_IMG="$resolved_dir/rootfs.img"
+          if [ ! -f "$ROOTFS_IMG" ]; then
+            echo "❌ rootfs.img not found at: $ROOTFS_IMG"
             exit 1
           fi
 
-          tarball="${machine}_qcomflash_payload.tar.xz"
-          tar -cJf "$tarball" -T "$workspace/artifacts/tar_list.txt"
-          mv "$tarball" "$workspace"
-          echo "$workspace/$tarball" >> "$workspace/artifacts/file_list.txt"
+          echo "=== qcomflash contents ==="
+          ls -larth "$resolved_dir"
 
-          echo "✅ Tarball created: $tarball"
+          mkdir -p "$workspace/artifacts"
+          : > "$workspace/artifacts/file_list.txt"
 
-      - name:
+          # ---------------------------------------------------------------
+          # Split into TWO artifacts:
+          # 1. {machine}_flash_files.tar — everything EXCEPT rootfs.img
+          # 2. {machine}_rootfs.img      — injected rootfs
+          # LAVA downloads them sequentially then combines in Docker.
+          # ---------------------------------------------------------------
+
+          FLASH_TAR="$workspace/${machine}_flash_files.tar"
+          ROOTFS_DEST="$workspace/${machine}_rootfs.img"
+
+          echo "📦 Creating flash_files.tar (excluding rootfs.img)..."
+          tar -cf "$FLASH_TAR" \
+            -C "$resolved_dir" \
+            --exclude='./rootfs.img' \
+            .
+          echo "✅ flash_files.tar: $(ls -lh "$FLASH_TAR" | awk '{print $5}')"
+
+          echo "📦 Copying injected rootfs.img..."
+          cp "$ROOTFS_IMG" "$ROOTFS_DEST"
+          echo "✅ rootfs.img: $(ls -lh "$ROOTFS_DEST" | awk '{print $5}')"
+
+          echo "$FLASH_TAR"   >> "$workspace/artifacts/file_list.txt"
+          echo "$ROOTFS_DEST" >> "$workspace/artifacts/file_list.txt"
+
+          echo "=== Queued for upload ==="
+          cat "$workspace/artifacts/file_list.txt"
+
+      - name: Upload artifacts to S3
         id: upload-artifacts
         uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@meta-qcom_full-build
         with:
@@ -169,12 +188,22 @@ jobs:
         env:
           machine: ${{ matrix.build_matrix.machine }}
 
+      - name: Upload machine-specific presigned URLs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: presigned-urls-${{ matrix.build_matrix.machine }}
+          path: ${{ github.workspace }}/presigned_urls.json
+          retention-days: 3
+
       - name: Clean up
+        if: always()
         shell: bash
         run: |
-          rm -rf "${{ github.workspace }}/artifacts"
-          rm -rf "${{ github.workspace }}/build"
-          rm -f "${{ github.workspace }}/modules.tar.xz"
+          rm -rf "${{ github.workspace }}/artifacts"   || true
+          rm -rf "${{ github.workspace }}/build"       || true
+          rm -rf "${{ github.workspace }}/downloads"   || true
+          rm -f  "${{ github.workspace }}/"*_flash_files.tar || true
+          rm -f  "${{ github.workspace }}/"*_rootfs.img || true
 
       - name: Update summary
         if: success() || failure()
@@ -185,4 +214,5 @@ jobs:
           else
             summary=":x: Build Failed for ${{ matrix.build_matrix.machine }}"
           fi
-          echo -e "<details><summary><i>Build Summary</i></summary>\n${summary}\n</details>" >> "$GITHUB_STEP_SUMMARY"
+          echo -e "<details><summary><i>Build Summary</i></summary>\n${summary}\n</details>" \
+            >> "$GITHUB_STEP_SUMMARY"

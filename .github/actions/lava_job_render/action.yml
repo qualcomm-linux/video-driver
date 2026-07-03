@@ -1,0 +1,247 @@
+name: LAVA Job Render
+description: >
+  Resolves flash_files + rootfs presigned URLs, writes cloudData.json +
+  metadata.json, renders a LAVA job definition with BOOT_METHOD=flasher
+  and --video_pre-merge tests, then patches device_type to correct lavaname.
+
+inputs:
+  docker_image:
+    description: Docker image to use for rendering
+    required: true
+  machine:
+    description: Target machine name (e.g. qcs9100-ride-sx)
+    required: true
+  lavaname:
+    description: LAVA device-type name (e.g. qcs9100-ride)
+    required: true
+  presigned_urls_file:
+    description: Absolute path to presigned_urls.json from the build job
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Extract presigned URLs for this machine
+      id: get_urls
+      shell: bash
+      env:
+        MACHINE:        ${{ inputs.machine }}
+        PRESIGNED_FILE: ${{ inputs.presigned_urls_file }}
+      run: |
+        set -euo pipefail
+
+        flash_key="${MACHINE}_flash_files.tar"
+        rootfs_key="${MACHINE}_rootfs.img"
+
+        if [ ! -f "$PRESIGNED_FILE" ]; then
+          echo "❌ presigned_urls.json not found at: $PRESIGNED_FILE"
+          exit 1
+        fi
+
+        echo "=== presigned_urls.json keys ==="
+        jq -r 'keys[]' "$PRESIGNED_FILE"
+
+        flash_url="$(jq -r --arg key "$flash_key" '.[$key] // empty' "$PRESIGNED_FILE")"
+        rootfs_url="$(jq -r --arg key "$rootfs_key" '.[$key] // empty' "$PRESIGNED_FILE")"
+
+        if [ -z "$flash_url" ]; then
+          echo "❌ No presigned URL found for key: $flash_key"
+          exit 1
+        fi
+
+        if [ -z "$rootfs_url" ]; then
+          echo "❌ No presigned URL found for key: $rootfs_key"
+          exit 1
+        fi
+
+        echo "✅ Resolved flash_url for: $flash_key"
+        echo "✅ Resolved rootfs_url for: $rootfs_key"
+        echo "flash_url=$flash_url"   >> "$GITHUB_OUTPUT"
+        echo "rootfs_url=$rootfs_url" >> "$GITHUB_OUTPUT"
+
+    - name: Write synthetic cloudData.json and metadata.json
+      id: write_json
+      shell: bash
+      env:
+        MACHINE:    ${{ inputs.machine }}
+        LAVA_NAME:  ${{ inputs.lavaname }}
+        FLASH_URL:  ${{ steps.get_urls.outputs.flash_url }}
+        ROOTFS_URL: ${{ steps.get_urls.outputs.rootfs_url }}
+        WORKSPACE:  ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+
+        JOB_RENDER_DIR="$(dirname "$WORKSPACE")/job_render"
+
+        if [ ! -d "$JOB_RENDER_DIR" ]; then
+          echo "❌ job_render directory not found at: $JOB_RENDER_DIR"
+          ls -la "$(dirname "$WORKSPACE")"
+          exit 1
+        fi
+
+        DATA_DIR="$JOB_RENDER_DIR/data"
+        mkdir -p "$DATA_DIR"
+
+        case "$MACHINE" in
+          qcs9100-ride-sx)  DTB_NAME="qcs9100-ride-r3" ;;
+          qcs8300-ride-sx)  DTB_NAME="qcs8300-ride"    ;;
+          rb3gen2-core-kit) DTB_NAME="qcs6490-rb3gen2" ;;
+          qcs615-ride)      DTB_NAME="qcs615-ride"      ;;
+          sm8750-mtp)       DTB_NAME="sm8750-mtp"       ;;
+          kaanapali-mtp)    DTB_NAME="kaanapali-mtp"    ;;
+          *)                DTB_NAME="$MACHINE"         ;;
+        esac
+
+        echo "dtb_name=$DTB_NAME"             >> "$GITHUB_OUTPUT"
+        echo "job_render_dir=$JOB_RENDER_DIR" >> "$GITHUB_OUTPUT"
+
+        echo "📝 Writing cloudData.json (machine=$MACHINE lavaname=$LAVA_NAME dtb=$DTB_NAME)"
+
+        jq -n \
+          --arg machine    "$MACHINE" \
+          --arg lavaname   "$LAVA_NAME" \
+          --arg flash_url  "$FLASH_URL" \
+          --arg rootfs_url "$ROOTFS_URL" \
+          '{
+            "id":     ("ci-" + $machine),
+            "kind":   "kbuild",
+            "name":   ("ci-build-" + $machine),
+            "path":   ["checkout", ("ci-build-" + $machine)],
+            "group":  ("ci-build-" + $machine),
+            "parent": "",
+            "state":  "done",
+            "result": "pass",
+            "artifacts": {
+              "metadata":    "",
+              "kernel":      "",
+              "vmlinux":     "",
+              "modules":     "",
+              "ramdisk":     "",
+              "firmware":    "",
+              "dtb":         "",
+              "flash_image": $flash_url,
+              "rootfs_image": $rootfs_url
+            },
+            "data": {
+              "kernel_revision": {
+                "tree":    "qcom-next",
+                "url":     "",
+                "branch":  "main",
+                "commit":  "",
+                "describe":"",
+                "version": {
+                  "version":    0,
+                  "patchlevel": 0,
+                  "sublevel":   null,
+                  "extra":      "",
+                  "name":       null
+                },
+                "patchset":       null,
+                "commit_tags":    [],
+                "commit_message": "",
+                "tip_of_branch":  true
+              },
+              "arch":        "arm64",
+              "defconfig":   "defconfig",
+              "compiler":    "gcc-12",
+              "error_code":  null,
+              "error_msg":   null,
+              "fragments":   [],
+              "config_full": "defconfig",
+              "platform":    $lavaname,
+              "runtime":     "lava",
+              "job_id":      ("ci-" + $machine),
+              "job_context": "github-actions",
+              "kernel_type": "image",
+              "regression":  null
+            },
+            "debug":          {},
+            "jobfilter":      null,
+            "platform_filter":[],
+            "owner":          "production",
+            "submitter":      "service:pipeline"
+          }' > "$DATA_DIR/cloudData.json"
+
+        echo "✅ cloudData.json written"
+
+        echo "📝 Writing metadata.json (DTB key: dtbs/qcom/${DTB_NAME}.dtb)"
+        jq -n \
+          --arg dtb_key "dtbs/qcom/${DTB_NAME}.dtb" \
+          '{
+            "build": {
+              "arch":        "arm64",
+              "compiler":    "gcc-12",
+              "defconfig":   "defconfig",
+              "fragments":   [],
+              "config_full": "defconfig",
+              "result":      "pass"
+            },
+            "artifacts": {
+              ($dtb_key): ""
+            }
+          }' > "$DATA_DIR/metadata.json"
+
+        echo "✅ metadata.json written"
+
+    - name: Render LAVA job definition
+      shell: bash
+      env:
+        DOCKER_IMAGE: ${{ inputs.docker_image }}
+        MACHINE:      ${{ inputs.machine }}
+        LAVA_NAME:    ${{ inputs.lavaname }}
+        TARGET_DTB:   ${{ steps.write_json.outputs.dtb_name }}
+        WORKSPACE:    ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+
+        JOB_RENDER_DIR="$(dirname "$WORKSPACE")/job_render"
+        RENDERS_DIR="$JOB_RENDER_DIR/renders"
+        mkdir -p "$RENDERS_DIR"
+
+        echo "🔧 Rendering LAVA job: machine=$MACHINE lavaname=$LAVA_NAME dtb=$TARGET_DTB"
+
+        docker run -i --rm \
+          --workdir="$JOB_RENDER_DIR" \
+          -v "$(dirname "$JOB_RENDER_DIR"):$(dirname "$JOB_RENDER_DIR")" \
+          -e MACHINE="$MACHINE" \
+          -e TARGET="$MACHINE" \
+          -e LAVA_NAME="$LAVA_NAME" \
+          -e TARGET_DTB="$TARGET_DTB" \
+          -e BOOT_METHOD="flasher" \
+          "$DOCKER_IMAGE" \
+          bash -c '
+            set -euo pipefail
+            export BOOT_METHOD=flasher
+            python3 lava_Job_definition_generator.py \
+              --localjson ./data/cloudData.json \
+              --meta-qcom \
+              --video_pre-merge
+          '
+
+        echo "✅ LAVA job definition rendered"
+
+    - name: Patch device_type in rendered YAML
+      shell: bash
+      env:
+        MACHINE:   ${{ inputs.machine }}
+        LAVA_NAME: ${{ inputs.lavaname }}
+        WORKSPACE: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+
+        JOB_RENDER_DIR="$(dirname "$WORKSPACE")/job_render"
+        YAML="$JOB_RENDER_DIR/renders/lava_job_definition.yaml"
+
+        if [ ! -f "$YAML" ]; then
+          echo "❌ Rendered YAML not found: $YAML"
+          exit 1
+        fi
+
+        echo "🔧 Patching device_type: $MACHINE → $LAVA_NAME"
+        sudo chown "$(id -u):$(id -g)" "$YAML" || true
+        sed -i "s|^device_type:.*|device_type: ${LAVA_NAME}|" "$YAML"
+
+        echo "✅ device_type patched"
+        echo "=== Rendered YAML ==="
+        cat "$YAML"
