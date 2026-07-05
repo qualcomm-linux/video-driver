@@ -64,6 +64,12 @@ else
   echo "SRCREV = \"${VIDEO_DRIVER_SHA}\"" >> "${RECIPE_PATH}"
 fi
 
+# ── NEW: remove patches already present in the checked-out source ──────────
+echo "🩹 Removing patches already merged into source tree..."
+sed -i '/0001-video-driver-copy-struct-v4l2_format-by-assignment\.patch/d' "${RECIPE_PATH}"
+echo "✅ Stale patch entries removed"
+# ───────────────────────────────────────────────────────────────────────────
+
 echo "✅ Recipe patched successfully"
 echo "=== Patched recipe preview ==="
-grep -nE 'SRC_URI|SRCREV' "${RECIPE_PATH}" || true
+grep -nE 'SRC_URI|SRCREV|\.patch' "${RECIPE_PATH}" || true
