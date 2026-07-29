@@ -13,9 +13,6 @@ struct msm_vidc_core;
 	defined(CONFIG_MSM_VIDC_QLI)
 int msm_vidc_get_platform_data_lemans(struct msm_vidc_core *core);
 int msm_vidc_init_platform_lemans(struct msm_vidc_core *core);
-int msm_vidc_adjust_ir_period_lemans(void *instance, struct v4l2_ctrl *ctrl);
-int msm_vidc_set_ir_period_lemans(void *instance,
-				  enum msm_vidc_inst_capability_type cap_id);
 #else
 int msm_vidc_get_platform_data_lemans(struct msm_vidc_core *core)
 {
@@ -26,18 +23,6 @@ int msm_vidc_init_platform_lemans(struct msm_vidc_core *core)
 {
 	return -EINVAL;
 }
-
-int msm_vidc_adjust_ir_period_lemans(void *instance, struct v4l2_ctrl *ctrl)
-{
-	return -EINVAL;
-}
-
-int msm_vidc_set_ir_period_lemans(void *instance,
-				  enum msm_vidc_inst_capability_type cap_id)
-{
-	return -EINVAL;
-}
-
 #endif
 
 #endif // _MSM_VIDC_LEMANS_H_
