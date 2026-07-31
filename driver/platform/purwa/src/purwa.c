@@ -1585,12 +1585,12 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_purw
 		{CONTENT_ADAPTIVE_CODING}},
 
 	{ENH_LAYER_COUNT, ENC, H264,
-		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, LTR_COUNT},
+		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, SLICE_MODE, LTR_COUNT},
 		msm_vidc_adjust_layer_count,
 		msm_vidc_set_layer_count_and_type},
 
 	{ENH_LAYER_COUNT, ENC, HEVC,
-		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, LTR_COUNT, OPEN_GOP},
+		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, LTR_COUNT, SLICE_MODE, OPEN_GOP},
 		msm_vidc_adjust_layer_count,
 		msm_vidc_set_layer_count_and_type},
 
