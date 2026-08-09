@@ -1,363 +1,177 @@
-name: sync-and-build
+name: pre_merge_lava
+
+run-name: LAVA Test - ${{ github.event.workflow_run.display_title }}
 
 on:
-  workflow_call:
-    inputs:
-      docker_image:
-        description: Docker image
-        type: string
-        required: true
-
-      build_matrix:
-        description: Build matrix for multi-target builds
-        type: string
-        required: true
-
-      commit_sha:
-        description: Exact commit SHA to build
-        type: string
-        required: true
-
-      source_repository:
-        description: Repository containing the commit to build
-        type: string
-        required: true
+  # This workflow intentionally consumes artifacts from the completed
+  # pre_merge workflow. The triggering workflow is restricted below to
+  # successful runs from the expected repository and supported events.
+  # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows:
+      - pre_merge
+    types:
+      - completed
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
-  build:
-    timeout-minutes: 720
+  verify-build:
+    name: Verify completed build
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.repository.full_name == github.repository &&
+      (
+        github.event.workflow_run.event == 'pull_request' ||
+        github.event.workflow_run.event == 'push' ||
+        github.event.workflow_run.event == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
 
-    runs-on:
-      group: GHA-video-Prd-SelfHosted-RG
-      labels:
-        - self-hosted
-        - video-prd-u2204-x64-large-od-ephem
-
-    strategy:
-      fail-fast: false
-      matrix:
-        build_matrix: ${{ fromJson(inputs.build_matrix) }}
+    outputs:
+      docker_image: ${{ steps.metadata.outputs.docker_image }}
+      build_matrix: ${{ steps.metadata.outputs.build_matrix }}
+      commit_sha: ${{ steps.metadata.outputs.commit_sha }}
+      build_run_id: ${{ steps.metadata.outputs.build_run_id }}
+      build_repository: ${{ steps.metadata.outputs.build_repository }}
 
     steps:
-      - name: Pre-clean workspace
+      - name: Download build metadata
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.event.workflow_run.repository.full_name }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: build-metadata
+          path: metadata
+
+      - name: Read and validate build metadata
+        id: metadata
         shell: bash
         env:
-          WORKSPACE: ${{ github.workspace }}
+          METADATA_FILE: metadata/build-metadata.json
+          EXPECTED_RUN_ID: ${{ github.event.workflow_run.id }}
+          EXPECTED_REPOSITORY: ${{ github.event.workflow_run.repository.full_name }}
         run: |
           set -euo pipefail
 
-          echo "=== Disk before clean ==="
-          df -h
+          if [ ! -f "$METADATA_FILE" ]; then
+            echo "::error::Build metadata was not found"
+            find metadata -maxdepth 3 -type f -print || true
+            exit 1
+          fi
 
-          rm -rf "$WORKSPACE/build/tmp" || true
-          rm -f "$(dirname "$WORKSPACE")/kas_local_conf_header.txt" || true
+          echo "=== Build metadata ==="
 
-          echo "=== Disk after clean ==="
-          df -h
+          jq empty "$METADATA_FILE"
+          jq . "$METADATA_FILE"
 
-          free -h
+          METADATA_RUN_ID="$(
+            jq -r '.build_run_id // empty' "$METADATA_FILE"
+          )"
 
-      - name: Validate build inputs
-        shell: bash
-        env:
-          COMMIT_SHA: ${{ inputs.commit_sha }}
-          SOURCE_REPOSITORY: ${{ inputs.source_repository }}
-        run: |
-          set -euo pipefail
+          METADATA_REPOSITORY="$(
+            jq -r '.repository // empty' "$METADATA_FILE"
+          )"
+
+          DOCKER_IMAGE="$(
+            jq -r '.docker_image // empty' "$METADATA_FILE"
+          )"
+
+          COMMIT_SHA="$(
+            jq -r '.commit_sha // empty' "$METADATA_FILE"
+          )"
+
+          SOURCE_REPOSITORY="$(
+            jq -r '.source_repository // empty' "$METADATA_FILE"
+          )"
+
+          BUILD_MATRIX="$(
+            jq -c '.build_matrix' "$METADATA_FILE"
+          )"
+
+          if [ "$METADATA_RUN_ID" != "$EXPECTED_RUN_ID" ]; then
+            echo "::error::Metadata run ID does not match workflow_run ID"
+            echo "Metadata run ID: $METADATA_RUN_ID"
+            echo "Expected run ID: $EXPECTED_RUN_ID"
+            exit 1
+          fi
+
+          if [ "$METADATA_REPOSITORY" != "$EXPECTED_REPOSITORY" ]; then
+            echo "::error::Metadata repository does not match workflow repository"
+            echo "Metadata repository: $METADATA_REPOSITORY"
+            echo "Expected repository: $EXPECTED_REPOSITORY"
+            exit 1
+          fi
+
+          if [ -z "$DOCKER_IMAGE" ] || [ "$DOCKER_IMAGE" = "null" ]; then
+            echo "::error::docker_image is missing from metadata"
+            exit 1
+          fi
+
+          if [ -z "$COMMIT_SHA" ] || [ "$COMMIT_SHA" = "null" ]; then
+            echo "::error::commit_sha is missing from metadata"
+            exit 1
+          fi
 
           if ! [[ "$COMMIT_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
-            echo "::error::Invalid commit SHA: $COMMIT_SHA"
+            echo "::error::Invalid commit SHA in metadata: $COMMIT_SHA"
+            exit 1
+          fi
+
+          if [ -z "$SOURCE_REPOSITORY" ] ||
+            [ "$SOURCE_REPOSITORY" = "null" ]; then
+            echo "::error::source_repository is missing from metadata"
             exit 1
           fi
 
           if ! [[ "$SOURCE_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-            echo "::error::Invalid source repository: $SOURCE_REPOSITORY"
+            echo "::error::Invalid source repository in metadata: $SOURCE_REPOSITORY"
             exit 1
           fi
 
+          if [ "$(echo "$BUILD_MATRIX" | jq -r 'type')" != "array" ]; then
+            echo "::error::build_matrix must be a JSON array"
+            exit 1
+          fi
+
+          echo "Docker image:      $DOCKER_IMAGE"
+          echo "Commit SHA:        $COMMIT_SHA"
           echo "Source repository: $SOURCE_REPOSITORY"
-          echo "Commit SHA:       $COMMIT_SHA"
-
-      - name: Checkout exact HEAD commit
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ inputs.source_repository }}
-          ref: ${{ inputs.commit_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-          clean: true
-
-      - name: Verify commit before build
-        shell: bash
-        env:
-          EXPECTED_SHA: ${{ inputs.commit_sha }}
-          EXPECTED_REPOSITORY: ${{ inputs.source_repository }}
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-
-          actual_sha="$(git rev-parse HEAD)"
-
-          echo "========================================"
-          echo "Event      : $EVENT_NAME"
-          echo "Repository : $EXPECTED_REPOSITORY"
-          echo "Input SHA  : $EXPECTED_SHA"
-          echo "HEAD SHA   : $actual_sha"
-          echo "Branch     : $REF_NAME"
-          echo "Commit msg : $(git log -1 --pretty=format:'%s')"
-          echo "Author     : $(git log -1 --pretty=format:'%an <%ae>')"
-          echo "Date       : $(git log -1 --pretty=format:'%ci')"
-          echo "========================================"
-
-          if [ "$actual_sha" != "$EXPECTED_SHA" ]; then
-            echo "::error::SHA mismatch"
-            echo "Expected: $EXPECTED_SHA"
-            echo "Actual  : $actual_sha"
-            exit 1
-          fi
-
-          echo "Correct repository and commit checked out"
-
-      - name: Clone meta-qcom as sibling repository
-        shell: bash
-        env:
-          WORKSPACE: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-
-          parent_dir="$(dirname "$WORKSPACE")"
-          meta_qcom_dir="$parent_dir/meta-qcom"
-
-          rm -rf "$meta_qcom_dir"
-
-          git clone \
-            --depth 1 \
-            https://github.com/qualcomm-linux/meta-qcom \
-            "$meta_qcom_dir"
-
-          echo "=== Parent workspace ==="
-          ls -la "$parent_dir"
-
-          echo "=== meta-qcom/ci ==="
-          ls -la "$meta_qcom_dir/ci" || true
-
-      - name: Pull Docker image
-        uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
-        with:
-          image: ${{ inputs.docker_image }}
-          registry: artifacts.codelinaro.org/clo-420-qli-registry
-
-      - name: Add swap space
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if sudo swapon --show | grep -q '/swapfile'; then
-            echo "Swap already enabled"
-          else
-            sudo fallocate -l 16G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-          fi
-
-          echo "=== Memory ==="
-          free -h
-
-      - name: Retag Docker image
-        shell: bash
-        env:
-          DOCKER_IMAGE: ${{ inputs.docker_image }}
-        run: |
-          set -euo pipefail
-
-          docker tag \
-            "artifacts.codelinaro.org/clo-420-qli-registry/$DOCKER_IMAGE" \
-            "$DOCKER_IMAGE" || true
-
-          docker images | grep -- "$DOCKER_IMAGE" || true
-
-      - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@testing
-        with:
-          docker_image: ${{ inputs.docker_image }}
-          kas_file: ${{ matrix.build_matrix.kas_file }}
-          build_command: bitbake qcom-multimedia-proprietary-image
-        env:
-          MACHINE: ${{ matrix.build_matrix.machine }}
-
-          KAS_LOCAL_CONF_HEADER: |
-            # === iris-video-dlkm CI override ===
-            EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
-            EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
-            S:pn-iris-video-dlkm = "${EXTERNALSRC}"
-            B:pn-iris-video-dlkm = "${EXTERNALSRC_BUILD}"
-            do_fetch:pn-iris-video-dlkm[noexec] = "1"
-            do_unpack:pn-iris-video-dlkm[noexec] = "1"
-            do_patch:pn-iris-video-dlkm[noexec] = "1"
-            MAKE_TARGETS:pn-iris-video-dlkm = ""
-            EXTRA_OEMAKE:pn-iris-video-dlkm = "-C ${STAGING_KERNEL_DIR} M=${S} modules"
-
-            # === OOM mitigation ===
-            BB_NUMBER_THREADS = "6"
-            PARALLEL_MAKE = "-j6"
-
-      - name: Download iris_test_app from S3
-        shell: bash
-        env:
-          WORKSPACE: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p "$WORKSPACE/v4l-video-test-app/build"
-
-          aws s3 sync \
-            "s3://qli-prd-video-gh-artifacts/qualcomm-linux-stg/video-driver/iris_test_app/" \
-            "$WORKSPACE/v4l-video-test-app/build/"
-
-          echo "iris_test_app download complete"
-
-          ls -la "$WORKSPACE/v4l-video-test-app/build/"
-
-      - name: Download video contents
-        shell: bash
-        env:
-          WORKSPACE: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p "$WORKSPACE/downloads"
-
-          wget -q \
-            "https://github.com/qualcomm-linux/qcom-linux-testkit/releases/download/IRIS-Video-Files-v1.0/video_clips_iris.tar.gz" \
-            -O "$WORKSPACE/downloads/video_clips_iris.tar.gz"
-
-          if [ ! -f "$WORKSPACE/downloads/video_clips_iris.tar.gz" ]; then
-            echo "::error::Video contents download failed"
-            exit 1
-          fi
-
-          ls -la "$WORKSPACE/downloads"
-
-      - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux/video-driver/.github/actions/inject@testing
-        with:
-          docker_image: ${{ inputs.docker_image }}
-          machine: ${{ matrix.build_matrix.machine }}
-
-      - name: Prepare qcomflash files
-        shell: bash
-        env:
-          WORKSPACE: ${{ github.workspace }}
-          MACHINE: ${{ matrix.build_matrix.machine }}
-        run: |
-          set -euo pipefail
-
-          symlink_path="$WORKSPACE/build/tmp/deploy/images/$MACHINE/qcom-multimedia-proprietary-image-${MACHINE}.rootfs.qcomflash"
-
-          if [ ! -L "$symlink_path" ]; then
-            echo "::error::qcomflash symlink not found: $symlink_path"
-            exit 1
-          fi
-
-          resolved_dir="$(readlink -f "$symlink_path")"
-
-          if [ ! -d "$resolved_dir" ]; then
-            echo "::error::Resolved qcomflash directory not found: $resolved_dir"
-            exit 1
-          fi
-
-          rootfs_img="$resolved_dir/rootfs.img"
-
-          if [ ! -f "$rootfs_img" ]; then
-            echo "::error::rootfs.img not found: $rootfs_img"
-            exit 1
-          fi
-
-          echo "=== qcomflash contents ==="
-          ls -larth "$resolved_dir"
-
-          mkdir -p "$WORKSPACE/artifacts"
-
-          : > "$WORKSPACE/artifacts/file_list.txt"
-
-          flash_tar="$WORKSPACE/${MACHINE}_flash_files.tar"
-          rootfs_dest="$WORKSPACE/${MACHINE}_rootfs.img"
-
-          tar -cf "$flash_tar" \
-            -C "$resolved_dir" \
-            --exclude='./rootfs.img' \
-            .
-
-          cp "$rootfs_img" "$rootfs_dest"
-
-          printf '%s\n' "$flash_tar" \
-            >> "$WORKSPACE/artifacts/file_list.txt"
-
-          printf '%s\n' "$rootfs_dest" \
-            >> "$WORKSPACE/artifacts/file_list.txt"
-
-          echo "=== Artifact file list ==="
-          cat "$WORKSPACE/artifacts/file_list.txt"
-
-      - name: Upload artifacts to S3
-        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@testing
-        with:
-          s3_bucket: qli-stg-video-gh-artifacts
-          local_file: ${{ github.workspace }}/artifacts/file_list.txt
-          mode: multi-upload
-          upload_location: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}
-
-      - name: Upload machine-specific pre-signed URLs
-        uses: actions/upload-artifact@v4
-        with:
-          name: presigned-urls-${{ matrix.build_matrix.machine }}
-          path: ${{ github.workspace }}/presigned_urls.json
-          retention-days: 7
-
-      - name: Clean up
-        if: always()
-        shell: bash
-        env:
-          WORKSPACE: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-
-          rm -rf "$WORKSPACE/artifacts" || true
-          rm -rf "$WORKSPACE/build" || true
-          rm -rf "$WORKSPACE/downloads" || true
-          rm -f "$WORKSPACE/"*_flash_files.tar || true
-          rm -f "$WORKSPACE/"*_rootfs.img || true
-          rm -f "$(dirname "$WORKSPACE")/kas_local_conf_header.txt" || true
-
-      - name: Update summary
-        if: always()
-        shell: bash
-        env:
-          MACHINE: ${{ matrix.build_matrix.machine }}
-          COMMIT_SHA: ${{ inputs.commit_sha }}
-          EVENT_NAME: ${{ github.event_name }}
-          JOB_STATUS: ${{ job.status }}
-        run: |
-          set -u
-
-          if [ "$JOB_STATUS" = "success" ]; then
-            summary=":heavy_check_mark: Build Success"
-          else
-            summary=":x: Build Failed"
-          fi
+          echo "Build repository:  $METADATA_REPOSITORY"
+          echo "Build run ID:      $METADATA_RUN_ID"
 
           {
-            echo "<details><summary><i>Build Summary</i></summary>"
-            echo
-            echo "$summary for $MACHINE"
-            echo
-            echo "**Event:** \`$EVENT_NAME\`"
-            echo "**Commit:** \`$COMMIT_SHA\`"
-            echo
-            echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "docker_image=$DOCKER_IMAGE"
+            echo "commit_sha=$COMMIT_SHA"
+            echo "build_run_id=$METADATA_RUN_ID"
+            echo "build_repository=$METADATA_REPOSITORY"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "build_matrix<<BUILD_MATRIX_EOF"
+            echo "$BUILD_MATRIX"
+            echo "BUILD_MATRIX_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  lava-test:
+    name: Run LAVA tests
+    needs:
+      - verify-build
+
+    if: ${{ needs.verify-build.result == 'success' }}
+
+    uses: qualcomm-linux/video-driver/.github/workflows/test.yml@testing
+
+    with:
+      docker_image: ${{ needs.verify-build.outputs.docker_image }}
+      build_matrix: ${{ needs.verify-build.outputs.build_matrix }}
+      commit_sha: ${{ needs.verify-build.outputs.commit_sha }}
+      build_run_id: ${{ needs.verify-build.outputs.build_run_id }}
+      build_repository: ${{ needs.verify-build.outputs.build_repository }}
+
+    secrets:
+      LAVA_OSS_TOKEN: ${{ secrets.LAVA_OSS_TOKEN }}
+      LAVA_OSS_USER: ${{ secrets.LAVA_OSS_USER }}
