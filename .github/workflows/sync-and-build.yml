@@ -214,7 +214,7 @@ jobs:
           mkdir -p "$WORKSPACE/v4l-video-test-app/build"
 
           aws s3 sync \
-            "s3://qli-prd-video-gh-artifacts/qualcomm-linux-stg/video-driver/iris_test_app/" \
+            "s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/iris_test_app/" \
             "$WORKSPACE/v4l-video-test-app/build/"
 
           echo "iris_test_app download complete"
@@ -305,7 +305,7 @@ jobs:
       - name: Upload artifacts to S3
         uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@testing
         with:
-          s3_bucket: qli-stg-video-gh-artifacts
+          s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
           mode: multi-upload
           upload_location: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}
