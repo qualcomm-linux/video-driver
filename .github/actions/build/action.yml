@@ -2,6 +2,10 @@ name: Build
 description: Build the project using a Docker container
 
 inputs:
+  machine:
+    description: Target machine name
+    required: true
+
   docker_image:
     description: Docker image to use for the build job
     required: true
@@ -30,9 +34,9 @@ runs:
 
         printf '%s' "${KAS_LOCAL_CONF_HEADER:-}" > "$KAS_CONF_FILE"
 
-        echo "=== KAS_LOCAL_CONF_HEADER on HOST ==="
+        echo "=== KAS_LOCAL_CONF_HEADER on host ==="
         cat "$KAS_CONF_FILE"
-        echo "====================================="
+        echo "======================================"
 
         if [ ! -s "$KAS_CONF_FILE" ]; then
           echo "::error::KAS_LOCAL_CONF_HEADER is empty"
@@ -41,6 +45,11 @@ runs:
 
         META_QCOM_DIR="${WORKSPACE_ROOT}/meta-qcom"
         KAS_OVERLAY="${META_QCOM_DIR}/ci_externalsrc_overlay.yml"
+
+        if [ ! -d "$META_QCOM_DIR" ]; then
+          echo "::error::meta-qcom directory not found: $META_QCOM_DIR"
+          exit 1
+        fi
 
         printf '%s\n' 'header:' > "$KAS_OVERLAY"
         printf '%s\n' '  version: 14' >> "$KAS_OVERLAY"
@@ -52,42 +61,50 @@ runs:
           printf '    %s\n' "$line" >> "$KAS_OVERLAY"
         done < "$KAS_CONF_FILE"
 
-        echo "=== KAS overlay written to meta-qcom ==="
+        echo "=== KAS overlay written ==="
         cat "$KAS_OVERLAY"
-        echo "========================================="
+        echo "============================"
 
         BUILD_SCRIPT="${WORKSPACE_ROOT}/ci_build.sh"
         rm -f "$BUILD_SCRIPT"
 
-        printf '%s\n' '#!/bin/bash' >> "$BUILD_SCRIPT"
+        printf '%s\n' '#!/usr/bin/env bash' >> "$BUILD_SCRIPT"
         printf '%s\n' 'set -euo pipefail' >> "$BUILD_SCRIPT"
         printf '%s\n' '' >> "$BUILD_SCRIPT"
 
-        printf '%s\n' 'echo "=== inside container ==="' >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "pwd: $(pwd)"' >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "=== /workspace ==="' >> "$BUILD_SCRIPT"
-        printf '%s\n' 'ls -la /workspace' >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "=== Inside container ==="' >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "PWD: $(pwd)"' >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "MACHINE: ${MACHINE}"' >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "KAS_FILE: ${KAS_FILE}"' >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "BUILD_COMMAND: ${BUILD_COMMAND}"' >> "$BUILD_SCRIPT"
         printf '%s\n' '' >> "$BUILD_SCRIPT"
 
-        printf '%s\n' 'echo "=== KAS overlay contents ==="' >> "$BUILD_SCRIPT"
-        printf '%s\n' 'cat /workspace/meta-qcom/ci_externalsrc_overlay.yml' >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "============================="' >> "$BUILD_SCRIPT"
+        printf '%s\n' \
+          'OVERLAY_FILE="/workspace/meta-qcom/ci_externalsrc_overlay.yml"' \
+          >> "$BUILD_SCRIPT"
+
+        printf '%s\n' \
+          'if [ ! -f "$OVERLAY_FILE" ]; then' \
+          >> "$BUILD_SCRIPT"
+
+        printf '%s\n' \
+          '  echo "::error::KAS overlay not found: $OVERLAY_FILE"' \
+          >> "$BUILD_SCRIPT"
+
+        printf '%s\n' '  exit 1' >> "$BUILD_SCRIPT"
+        printf '%s\n' 'fi' >> "$BUILD_SCRIPT"
         printf '%s\n' '' >> "$BUILD_SCRIPT"
 
         printf '%s\n' \
           'FULL_KAS_FILE="${KAS_FILE}:../meta-qcom/ci_externalsrc_overlay.yml"' \
           >> "$BUILD_SCRIPT"
 
-        printf '%s\n' 'echo "=== Full KAS file: ${FULL_KAS_FILE} ==="' \
+        printf '%s\n' \
+          'echo "Full KAS file: ${FULL_KAS_FILE}"' \
           >> "$BUILD_SCRIPT"
 
-        printf '%s\n' 'echo "Starting build for ${MACHINE}"' \
-          >> "$BUILD_SCRIPT"
-
-        printf '%s\n' 'echo "KAS file: ${FULL_KAS_FILE}"' \
-          >> "$BUILD_SCRIPT"
-
-        printf '%s\n' 'echo "Build command: ${BUILD_COMMAND}"' \
+        printf '%s\n' \
+          'echo "Starting build for ${MACHINE}"' \
           >> "$BUILD_SCRIPT"
 
         printf '%s\n' 'which kas' >> "$BUILD_SCRIPT"
@@ -95,20 +112,20 @@ runs:
         printf '%s\n' '' >> "$BUILD_SCRIPT"
 
         printf '%s\n' \
-          'kas shell "${FULL_KAS_FILE}" -c "${BUILD_COMMAND}"' \
+          'kas shell "$FULL_KAS_FILE" -c "$BUILD_COMMAND"' \
           >> "$BUILD_SCRIPT"
 
         printf '%s\n' '' >> "$BUILD_SCRIPT"
 
         printf '%s\n' \
-          'echo "=== local.conf EXTERNALSRC lines after build ==="' \
+          'echo "=== local.conf EXTERNALSRC lines ==="' \
           >> "$BUILD_SCRIPT"
 
         printf '%s\n' \
-          'grep -n "EXTERNALSRC\|do_fetch\|do_patch" /workspace/video-driver/build/conf/local.conf || true' \
+          'grep -n "EXTERNALSRC\|do_fetch\|do_unpack\|do_patch" /workspace/video-driver/build/conf/local.conf || true' \
           >> "$BUILD_SCRIPT"
 
-        chmod 0755 "$BUILD_SCRIPT"
+        chmod +x "$BUILD_SCRIPT"
 
         echo "=== ci_build.sh written ==="
         cat "$BUILD_SCRIPT"
@@ -117,7 +134,7 @@ runs:
     - name: Build
       shell: bash
       env:
-        MACHINE: ${{ env.machine }}
+        MACHINE: ${{ inputs.machine }}
         DOCKER_IMAGE: ${{ inputs.docker_image }}
         KAS_FILE: ${{ inputs.kas_file }}
         BUILD_COMMAND: ${{ inputs.build_command }}
@@ -130,22 +147,22 @@ runs:
         REPO_NAME="$(basename "$PWD")"
 
         if [ -z "$MACHINE" ]; then
-          echo "::error::Machine environment variable is empty"
+          echo "::error::Machine input is empty"
           exit 1
         fi
 
         if [ -z "$DOCKER_IMAGE" ]; then
-          echo "::error::Docker image is empty"
+          echo "::error::Docker image input is empty"
           exit 1
         fi
 
         if [ -z "$KAS_FILE" ]; then
-          echo "::error::KAS file is empty"
+          echo "::error::KAS file input is empty"
           exit 1
         fi
 
         if [ -z "$BUILD_COMMAND" ]; then
-          echo "::error::Build command is empty"
+          echo "::error::Build command input is empty"
           exit 1
         fi
 
@@ -153,8 +170,8 @@ runs:
         echo "Docker image: $DOCKER_IMAGE"
         echo "KAS file: $KAS_FILE"
         echo "Build command: $BUILD_COMMAND"
-        echo "WORKSPACE_ROOT: $WORKSPACE_ROOT"
-        echo "REPO_NAME: $REPO_NAME"
+        echo "Workspace root: $WORKSPACE_ROOT"
+        echo "Repository name: $REPO_NAME"
 
         docker run --rm \
           --user "${USER_ID}:${GROUP_ID}" \
@@ -164,4 +181,4 @@ runs:
           -e "KAS_FILE=$KAS_FILE" \
           -e "BUILD_COMMAND=$BUILD_COMMAND" \
           "$DOCKER_IMAGE" \
-          bash -lc /workspace/ci_build.sh
+          bash -lc '/workspace/ci_build.sh'

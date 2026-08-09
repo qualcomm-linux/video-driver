@@ -182,14 +182,13 @@ jobs:
           docker images | grep -- "$DOCKER_IMAGE" || true
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@testing
+        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
         with:
+          machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: bitbake qcom-multimedia-proprietary-image
-        env:
-          MACHINE: ${{ matrix.build_matrix.machine }}
-
+          
           KAS_LOCAL_CONF_HEADER: |
             # === iris-video-dlkm CI override ===
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
