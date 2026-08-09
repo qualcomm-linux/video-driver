@@ -7,7 +7,7 @@ on:
 
   push:
     branches:
-      - video.qclinux.main
+      - testing
 
   pull_request:
     types:
@@ -15,7 +15,7 @@ on:
       - synchronize
       - reopened
     branches:
-      - video.qclinux.main
+      - testing
 
 permissions:
   contents: read
@@ -24,7 +24,7 @@ permissions:
 jobs:
   loading:
     name: Load build configuration
-    uses: qualcomm-linux/video-driver/.github/workflows/loading.yml@video.qclinux.main
+    uses: qualcomm-linux/video-driver/.github/workflows/loading.yml@testing
     with:
       event_name: ${{ github.event_name }}
 
@@ -32,7 +32,7 @@ jobs:
     name: Build
     needs:
       - loading
-    uses: qualcomm-linux/video-driver/.github/workflows/sync-and-build.yml@video.qclinux.main
+    uses: qualcomm-linux/video-driver/.github/workflows/sync-and-build.yml@testing
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
       docker_image: kmake-image:ver.1.0
@@ -51,7 +51,7 @@ jobs:
     name: OWL parallel kernel and video-driver build
     needs:
       - loading
-    uses: qualcomm-linux/video-driver/.github/workflows/owl_build.yml@video.qclinux.main
+    uses: qualcomm-linux/video-driver/.github/workflows/owl_build.yml@testing
 
   create-metadata:
     name: Create build metadata

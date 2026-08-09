@@ -162,7 +162,7 @@ jobs:
 
       - name: Render LAVA job definition
         if: ${{ matrix.build_matrix.lavaname != '' }}
-        uses: qualcomm-linux/video-driver/.github/actions/lava_job_render@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/lava_job_render@testing
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
