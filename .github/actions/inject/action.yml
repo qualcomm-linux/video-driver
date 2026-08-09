@@ -32,7 +32,13 @@ runs:
         set -euo pipefail
 
         case "$MACHINE" in
-          qcs9100-ride-sx|qcs8300-ride-sx|rb3gen2-core-kit|qcs615-ride|sm8750-mtp|kaanapali-mtp)
+          qcs9100-ride-sx|\
+          qcs8300-ride-sx|\
+          rb3gen2-core-kit|\
+          qcs615-ride|\
+          sm8750-mtp|\
+          kaanapali-mtp|\
+          qcom-armv8a)
             ;;
           *)
             echo "::error::Unsupported machine: $MACHINE"
@@ -60,8 +66,15 @@ runs:
 
             image_base_dir="build/tmp/deploy/images/${MACHINE}"
 
+            echo "Looking for image output under: ${image_base_dir}"
+
             if [ ! -d "$image_base_dir" ]; then
-              echo "Machine output directory not found: $image_base_dir"
+              echo "::error::Machine output directory not found: $image_base_dir"
+              echo "Available image directories:"
+              find build/tmp/deploy/images \
+                -maxdepth 2 \
+                -type d \
+                -print | sort || true
               exit 1
             fi
 
@@ -74,19 +87,44 @@ runs:
             )"
 
             if [ -z "$image_dir" ]; then
-              echo "No .qcomflash directory found"
+              echo "::error::No .qcomflash directory found under $image_base_dir"
+              find "$image_base_dir" \
+                -maxdepth 2 \
+                -print | sort || true
               exit 1
             fi
 
+            echo "Using image directory: $image_dir"
+
             cd "$image_dir"
 
-            rootfs_img="$(realpath rootfs.img)"
-            test -f "$rootfs_img"
+            if [ ! -e rootfs.img ]; then
+              echo "::error::rootfs.img not found in $image_dir"
+              exit 1
+            fi
 
-            test -d "$WORKSPACE/v4l-video-test-app/build"
-            test -f "$WORKSPACE/downloads/video_clips_iris.tar.gz"
+            rootfs_img="$(realpath rootfs.img)"
+
+            if [ ! -f "$rootfs_img" ]; then
+              echo "::error::Resolved rootfs image is not a regular file: $rootfs_img"
+              exit 1
+            fi
+
+            iris_build_dir="$WORKSPACE/v4l-video-test-app/build"
+            video_tarball="$WORKSPACE/downloads/video_clips_iris.tar.gz"
+
+            if [ ! -d "$iris_build_dir" ]; then
+              echo "::error::IRIS application build directory not found: $iris_build_dir"
+              exit 1
+            fi
+
+            if [ ! -f "$video_tarball" ]; then
+              echo "::error::Video tarball not found: $video_tarball"
+              exit 1
+            fi
 
             mkdir -p /tmp/rootfs
+
             loopdev=""
 
             cleanup() {
@@ -110,16 +148,20 @@ runs:
                 losetup --find --show "$rootfs_img" 2>/dev/null || true
               )"
 
-              [ -n "$loopdev" ] && break
+              if [ -n "$loopdev" ]; then
+                break
+              fi
 
               echo "Loop allocation attempt $attempt failed"
               sleep 2
             done
 
             if [ -z "$loopdev" ]; then
-              echo "Failed to allocate loop device"
+              echo "::error::Failed to allocate loop device for $rootfs_img"
               exit 1
             fi
+
+            echo "Using loop device: $loopdev"
 
             mount "$loopdev" /tmp/rootfs
 
@@ -128,15 +170,22 @@ runs:
               /tmp/rootfs/data/vendor/iris_test_app/output
 
             cp -a \
-              "$WORKSPACE/v4l-video-test-app/build/." \
+              "$iris_build_dir/." \
               /tmp/rootfs/data/vendor/iris_test_app/
 
             cp -a \
-              "$WORKSPACE/downloads/video_clips_iris.tar.gz" \
+              "$video_tarball" \
               /tmp/rootfs/data/vendor/iris_test_app/
+
+            echo "Injected files:"
+            ls -la /tmp/rootfs/data/vendor/iris_test_app/
 
             sync
             umount /tmp/rootfs
+
+            losetup -d "$loopdev"
+            loopdev=""
+
             trap - EXIT
 
             echo "IRIS injection completed for $MACHINE"
