@@ -188,8 +188,7 @@ jobs:
           docker_image: ${{ inputs.docker_image }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: bitbake qcom-multimedia-proprietary-image
-          
-          KAS_LOCAL_CONF_HEADER: |
+          kas_local_conf_header: |
             # === iris-video-dlkm CI override ===
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
             EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"

@@ -19,37 +19,46 @@ inputs:
     required: false
     default: bitbake core-image-base
 
+  kas_local_conf_header:
+    description: Multiline KAS local configuration header
+    required: true
+
 runs:
   using: composite
   steps:
     - name: Write KAS overlay and build script
       shell: bash
       env:
-        KAS_LOCAL_CONF_HEADER: ${{ env.KAS_LOCAL_CONF_HEADER }}
+        KAS_LOCAL_CONF_HEADER: ${{ inputs.kas_local_conf_header }}
       run: |
         set -euo pipefail
 
         WORKSPACE_ROOT="$(dirname "$PWD")"
         KAS_CONF_FILE="${WORKSPACE_ROOT}/kas_local_conf_header.txt"
-
-        printf '%s' "${KAS_LOCAL_CONF_HEADER:-}" > "$KAS_CONF_FILE"
-
-        echo "=== KAS_LOCAL_CONF_HEADER on host ==="
-        cat "$KAS_CONF_FILE"
-        echo "======================================"
-
-        if [ ! -s "$KAS_CONF_FILE" ]; then
-          echo "::error::KAS_LOCAL_CONF_HEADER is empty"
-          exit 1
-        fi
-
         META_QCOM_DIR="${WORKSPACE_ROOT}/meta-qcom"
         KAS_OVERLAY="${META_QCOM_DIR}/ci_externalsrc_overlay.yml"
+        BUILD_SCRIPT="${WORKSPACE_ROOT}/ci_build.sh"
+
+        if [ -z "${KAS_LOCAL_CONF_HEADER:-}" ]; then
+          echo "::error::kas_local_conf_header input is empty"
+          exit 1
+        fi
 
         if [ ! -d "$META_QCOM_DIR" ]; then
           echo "::error::meta-qcom directory not found: $META_QCOM_DIR"
           exit 1
         fi
+
+        printf '%s' "$KAS_LOCAL_CONF_HEADER" > "$KAS_CONF_FILE"
+
+        if [ ! -s "$KAS_CONF_FILE" ]; then
+          echo "::error::KAS configuration file is empty: $KAS_CONF_FILE"
+          exit 1
+        fi
+
+        echo "=== KAS local configuration header ==="
+        cat "$KAS_CONF_FILE"
+        echo "======================================="
 
         printf '%s\n' 'header:' > "$KAS_OVERLAY"
         printf '%s\n' '  version: 14' >> "$KAS_OVERLAY"
@@ -65,7 +74,6 @@ runs:
         cat "$KAS_OVERLAY"
         echo "============================"
 
-        BUILD_SCRIPT="${WORKSPACE_ROOT}/ci_build.sh"
         rm -f "$BUILD_SCRIPT"
 
         printf '%s\n' '#!/usr/bin/env bash' >> "$BUILD_SCRIPT"
@@ -122,7 +130,7 @@ runs:
           >> "$BUILD_SCRIPT"
 
         printf '%s\n' \
-          'grep -n "EXTERNALSRC\|do_fetch\|do_unpack\|do_patch" /workspace/video-driver/build/conf/local.conf || true' \
+          'grep -n "EXTERNALSRC\|EXTERNALSRC_BUILD\|do_fetch\|do_unpack\|do_patch" /workspace/video-driver/build/conf/local.conf || true' \
           >> "$BUILD_SCRIPT"
 
         chmod +x "$BUILD_SCRIPT"
@@ -163,6 +171,12 @@ runs:
 
         if [ -z "$BUILD_COMMAND" ]; then
           echo "::error::Build command input is empty"
+          exit 1
+        fi
+
+        if [ ! -x "${WORKSPACE_ROOT}/ci_build.sh" ]; then
+          echo "::error::Build script not found or not executable:"
+          echo "${WORKSPACE_ROOT}/ci_build.sh"
           exit 1
         fi
 
