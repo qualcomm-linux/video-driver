@@ -182,7 +182,7 @@ jobs:
           docker images | grep -- "$DOCKER_IMAGE" || true
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/build@testing
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
