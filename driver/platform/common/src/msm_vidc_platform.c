@@ -1329,25 +1329,11 @@ int msm_vidc_adjust_ltr_count(void *instance, struct v4l2_ctrl *ctrl)
 {
 	s32 adjusted_value;
 	struct msm_vidc_inst *inst = (struct msm_vidc_inst *)instance;
-	s64 rc_type = -1, all_intra = 0, pix_fmts = MSM_VIDC_FMT_NONE;
+	s64 all_intra = 0, pix_fmts = MSM_VIDC_FMT_NONE;
 	s64 layer_type = -1, enh_layer_count = -1;
 	u32 num_ref_frames = 0, max_exceeding_ref_frames = 0;
 
 	adjusted_value = ctrl ? ctrl->val : inst->capabilities[LTR_COUNT].value;
-
-	if (msm_vidc_get_parent_value(inst, LTR_COUNT, BITRATE_MODE,
-				      &rc_type, __func__))
-		return -EINVAL;
-
-	if ((rc_type != HFI_RC_OFF &&
-	     rc_type != HFI_RC_CBR_CFR &&
-	     rc_type != HFI_RC_CBR_VFR)) {
-		adjusted_value = 0;
-		i_vpr_h(inst,
-			"%s: ltr count unsupported, rc_type: %#llx\n",
-			__func__, rc_type);
-		goto exit;
-	}
 
 	if (is_valid_cap(inst, ALL_INTRA)) {
 		if (msm_vidc_get_parent_value(inst, LTR_COUNT,
