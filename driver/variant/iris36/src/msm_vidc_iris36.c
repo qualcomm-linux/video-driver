@@ -1727,11 +1727,9 @@ static int __power_off_glymur_vcodec0(struct msm_vidc_core *core)
 	if (!handshake_done && handshake_busy)
 		goto disable_power;
 
-	rc = __read_register_with_poll_timeout(core, AON_WRAPPER_MVP_NOC_LPI_STATUS,
-					       NOC_LPI_STATUS_DONE,
-					       NOC_LPI_STATUS_DONE, 200, 2000);
-	if (rc)
-		d_vpr_e("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL failed\n", __func__);
+	__read_register_with_poll_timeout(core, AON_WRAPPER_MVP_NOC_LPI_STATUS,
+					  NOC_LPI_STATUS_DONE,
+					  NOC_LPI_STATUS_DONE, 200, 2000);
 
 	rc = __write_register(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL, 0x0);
 	if (rc)
@@ -1825,11 +1823,9 @@ static int __power_off_glymur_vcodec1(struct msm_vidc_core *core)
 	if (!handshake_done && handshake_busy)
 		goto disable_power;
 
-	rc = __read_register_with_poll_timeout(core, AON_WRAPPER_MVP_NOC_LPI_STATUS,
-					       NOC_LPI_VCODEC1_STATUS_DONE,
-					       NOC_LPI_VCODEC1_STATUS_DONE, 200, 2000);
-	if (rc)
-		d_vpr_e("%s: AON_WRAPPER_MVP_NOC_LPI_CONTROL failed\n", __func__);
+	__read_register_with_poll_timeout(core, AON_WRAPPER_MVP_NOC_LPI_STATUS,
+					  NOC_LPI_VCODEC1_STATUS_DONE,
+					  NOC_LPI_VCODEC1_STATUS_DONE, 200, 2000);
 
 	rc = __write_register(core, AON_WRAPPER_MVP_NOC_LPI_CONTROL, 0x0);
 	if (rc)
