@@ -97,6 +97,7 @@ struct msm_vidc_inst {
 	struct buf_queue                   bufq[MAX_PORT];
 	struct msm_vidc_rectangle          crop;
 	struct msm_vidc_rectangle          compose;
+	struct msm_vidc_rectangle          raw;
 	struct msm_vidc_power              power;
 	struct vidc_bus_vote_data          bus_data;
 	struct vidc_clock_scaling_data     clock_data;
