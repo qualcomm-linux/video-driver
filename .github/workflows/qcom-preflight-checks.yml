@@ -1,30 +1,24 @@
-name: Qualcomm Preflight Checks
+name: QC Preflight Checks
 
 on:
   pull_request:
-    branches:
-      - video.qclinux.main
-
   push:
-    branches:
-      - video.qclinux.main
-
+    branches: [video.qclinux.main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  security-events: write
-
 jobs:
-  qcom-preflight-checks:
-    uses: qualcomm/qcom-reusable-workflows/.github/workflows/qcom-preflight-checks-reusable-workflow.yml@v1.1.4
-
+  preflight:
+    name: Run QC Preflight Checks
+    uses: qualcomm/qcom-reusable-workflows/.github/workflows/reusable-qcom-preflight-checks-orchestrator.yml@v2
     with:
-      repolinter: true
-      semgrep: true
-      copyright-license-detector: true
-      pr-check-emails: true
-      dependency-review: true
+      enable-semgrep-scan: true
+      enable-dependency-review: true
+      enable-repolinter-check: true
+      enable-copyright-license-check: true
+      enable-commit-email-check: true
+      enable-commit-msg-check: false
+      enable-armor-checkers: false
 
-    secrets:
-      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+    permissions:
+      contents: read
+      security-events: write
