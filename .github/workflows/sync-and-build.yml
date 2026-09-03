@@ -182,13 +182,16 @@ jobs:
           docker images | grep -- "$DOCKER_IMAGE" || true
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/build@adb_build
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: bitbake qcom-multimedia-proprietary-image
           kas_local_conf_header: |
+            # === Enable ADB daemon ===
+            IMAGE_FEATURES += "enable-adbd"
+
             # === iris-video-dlkm CI override ===
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
             EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
@@ -242,7 +245,7 @@ jobs:
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/inject@adb_build
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
@@ -303,7 +306,7 @@ jobs:
           cat "$WORKSPACE/artifacts/file_list.txt"
 
       - name: Upload artifacts to S3
-        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@adb_build
         with:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
@@ -316,6 +319,22 @@ jobs:
           name: presigned-urls-${{ matrix.build_matrix.machine }}
           path: ${{ github.workspace }}/presigned_urls.json
           retention-days: 7
+
+      - name: Upload flash files
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-files-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_flash_files.tar
+          retention-days: 7
+          compression-level: 0
+
+      - name: Upload rootfs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rootfs-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_rootfs.img
+          retention-days: 7
+          compression-level: 0    
 
       - name: Clean up
         if: always()

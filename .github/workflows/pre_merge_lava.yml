@@ -163,7 +163,7 @@ jobs:
 
     if: ${{ needs.verify-build.result == 'success' }}
 
-    uses: qualcomm-linux/video-driver/.github/workflows/test.yml@video.qclinux.main
+    uses: qualcomm-linux/video-driver/.github/workflows/test.yml@adb_build
 
     with:
       docker_image: ${{ needs.verify-build.outputs.docker_image }}

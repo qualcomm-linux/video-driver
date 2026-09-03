@@ -2,64 +2,90 @@
   "qcs9100-ride-sx": {
     "machine": "qcs9100-ride-sx",
     "kas_file": "../meta-qcom/ci/qcs9100-ride-sx.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs9100-ride"
+    "lavaname": "qcs9100-ride",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "qcs8300-ride-sx": {
     "machine": "qcs8300-ride-sx",
     "kas_file": "../meta-qcom/ci/qcs8300-ride-sx.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs8300-ride"
+    "lavaname": "qcs8300-ride",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "qcs6490-rb3gen2-core-kit": {
     "machine": "rb3gen2-core-kit",
     "kas_file": "../meta-qcom/ci/qcs6490-rb3gen2-core-kit.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs6490-rb3gen2"
+    "lavaname": "qcs6490-rb3gen2",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "qcs615-ride": {
     "machine": "qcs615-ride",
     "kas_file": "../meta-qcom/ci/qcs615-ride.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs615-ride"
+    "lavaname": "qcs615-ride",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
   },
   "sm8750-mtp": {
     "machine": "sm8750-mtp",
     "kas_file": "../meta-qcom/ci/sm8750-mtp.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "sm8750-mtp"
+    "lavaname": "sm8750-mtp",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
   },
   "kaanapali-mtp": {
     "machine": "kaanapali-mtp",
     "kas_file": "../meta-qcom/ci/kaanapali-mtp.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "kaanapali-mtp"
+    "lavaname": "kaanapali-mtp",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "linux-yocto-dev": {
     "machine": "qcom-armv8a",
-    "kas_file": "../meta-qcom/ci/linux-yocto-dev.yml:../meta-qcom/ci/qcom-armv8a.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/linux-yocto-dev.yml:../meta-qcom/ci/qcom-armv8a.yml:../meta-qcom/ci/qcom-distro.yml",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "linux-yocto-6.18": {
     "machine": "qcom-armv8a",
-    "kas_file": "../meta-qcom/ci/ci.yml:../meta-qcom/ci/qcom-armv8a.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/ci.yml:../meta-qcom/ci/qcom-armv8a.yml:../meta-qcom/ci/qcom-distro.yml",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "qcs6490-rb3gen2-core-kit-linux-qcom-6.18": {
     "machine": "rb3gen2-core-kit",
     "kas_file": "../meta-qcom/ci/qcs6490-rb3gen2-core-kit.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs6490-rb3gen2"
+    "lavaname": "qcs6490-rb3gen2",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "qcs9100-ride-sx-linux-qcom-6.18": {
     "machine": "qcs9100-ride-sx",
     "kas_file": "../meta-qcom/ci/qcs9100-ride-sx.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs9100-ride"
+    "lavaname": "qcs9100-ride",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "qcs615-ride-linux-qcom-6.18": {
     "machine": "qcs615-ride",
     "kas_file": "../meta-qcom/ci/qcs615-ride.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs615-ride"
+    "lavaname": "qcs615-ride",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
   },
   "qcs8300-ride-sx-linux-qcom-6.18": {
     "machine": "qcs8300-ride-sx",
     "kas_file": "../meta-qcom/ci/qcs8300-ride-sx.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs8300-ride"
+    "lavaname": "qcs8300-ride",
+    "build_command": "bitbake qcom-multimedia-proprietary-image",
+    "image_name": "qcom-multimedia-proprietary-image"
   },
   "sm8750-mtp-linux-qcom-6.18": {
     "machine": "sm8750-mtp",
     "kas_file": "../meta-qcom/ci/sm8750-mtp.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "sm8750-mtp"
+    "lavaname": "sm8750-mtp",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
   }
 }
