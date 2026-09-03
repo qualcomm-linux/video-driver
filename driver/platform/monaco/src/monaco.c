@@ -1814,11 +1814,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_mona
 /* Default UBWC config for LPDDR5 */
 static const struct qcom_ubwc_cfg_data ubwc_config_monaco = {
 	.ubwc_enc_version = UBWC_4_0,
-	.ubwc_dec_version = UBWC_4_0,
-	.ubwc_swizzle     = UBWC_SWIZZLE_ENABLE_LVL2 | UBWC_SWIZZLE_ENABLE_LVL3,
 	.highest_bank_bit = 16,
-	.ubwc_bank_spread = true,
-	.macrotile_mode   = true,
 };
 
 static struct msm_vidc_format_capability format_data_monaco = {
