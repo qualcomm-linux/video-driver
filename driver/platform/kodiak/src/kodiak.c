@@ -2292,12 +2292,8 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kodi
 
 /* Default UBWC config for LPDDR4 */
 static const struct qcom_ubwc_cfg_data ubwc_config_kodiak = {
-	.ubwc_enc_version = UBWC_3_0,
-	.ubwc_dec_version = UBWC_4_0,
-	.ubwc_swizzle     = UBWC_SWIZZLE_ENABLE_LVL2 | UBWC_SWIZZLE_ENABLE_LVL3,
+	.ubwc_enc_version = UBWC_3_1,
 	.highest_bank_bit = 14,
-	.ubwc_bank_spread = true,
-	.macrotile_mode   = true,
 };
 
 static struct msm_vidc_format_capability format_data_kodiak = {
