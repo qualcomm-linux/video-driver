@@ -1811,7 +1811,14 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_mona
 		NULL},
 };
 
-/* Default UBWC config for LPDDR5 */
+#if MSM_VIDC_HAS_QCOM_UBWC_HEADER_MODIFIED
+/* Kernel with modified ubwc headers(ver >= 7.3) */
+static const struct qcom_ubwc_cfg_data ubwc_config_monaco = {
+	.ubwc_enc_version = UBWC_4_0,
+	.highest_bank_bit = 16,
+};
+#else
+/* Kernel with unmodified ubwc headers(6.17 < ver < 7.3) */
 static const struct qcom_ubwc_cfg_data ubwc_config_monaco = {
 	.ubwc_enc_version = UBWC_4_0,
 	.ubwc_dec_version = UBWC_4_0,
@@ -1820,6 +1827,7 @@ static const struct qcom_ubwc_cfg_data ubwc_config_monaco = {
 	.ubwc_bank_spread = true,
 	.macrotile_mode   = true,
 };
+#endif
 
 static struct msm_vidc_format_capability format_data_monaco = {
 	.codec_info = codec_data_monaco,

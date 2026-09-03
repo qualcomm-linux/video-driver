@@ -18,6 +18,20 @@
 #endif
 #endif
 
+/* The structure qcom_ubwc_cfg_data is introduced in 6.17 kernel and
+ * Modified in 7.3 kernel
+ * To check the different version of this header we are deviding
+ * 6.17 to 7.2 as Unmodified and from 7.3 onwards modified.
+ */
+#ifndef MSM_VIDC_HAS_QCOM_UBWC_HEADER_MODIFIED
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 3, 0)
+#define MSM_VIDC_HAS_QCOM_UBWC_HEADER_MODIFIED 1
+#else
+#define MSM_VIDC_HAS_QCOM_UBWC_HEADER_MODIFIED 0
+#endif
+#endif
+
+
 /*
  * Helper functions (qcom_ubwc_min_acc_length_64b, qcom_ubwc_macrotile_mode,
  * qcom_ubwc_bank_spread, qcom_ubwc_swizzle) were added to the kernel header
@@ -43,6 +57,7 @@ enum ubwc_version {
 	UBWC_1_0 = 0x10,
 	UBWC_2_0 = 0x20,
 	UBWC_3_0 = 0x30,
+	UBWC_3_1 = 0x31,
 	UBWC_4_0 = 0x40,
 };
 
@@ -52,24 +67,66 @@ enum ubwc_version {
 
 struct qcom_ubwc_cfg_data {
 	u32	ubwc_enc_version;
-	u32	ubwc_dec_version;
-	u32	ubwc_swizzle;
 	int	highest_bank_bit;
-	bool	ubwc_bank_spread;
-	bool	macrotile_mode;
+	unsigned int flags;
+#define UBWC_FLAG_DISABLE_SWIZZLE_LVL2	BIT(0)
+#define UBWC_FLAG_DISABLE_SWIZZLE_LVL3	BIT(1)
 };
 
 static inline const struct qcom_ubwc_cfg_data *qcom_ubwc_config_get_data(void)
 {
-	return ERR_PTR(-ENODEV);
+	return ERR_PTR(-EOPNOTSUPP);
 }
 #endif /* MSM_VIDC_HAS_QCOM_UBWC_HEADER */
 
 #if !MSM_VIDC_HAS_QCOM_UBWC_HELPERS
+ /*
+  * Compat helper functions for kernels < v7.1 that have
+  * <linux/soc/qcom/ubwc.h> but not the inline helpers.
+  * Once v7.1 is the minimum supported kernel these can be removed.
+  */
+#if MSM_VIDC_HAS_QCOM_UBWC_HEADER_MODIFIED
 /*
- * Compat helper functions for kernels < v7.1 that have
- * <linux/soc/qcom/ubwc.h> but not the inline helpers.
- * Once v7.1 is the minimum supported kernel these can be removed.
+ * In this case the kernel will be using its own structure,
+ * i.e. modified(v7.3 onwards), So we can use the new changes done in header
+ */
+static inline bool qcom_ubwc_min_acc_length_64b(const struct qcom_ubwc_cfg_data *cfg)
+{
+	return cfg->ubwc_enc_version == UBWC_1_0;
+}
+
+static inline bool qcom_ubwc_macrotile_mode(const struct qcom_ubwc_cfg_data *cfg)
+{
+	return cfg->ubwc_enc_version >= UBWC_3_1;
+}
+
+static inline bool qcom_ubwc_bank_spread(const struct qcom_ubwc_cfg_data *cfg)
+{
+	return true;
+}
+
+static inline u32 qcom_ubwc_swizzle(const struct qcom_ubwc_cfg_data *cfg)
+{
+	if (cfg->ubwc_enc_version == 0)
+		return 0;
+	if (cfg->ubwc_enc_version == UBWC_1_0)
+		return UBWC_SWIZZLE_ENABLE_LVL1 |
+		       UBWC_SWIZZLE_ENABLE_LVL2 |
+		       UBWC_SWIZZLE_ENABLE_LVL3;
+	u32 ubwc_swizzle = UBWC_SWIZZLE_ENABLE_LVL2 |
+			   UBWC_SWIZZLE_ENABLE_LVL3;
+	if (cfg->flags & UBWC_FLAG_DISABLE_SWIZZLE_LVL2)
+		ubwc_swizzle &= ~UBWC_SWIZZLE_ENABLE_LVL2;
+	if (cfg->flags & UBWC_FLAG_DISABLE_SWIZZLE_LVL3)
+		ubwc_swizzle &= ~UBWC_SWIZZLE_ENABLE_LVL3;
+	return ubwc_swizzle;
+}
+
+#else
+/*
+ * In this case the kernel will be using its own structure,
+ * i.e. unmodified, So we cannot use the new changes done in header
+ * onwards 7.3
  */
 static inline bool qcom_ubwc_min_acc_length_64b(const struct qcom_ubwc_cfg_data *cfg)
 {
@@ -92,6 +149,8 @@ static inline u32 qcom_ubwc_swizzle(const struct qcom_ubwc_cfg_data *cfg)
 {
 	return cfg->ubwc_swizzle;
 }
+
+#endif /* MSM_VIDC_HAS_QCOM_UBWC_HEADER_MODIFIED */
 #endif /* !MSM_VIDC_HAS_QCOM_UBWC_HELPERS */
 
 #include "msm_vidc_internal.h"

@@ -2290,7 +2290,14 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_kodi
 		NULL},
 };
 
-/* Default UBWC config for LPDDR4 */
+#if MSM_VIDC_HAS_QCOM_UBWC_HEADER_MODIFIED
+/* Kernel with modified ubwc headers */
+static const struct qcom_ubwc_cfg_data ubwc_config_kodiak = {
+	.ubwc_enc_version = UBWC_3_1,
+	.highest_bank_bit = 14,
+};
+#else
+/* Kernel with unmodified ubwc Headers */
 static const struct qcom_ubwc_cfg_data ubwc_config_kodiak = {
 	.ubwc_enc_version = UBWC_3_0,
 	.ubwc_dec_version = UBWC_4_0,
@@ -2298,7 +2305,8 @@ static const struct qcom_ubwc_cfg_data ubwc_config_kodiak = {
 	.highest_bank_bit = 14,
 	.ubwc_bank_spread = true,
 	.macrotile_mode   = true,
-};
+ };
+#endif
 
 static struct msm_vidc_format_capability format_data_kodiak = {
 	.codec_info = codec_data_kodiak,

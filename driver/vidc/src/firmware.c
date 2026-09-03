@@ -403,7 +403,7 @@ int fw_load(struct msm_vidc_core *core)
 		 * failure is expected. Only treat it as fatal when OP-TEE is
 		 * not on the bus.
 		 */
-		if (qcom_pas_is_tee_backed()) {
+		if (qcom_pas_is_available()) {
 			d_vpr_h("%s: scm_mem_protect failed %d; OP-TEE PAS in use, ignoring\n",
 				__func__, rc);
 			return 0;
