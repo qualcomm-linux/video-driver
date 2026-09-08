@@ -591,6 +591,13 @@ static struct msm_platform_inst_capability instance_cap_data_purwa[] = {
 		0,
 		CAP_FLAG_OUTPUT_PORT | CAP_FLAG_MENU},
 
+	{IR_PERIOD, ENC, H264 | HEVC,
+		0, INT_MAX, 1, 0,
+		V4L2_CID_MPEG_VIDEO_INTRA_REFRESH_PERIOD,
+		0,
+		CAP_FLAG_INPUT_PORT | CAP_FLAG_OUTPUT_PORT |
+		CAP_FLAG_DYNAMIC_ALLOWED},
+
 	{AU_DELIMITER, ENC, H264 | HEVC,
 		0, 1, 1, 0,
 		V4L2_CID_MPEG_VIDEO_AU_DELIMITER,
@@ -1359,11 +1366,11 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_purw
 	 */
 
 	{PIX_FMTS, ENC, H264,
-		{LTR_COUNT, BIT_DEPTH}},
+		{LTR_COUNT, IR_PERIOD, BIT_DEPTH}},
 
 	{PIX_FMTS, ENC, HEVC,
 		{PROFILE, MIN_FRAME_QP, MAX_FRAME_QP, I_FRAME_QP, P_FRAME_QP,
-			B_FRAME_QP, MIN_QUALITY, BLUR_TYPES, LTR_COUNT, BIT_DEPTH}},
+		 B_FRAME_QP, MIN_QUALITY, BLUR_TYPES, IR_PERIOD, LTR_COUNT, BIT_DEPTH}},
 
 	{PIX_FMTS, DEC, HEVC,
 		{PROFILE}},
@@ -1423,7 +1430,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_purw
 		msm_vidc_set_bitrate},
 
 	{BITRATE_MODE, ENC, H264,
-		{LTR_COUNT, I_FRAME_QP, P_FRAME_QP,
+		{LTR_COUNT, IR_PERIOD, I_FRAME_QP, P_FRAME_QP,
 			B_FRAME_QP, ENH_LAYER_COUNT, BIT_RATE,
 			MIN_QUALITY, VBV_DELAY,
 			PEAK_BITRATE, SLICE_MODE, CONTENT_ADAPTIVE_CODING,
@@ -1432,7 +1439,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_purw
 		msm_vidc_set_u32_enum},
 
 	{BITRATE_MODE, ENC, HEVC,
-		{LTR_COUNT, I_FRAME_QP, P_FRAME_QP,
+		{LTR_COUNT, IR_PERIOD, I_FRAME_QP, P_FRAME_QP,
 			B_FRAME_QP, CONSTANT_QUALITY, ENH_LAYER_COUNT,
 			BIT_RATE, MIN_QUALITY, VBV_DELAY,
 			PEAK_BITRATE, SLICE_MODE, CONTENT_ADAPTIVE_CODING,
@@ -1489,6 +1496,11 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_purw
 		{0},
 		msm_vidc_adjust_mark_ltr,
 		msm_vidc_set_use_and_mark_ltr},
+
+	{IR_PERIOD, ENC, H264 | HEVC,
+		{0},
+		msm_vidc_adjust_ir_period,
+		msm_vidc_set_ir_period},
 
 	{AU_DELIMITER, ENC, H264 | HEVC,
 		{0},
@@ -1775,7 +1787,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_purw
 		msm_vidc_set_u32},
 
 	{ALL_INTRA, ENC, H264 | HEVC,
-		{LTR_COUNT, SLICE_MODE, BIT_RATE},
+		{LTR_COUNT, IR_PERIOD, SLICE_MODE, BIT_RATE},
 		msm_vidc_adjust_all_intra,
 		NULL},
 };
