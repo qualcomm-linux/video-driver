@@ -222,8 +222,7 @@ static int msm_venc_set_raw_resolution(struct msm_vidc_inst *inst,
 		return -EINVAL;
 	}
 
-	resolution = (inst->fmts[port].fmt.pix_mp.width << 16) |
-		inst->fmts[port].fmt.pix_mp.height;
+	resolution = (inst->raw.width << 16) | inst->raw.height;
 	i_vpr_h(inst, "%s: width: %d height: %d\n", __func__,
 			inst->fmts[port].fmt.pix_mp.width, inst->fmts[port].fmt.pix_mp.height);
 	rc = venus_hfi_session_property(inst,
@@ -284,6 +283,8 @@ static int msm_venc_set_crop_offsets(struct msm_vidc_inst *inst,
 		top_offset = inst->crop.top;
 		width = inst->crop.width;
 		height = inst->crop.height;
+		right_offset = (inst->raw.width - width);
+		bottom_offset = (inst->raw.height - height);
 	} else {
 		left_offset = inst->compose.left;
 		top_offset = inst->compose.top;
@@ -293,10 +294,9 @@ static int msm_venc_set_crop_offsets(struct msm_vidc_inst *inst,
 			width = inst->compose.height;
 			height = inst->compose.width;
 		}
+		right_offset = (inst->fmts[port].fmt.pix_mp.width - width);
+		bottom_offset = (inst->fmts[port].fmt.pix_mp.height - height);
 	}
-
-	right_offset = (inst->fmts[port].fmt.pix_mp.width - width);
-	bottom_offset = (inst->fmts[port].fmt.pix_mp.height - height);
 
 	if (is_image_session(inst))
 		right_offset = bottom_offset = 0;
@@ -1264,8 +1264,10 @@ static int msm_venc_s_fmt_input(struct msm_vidc_inst *inst, struct v4l2_format *
 
 	fmt = &inst->fmts[INPUT_PORT];
 	fmt->type = INPUT_MPLANE;
-	fmt->fmt.pix_mp.width = width;
-	fmt->fmt.pix_mp.height = height;
+	inst->raw.width = width;
+	inst->raw.height = height;
+	fmt->fmt.pix_mp.width = video_y_stride_pix(pix_fmt, width);
+	fmt->fmt.pix_mp.height = video_y_scanlines(pix_fmt, height);
 	fmt->fmt.pix_mp.num_planes = 1;
 	fmt->fmt.pix_mp.pixelformat = f->fmt.pix_mp.pixelformat;
 	fmt->fmt.pix_mp.plane_fmt[0].bytesperline = bytesperline;
