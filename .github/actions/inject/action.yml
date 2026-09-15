@@ -30,7 +30,25 @@ runs:
         WORKSPACE: ${{ github.workspace }}
       run: |
         set -euo pipefail
+        echo "MACHINE=$MACHINE"
+        echo "WORKSPACE=$WORKSPACE"
 
+        deploy_images_dir="$WORKSPACE/build/tmp/deploy/images"
+
+        echo "Contents of deploy images directory: $deploy_images_dir"
+
+        if [ -d "$deploy_images_dir" ]; then
+          find "$deploy_images_dir" \
+            -maxdepth 2 \
+            -printf '%y %p -> %l\n' \
+            | sort
+        else
+          echo "::error::Deploy images directory not found: $deploy_images_dir"
+          find "$WORKSPACE/build/tmp" \
+            -maxdepth 5 \
+            -print 2>/dev/null \
+            | sort || true
+        fi
         case "$MACHINE" in
           qcs9100-ride-sx|\
           qcs8300-ride-sx|\
@@ -38,7 +56,10 @@ runs:
           qcs615-ride|\
           sm8750-mtp|\
           kaanapali-mtp|\
-          qcom-armv8a)
+          iq-8275-evk|\
+          qcom-armv8a|\
+          glymur-crd|\
+          shikra-evk)
             ;;
           *)
             echo "::error::Unsupported machine: $MACHINE"
