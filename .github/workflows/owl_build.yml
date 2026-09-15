@@ -34,6 +34,12 @@ jobs:
             branch: ""
             tag_pattern: v6.18*
 
+          - name: linux-next-master
+            repository: https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+            checkout_type: branch
+            branch: master
+            tag_pattern: ""
+
           - name: linux-yocto-dev-master
             repository: https://git.yoctoproject.org/linux-yocto-dev.git
             checkout_type: branch
@@ -47,10 +53,10 @@ jobs:
             tag_pattern: ""
 
     runs-on:
-      group: GHA-video-Prd-SelfHosted-RG
+      group: GHA-video-Stg-SelfHosted-RG
       labels:
         - self-hosted
-        - video-prd-u2204-x64-large-od-ephem
+        - video-stg-u2204-x64-large-od-ephem
 
     timeout-minutes: 720
 
