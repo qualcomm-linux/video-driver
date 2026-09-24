@@ -35,7 +35,8 @@
   },
   "linux-yocto-6.18": {
     "machine": "qcom-armv8a",
-    "kas_file": "../meta-qcom/ci/ci.yml:../meta-qcom/ci/qcom-armv8a.yml:../meta-qcom/ci/qcom-distro.yml"
+    "kas_file": "../meta-qcom/ci/ci.yml:../meta-qcom/ci/qcom-armv8a.yml:../meta-qcom/ci/qcom-distro.yml",
+    "extra_packages": "ccache"
   },
   "qcs6490-rb3gen2-core-kit-linux-qcom-6.18": {
     "machine": "rb3gen2-core-kit",
