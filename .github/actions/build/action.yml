@@ -65,11 +65,11 @@ runs:
         cat "$KAS_CONF_FILE"
         echo "======================================="
 
-        printf '%s\n' 'header:' > "$KAS_OVERLAY"
-        printf '%s\n' '  version: 14' >> "$KAS_OVERLAY"
-        printf '%s\n' '' >> "$KAS_OVERLAY"
-        printf '%s\n' 'local_conf_header:' >> "$KAS_OVERLAY"
-        printf '%s\n' '  iris-video-ci-override: |' >> "$KAS_OVERLAY"
+        printf '%s\n' 'header:'                             > "$KAS_OVERLAY"
+        printf '%s\n' '  version: 14'                      >> "$KAS_OVERLAY"
+        printf '%s\n' ''                                    >> "$KAS_OVERLAY"
+        printf '%s\n' 'local_conf_header:'                  >> "$KAS_OVERLAY"
+        printf '%s\n' '  iris-video-ci-override: |'         >> "$KAS_OVERLAY"
 
         while IFS= read -r line || [ -n "$line" ]; do
           printf '    %s\n' "$line" >> "$KAS_OVERLAY"
@@ -81,30 +81,30 @@ runs:
 
         rm -f "$BUILD_SCRIPT"
 
-        printf '%s\n' '#!/usr/bin/env bash'                                                                                                        >> "$BUILD_SCRIPT"
-        printf '%s\n' 'set -euo pipefail'                                                                                                          >> "$BUILD_SCRIPT"
-        printf '%s\n' ''                                                                                                                            >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "=== Inside container ==="'                                                                                            >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "PWD: $(pwd)"'                                                                                                         >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "MACHINE: ${MACHINE}"'                                                                                                 >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "KAS_FILE: ${KAS_FILE}"'                                                                                               >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "BUILD_COMMAND: ${BUILD_COMMAND}"'                                                                                     >> "$BUILD_SCRIPT"
-        printf '%s\n' ''                                                                                                                            >> "$BUILD_SCRIPT"
-        printf '%s\n' 'OVERLAY_FILE="/workspace/meta-qcom/ci_externalsrc_overlay.yml"'                                                             >> "$BUILD_SCRIPT"
-        printf '%s\n' 'if [ ! -f "$OVERLAY_FILE" ]; then'                                                                                          >> "$BUILD_SCRIPT"
-        printf '%s\n' '  echo "::error::KAS overlay not found: $OVERLAY_FILE"'                                                                     >> "$BUILD_SCRIPT"
-        printf '%s\n' '  exit 1'                                                                                                                    >> "$BUILD_SCRIPT"
-        printf '%s\n' 'fi'                                                                                                                          >> "$BUILD_SCRIPT"
-        printf '%s\n' ''                                                                                                                            >> "$BUILD_SCRIPT"
-        printf '%s\n' 'FULL_KAS_FILE="${KAS_FILE}:../meta-qcom/ci_externalsrc_overlay.yml"'                                                        >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "Full KAS file: ${FULL_KAS_FILE}"'                                                                                     >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "Starting build for ${MACHINE}"'                                                                                       >> "$BUILD_SCRIPT"
-        printf '%s\n' 'which kas'                                                                                                                   >> "$BUILD_SCRIPT"
-        printf '%s\n' 'kas --version'                                                                                                               >> "$BUILD_SCRIPT"
-        printf '%s\n' ''                                                                                                                            >> "$BUILD_SCRIPT"
-        printf '%s\n' 'kas shell "$FULL_KAS_FILE" -c "$BUILD_COMMAND"'                                                                             >> "$BUILD_SCRIPT"
-        printf '%s\n' ''                                                                                                                            >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "=== local.conf EXTERNALSRC lines ==="'                                                                                >> "$BUILD_SCRIPT"
+        printf '%s\n' '#!/usr/bin/env bash'                                                                                    >> "$BUILD_SCRIPT"
+        printf '%s\n' 'set -euo pipefail'                                                                                      >> "$BUILD_SCRIPT"
+        printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "=== Inside container ==="'                                                                        >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "PWD: $(pwd)"'                                                                                     >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "MACHINE: ${MACHINE}"'                                                                             >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "KAS_FILE: ${KAS_FILE}"'                                                                           >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "BUILD_COMMAND: ${BUILD_COMMAND}"'                                                                 >> "$BUILD_SCRIPT"
+        printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
+        printf '%s\n' 'OVERLAY_FILE="/workspace/meta-qcom/ci_externalsrc_overlay.yml"'                                         >> "$BUILD_SCRIPT"
+        printf '%s\n' 'if [ ! -f "$OVERLAY_FILE" ]; then'                                                                      >> "$BUILD_SCRIPT"
+        printf '%s\n' '  echo "::error::KAS overlay not found: $OVERLAY_FILE"'                                                 >> "$BUILD_SCRIPT"
+        printf '%s\n' '  exit 1'                                                                                                >> "$BUILD_SCRIPT"
+        printf '%s\n' 'fi'                                                                                                      >> "$BUILD_SCRIPT"
+        printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
+        printf '%s\n' 'FULL_KAS_FILE="${KAS_FILE}:../meta-qcom/ci_externalsrc_overlay.yml"'                                    >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "Full KAS file: ${FULL_KAS_FILE}"'                                                                 >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "Starting build for ${MACHINE}"'                                                                   >> "$BUILD_SCRIPT"
+        printf '%s\n' 'which kas'                                                                                               >> "$BUILD_SCRIPT"
+        printf '%s\n' 'kas --version'                                                                                          >> "$BUILD_SCRIPT"
+        printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
+        printf '%s\n' 'kas shell "$FULL_KAS_FILE" -c "$BUILD_COMMAND"'                                                         >> "$BUILD_SCRIPT"
+        printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "=== local.conf EXTERNALSRC lines ==="'                                                            >> "$BUILD_SCRIPT"
         printf '%s\n' 'grep -n "EXTERNALSRC\|EXTERNALSRC_BUILD\|do_fetch\|do_unpack\|do_patch" /workspace/video-driver/build/conf/local.conf || true' >> "$BUILD_SCRIPT"
 
         chmod +x "$BUILD_SCRIPT"
@@ -150,8 +150,7 @@ runs:
         fi
 
         if [ ! -x "${WORKSPACE_ROOT}/ci_build.sh" ]; then
-          echo "::error::Build script not found or not executable:"
-          echo "${WORKSPACE_ROOT}/ci_build.sh"
+          echo "::error::Build script not found or not executable: ${WORKSPACE_ROOT}/ci_build.sh"
           exit 1
         fi
 
@@ -165,28 +164,46 @@ runs:
         if [ -n "${EXTRA_PACKAGES:-}" ]; then
           echo "Extra packages: $EXTRA_PACKAGES"
 
-          # Run as root: install packages, then drop to build user via su
+          # Step 1: install packages as root
           docker run --rm \
+            -v "${WORKSPACE_ROOT}:/workspace" \
+            -w "/workspace/${REPO_NAME}" \
+            "$DOCKER_IMAGE" \
+            bash -lc "
+              echo '=== Installing extra packages as root ==='
+              apt-get update -qq
+              apt-get install -y --no-install-recommends ${EXTRA_PACKAGES}
+              echo '=== Installed: ==='
+              dpkg -l ${EXTRA_PACKAGES}
+            "
+
+          # Step 2: commit the modified container as a temporary image
+          TEMP_IMAGE="${DOCKER_IMAGE}-with-extra-$$"
+
+          CONTAINER_ID=$(docker run --rm -d \
+            -v "${WORKSPACE_ROOT}:/workspace" \
+            "$DOCKER_IMAGE" \
+            bash -lc "apt-get update -qq && apt-get install -y --no-install-recommends ${EXTRA_PACKAGES} && sleep 5")
+
+          sleep 6
+          docker commit "$CONTAINER_ID" "$TEMP_IMAGE" || true
+          docker rm -f "$CONTAINER_ID" 2>/dev/null || true
+
+          # Step 3: run build with the updated image as build user
+          docker run --rm \
+            --user "${USER_ID}:${GROUP_ID}" \
             -v "${WORKSPACE_ROOT}:/workspace" \
             -w "/workspace/${REPO_NAME}" \
             -e "MACHINE=$MACHINE" \
             -e "KAS_FILE=$KAS_FILE" \
             -e "BUILD_COMMAND=$BUILD_COMMAND" \
-            "$DOCKER_IMAGE" \
-            bash -lc "
-              set -euo pipefail
-              echo '=== Installing extra packages as root ==='
-              apt-get update -qq
-              apt-get install -y --no-install-recommends ${EXTRA_PACKAGES}
-              echo '=== Package installation complete ==='
-              command -v ccache && ccache --version || true
-              # Drop to build user
-              groupadd -f -g ${GROUP_ID} cigroup 2>/dev/null || true
-              useradd -o -u ${USER_ID} -g ${GROUP_ID} -M -s /bin/bash ciuser 2>/dev/null || true
-              su -s /bin/bash -c '/workspace/ci_build.sh' ciuser
-            "
+            "$TEMP_IMAGE" \
+            bash -lc '/workspace/ci_build.sh'
+
+          docker rmi "$TEMP_IMAGE" 2>/dev/null || true
+
         else
-          # No extra packages: run directly as build user (original behaviour)
+          # No extra packages — run directly as build user
           docker run --rm \
             --user "${USER_ID}:${GROUP_ID}" \
             -v "${WORKSPACE_ROOT}:/workspace" \
