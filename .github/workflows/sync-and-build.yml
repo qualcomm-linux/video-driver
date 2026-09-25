@@ -189,8 +189,9 @@ jobs:
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: bitbake qcom-multimedia-proprietary-image
           kas_local_conf_header: |
-            # === Host tool overrides ===
+            # === ccache disable (ccache not available in Docker image) ===
             HOSTTOOLS:remove = "ccache"
+            INHERIT:remove = "ccache"
 
             # === iris-video-dlkm CI override ===
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
