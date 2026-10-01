@@ -5,7 +5,7 @@
     "lavaname": "qcs9100-ride"
   },
   "monaco-evk": {
-    "machine": "monaco-evk",
+    "machine": "iq-8275-evk",
     "kas_file": "../meta-qcom/ci/iq-8275-evk.yml:../meta-qcom/ci/qcom-distro.yml",
     "lavaname": "monaco-evk"
   },
@@ -53,10 +53,10 @@
     "kas_file": "../meta-qcom/ci/qcs615-ride.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
     "lavaname": "qcs615-ride"
   },
-  "qcs8300-ride-sx-linux-qcom-6.18": {
-    "machine": "qcs8300-ride-sx",
-    "kas_file": "../meta-qcom/ci/qcs8300-ride-sx.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "qcs8300-ride"
+  "iq-8275-evk-linux-qcom-6.18": {
+    "machine": "iq-8275-evk",
+    "kas_file": "../meta-qcom/ci/iq-8275-evk.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "monaco-evk"
   },
   "sm8750-mtp-linux-qcom-6.18": {
     "machine": "sm8750-mtp",
