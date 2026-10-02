@@ -92,28 +92,28 @@
   "glymur-crd-qcom-6.18": {
     "machine": "glymur-crd",
     "kas_file": "../meta-qcom/ci/glymur-crd.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "glymur-crd"
+    "lavaname": "glymur-crd",
     "build_command": "bitbake qcom-multimedia-proprietary-image",
     "image_name": "qcom-multimedia-proprietary-image"
   },
    "glymur-crd": {
     "machine": "glymur-crd",
     "kas_file": "../meta-qcom/ci/glymur-crd.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "glymur-crd"
+    "lavaname": "glymur-crd",
     "build_command": "bitbake qcom-multimedia-proprietary-image",
     "image_name": "qcom-multimedia-proprietary-image"
   },
   "shikra-evk": {
     "machine": "shikra-evk",
     "kas_file": "../meta-qcom/ci/shikra-evk.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "shikra-iqs-evk"
+    "lavaname": "shikra-iqs-evk",
     "build_command": "bitbake qcom-multimedia-image",
     "image_name": "qcom-multimedia-image"
   },
   "shikra-evk": {
     "machine": "shikra-evk",
     "kas_file": "../meta-qcom/ci/shikra-evk.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
-    "lavaname": "shikra-iqs-evk"
+    "lavaname": "shikra-iqs-evk",
     "build_command": "bitbake qcom-multimedia-image",
     "image_name": "qcom-multimedia-image"
   }
