@@ -38,8 +38,8 @@ runs:
           qcs615-ride|\
           sm8750-mtp|\
           kaanapali-mtp|\
-          iq-8275-evk)|\
-          qcom-armv8a)
+          iq-8275-evk|\
+          qcom-armv8a
             ;;
           *)
             echo "::error::Unsupported machine: $MACHINE"
