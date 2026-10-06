@@ -182,7 +182,7 @@ jobs:
           docker images | grep -- "$DOCKER_IMAGE" || true
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/build@git_enable
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
@@ -191,6 +191,9 @@ jobs:
           kas_local_conf_header: |
             # === Enable ADB daemon ===
             IMAGE_FEATURES += "enable-adbd"
+
+            # === Enable Git in target rootfs ===
+            IMAGE_INSTALL:append = " git"
 
             # === ccache disable (ccache not available in Docker image) ===
             HOSTTOOLS:remove = "ccache"
@@ -241,15 +244,15 @@ jobs:
             "https://github.com/qualcomm-linux/qcom-linux-testkit/releases/download/IRIS-Video-Files-v1.0/video_clips_iris.tar.gz" \
             -O "$WORKSPACE/downloads/video_clips_iris.tar.gz"
 
-          if [ ! -f "$WORKSPACE/downloads/video_clips_iris.tar.gz" ]; then
-            echo "::error::Video contents download failed"
+          if [ ! -s "$WORKSPACE/downloads/video_clips_iris.tar.gz" ]; then
+            echo "::error::Video contents download failed or file is empty"
             exit 1
           fi
 
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/inject@git_enable
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
@@ -310,7 +313,7 @@ jobs:
           cat "$WORKSPACE/artifacts/file_list.txt"
 
       - name: Upload artifacts to S3
-        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@git_enable
         with:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
@@ -323,6 +326,22 @@ jobs:
           name: presigned-urls-${{ matrix.build_matrix.machine }}
           path: ${{ github.workspace }}/presigned_urls.json
           retention-days: 7
+          
+      - name: Upload flash files
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-files-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_flash_files.tar
+          retention-days: 7
+          compression-level: 0
+
+      - name: Upload rootfs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rootfs-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_rootfs.img
+          retention-days: 7
+          compression-level: 0
 
       - name: Clean up
         if: always()
