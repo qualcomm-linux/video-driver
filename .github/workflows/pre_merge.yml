@@ -47,6 +47,9 @@ jobs:
             && github.event.pull_request.head.repo.full_name
             || github.repository }}
 
+    secrets:
+      HYDRA_WIFI_PASSWORD: ${{ secrets.HYDRA_WIFI_PASSWORD }}
+
   owl_build:
     name: OWL parallel kernel and video-driver build
     needs:

@@ -23,6 +23,11 @@ on:
         type: string
         required: true
 
+    secrets:
+      HYDRA_WIFI_PASSWORD:
+        description: Password for the Hydra Wi-Fi network
+        required: true
+
 permissions:
   contents: read
 
@@ -182,7 +187,9 @@ jobs:
           docker images | grep -- "$DOCKER_IMAGE" || true
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@git_enable
+        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        env:
+          WIFI_PASSWORD: ${{ secrets.HYDRA_WIFI_PASSWORD }}
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
@@ -195,7 +202,48 @@ jobs:
             # === Enable Git in target rootfs ===
             IMAGE_INSTALL:append = " git"
 
-            # === ccache disable (ccache not available in Docker image) ===
+            # === Pass Wi-Fi password into the BitBake build environment ===
+            BB_ENV_PASSTHROUGH_ADDITIONS:append = " WIFI_PASSWORD"
+
+            # === Connect to Hydra Wi-Fi after boot ===
+            wifi_post_boot_service() {
+                install -d ${IMAGE_ROOTFS}${systemd_system_unitdir}
+                install -d ${IMAGE_ROOTFS}${sysconfdir}/default
+                install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants
+
+                cat > ${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service <<'EOF'
+            [Unit]
+            Description=Connect to Hydra Wi-Fi
+            Wants=NetworkManager.service
+            After=NetworkManager.service
+            Before=network-online.target
+
+            [Service]
+            Type=oneshot
+            EnvironmentFile=/etc/default/wifi-connect
+            ExecStart=/bin/sh -c '/usr/bin/nmcli dev wifi connect Hydra password "$WIFI_PASSWORD"'
+            RemainAfterExit=yes
+            StandardOutput=journal
+            StandardError=journal
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+                printf '%s\n' "WIFI_PASSWORD=$WIFI_PASSWORD" \
+                    > ${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect
+
+                chmod 600 \
+                    ${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect
+
+                ln -sf \
+                    ${systemd_system_unitdir}/wifi-connect.service \
+                    ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service
+            }
+
+            ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"
+
+            # === ccache disable ===
             HOSTTOOLS:remove = "ccache"
             INHERIT:remove = "ccache"
 
@@ -252,7 +300,7 @@ jobs:
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux/video-driver/.github/actions/inject@git_enable
+        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.main
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
@@ -313,7 +361,7 @@ jobs:
           cat "$WORKSPACE/artifacts/file_list.txt"
 
       - name: Upload artifacts to S3
-        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@git_enable
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
         with:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
@@ -326,22 +374,6 @@ jobs:
           name: presigned-urls-${{ matrix.build_matrix.machine }}
           path: ${{ github.workspace }}/presigned_urls.json
           retention-days: 7
-          
-      - name: Upload flash files
-        uses: actions/upload-artifact@v4
-        with:
-          name: flash-files-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_flash_files.tar
-          retention-days: 7
-          compression-level: 0
-
-      - name: Upload rootfs
-        uses: actions/upload-artifact@v4
-        with:
-          name: rootfs-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_rootfs.img
-          retention-days: 7
-          compression-level: 0
 
       - name: Clean up
         if: always()
