@@ -59,6 +59,8 @@ jobs:
 
           rm -rf "$WORKSPACE/build/tmp" || true
           rm -f "$(dirname "$WORKSPACE")/kas_local_conf_header.txt" || true
+          rm -f "$WORKSPACE/.hydra_wifi_password" || true
+          rm -rf "$WORKSPACE/classes" || true
 
           echo "=== Disk after clean ==="
           df -h
@@ -186,62 +188,117 @@ jobs:
 
           docker images | grep -- "$DOCKER_IMAGE" || true
 
+      - name: Prepare Hydra Wi-Fi password
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          HYDRA_WIFI_PASSWORD: ${{ secrets.HYDRA_WIFI_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${HYDRA_WIFI_PASSWORD:-}" ]; then
+            echo "::error::HYDRA_WIFI_PASSWORD secret is empty or was not passed"
+            exit 1
+          fi
+
+          password_file="$WORKSPACE/.hydra_wifi_password"
+
+          umask 077
+          printf '%s' "$HYDRA_WIFI_PASSWORD" > "$password_file"
+          chmod 600 "$password_file"
+
+          if [ ! -s "$password_file" ]; then
+            echo "::error::Wi-Fi password file was not created"
+            exit 1
+          fi
+
+          echo "Hydra Wi-Fi password file prepared"
+
+      - name: Create Wi-Fi post-boot BitBake class
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$WORKSPACE/classes"
+
+          cat > "$WORKSPACE/classes/wifi-post-boot.bbclass" <<'EOF'
+          WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"
+
+          wifi_post_boot_service() {
+              if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then
+                  bb.fatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"
+              fi
+
+              wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"
+
+              if [ -z "${wifi_password}" ]; then
+                  bb.fatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"
+              fi
+
+              install -d "${IMAGE_ROOTFS}${systemd_system_unitdir}"
+              install -d "${IMAGE_ROOTFS}${sysconfdir}/default"
+              install -d "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants"
+
+              cat > "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service" <<'SERVICE_EOF'
+          [Unit]
+          Description=Connect to Hydra Wi-Fi
+          Wants=NetworkManager.service
+          After=NetworkManager.service
+          Before=network-online.target
+
+          [Service]
+          Type=oneshot
+          EnvironmentFile=/etc/default/wifi-connect
+          ExecStart=/bin/sh -c '/usr/bin/nmcli dev wifi connect Hydra password "$WIFI_PASSWORD"'
+          RemainAfterExit=yes
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE_EOF
+
+              printf 'WIFI_PASSWORD=%s\n' "${wifi_password}" \
+                  > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect"
+
+              chmod 600 \
+                  "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect"
+
+              ln -sf \
+                  "${systemd_system_unitdir}/wifi-connect.service" \
+                  "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service"
+
+              bbnote "Installed Hydra Wi-Fi post-boot service"
+          }
+
+          ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"
+          EOF
+
+          chmod 644 "$WORKSPACE/classes/wifi-post-boot.bbclass"
+
+          echo "Created Wi-Fi post-boot BitBake class"
+          echo "Class path: $WORKSPACE/classes/wifi-post-boot.bbclass"
+
       - name: Build image
         uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
-        env:
-          WIFI_PASSWORD: ${{ secrets.HYDRA_WIFI_PASSWORD }}
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: bitbake qcom-multimedia-proprietary-image
           kas_local_conf_header: |
+            # === Enable Wi-Fi post-boot service ===
+            BBPATH:prepend = "/workspace/video-driver:"
+            INHERIT += "wifi-post-boot"
+            WIFI_PASSWORD_FILE = "/workspace/video-driver/.hydra_wifi_password"
+
             # === Enable ADB daemon ===
             IMAGE_FEATURES += "enable-adbd"
 
             # === Enable Git in target rootfs ===
             IMAGE_INSTALL:append = " git"
-
-            # === Pass Wi-Fi password into the BitBake build environment ===
-            BB_ENV_PASSTHROUGH_ADDITIONS:append = " WIFI_PASSWORD"
-
-            # === Connect to Hydra Wi-Fi after boot ===
-            wifi_post_boot_service() {
-                install -d ${IMAGE_ROOTFS}${systemd_system_unitdir}
-                install -d ${IMAGE_ROOTFS}${sysconfdir}/default
-                install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants
-
-                cat > ${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service <<'EOF'
-            [Unit]
-            Description=Connect to Hydra Wi-Fi
-            Wants=NetworkManager.service
-            After=NetworkManager.service
-            Before=network-online.target
-
-            [Service]
-            Type=oneshot
-            EnvironmentFile=/etc/default/wifi-connect
-            ExecStart=/bin/sh -c '/usr/bin/nmcli dev wifi connect Hydra password "$WIFI_PASSWORD"'
-            RemainAfterExit=yes
-            StandardOutput=journal
-            StandardError=journal
-
-            [Install]
-            WantedBy=multi-user.target
-            EOF
-
-                printf '%s\n' "WIFI_PASSWORD=$WIFI_PASSWORD" \
-                    > ${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect
-
-                chmod 600 \
-                    ${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect
-
-                ln -sf \
-                    ${systemd_system_unitdir}/wifi-connect.service \
-                    ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service
-            }
-
-            ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"
 
             # === ccache disable ===
             HOSTTOOLS:remove = "ccache"
@@ -383,6 +440,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          rm -f "$WORKSPACE/.hydra_wifi_password" || true
+          rm -rf "$WORKSPACE/classes" || true
           rm -rf "$WORKSPACE/artifacts" || true
           rm -rf "$WORKSPACE/build" || true
           rm -rf "$WORKSPACE/downloads" || true
