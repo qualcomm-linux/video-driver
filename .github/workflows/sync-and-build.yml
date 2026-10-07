@@ -224,65 +224,212 @@ jobs:
           mkdir -p "$WORKSPACE/classes"
 
           cat > "$WORKSPACE/classes/wifi-post-boot.bbclass" <<'EOF'
-          WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"
+WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"
 
-          wifi_post_boot_service() {
-              if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then
-                  bb.fatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"
-              fi
+wifi_post_boot_service() {
+    if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then
+        bbfatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"
+    fi
 
-              wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"
+    wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"
 
-              if [ -z "${wifi_password}" ]; then
-                  bb.fatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"
-              fi
+    if [ -z "${wifi_password}" ]; then
+        bbfatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"
+    fi
 
-              install -d "${IMAGE_ROOTFS}${systemd_system_unitdir}"
-              install -d "${IMAGE_ROOTFS}${sysconfdir}/default"
-              install -d "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants"
+    install -d "${IMAGE_ROOTFS}${systemd_system_unitdir}"
+    install -d "${IMAGE_ROOTFS}${sysconfdir}/default"
+    install -d "${IMAGE_ROOTFS}${sbindir}"
+    install -d "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants"
 
-              cat > "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service" <<'SERVICE_EOF'
-          [Unit]
-          Description=Connect to Hydra Wi-Fi
-          Wants=NetworkManager.service
-          After=NetworkManager.service
-          Before=network-online.target
+    cat > "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh" <<'SCRIPT_EOF'
+#!/bin/sh
 
-          [Service]
-          Type=oneshot
-          EnvironmentFile=/etc/default/wifi-connect
-          ExecStart=/bin/sh -c '/usr/bin/nmcli dev wifi connect Hydra password "$WIFI_PASSWORD"'
-          RemainAfterExit=yes
-          StandardOutput=journal
-          StandardError=journal
+set -u
 
-          [Install]
-          WantedBy=multi-user.target
-          SERVICE_EOF
+SSID="Hydra"
+PASSWORD_FILE="/etc/default/wifi-connect-password"
+MAX_ATTEMPTS=12
+WIFI_DEVICE=""
 
-              printf 'WIFI_PASSWORD=%s\n' "${wifi_password}" \
-                  > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect"
+log() {
+    echo "wifi-connect: $*"
+}
 
-              chmod 600 \
-                  "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect"
+if [ ! -s "$PASSWORD_FILE" ]; then
+    log "Password file missing or empty: $PASSWORD_FILE"
+    exit 1
+fi
 
-              ln -sf \
-                  "${systemd_system_unitdir}/wifi-connect.service" \
-                  "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service"
+PASSWORD="$(cat "$PASSWORD_FILE")"
 
-              bbnote "Installed Hydra Wi-Fi post-boot service"
-          }
+log "Waiting for NetworkManager"
 
-          ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"
-          EOF
+attempt=1
+while [ "$attempt" -le 30 ]; do
+    if systemctl is-active --quiet NetworkManager.service; then
+        break
+    fi
+
+    log "NetworkManager is not active yet; attempt $attempt/30"
+    attempt=$((attempt + 1))
+    sleep 2
+done
+
+if ! systemctl is-active --quiet NetworkManager.service; then
+    log "NetworkManager did not become active"
+    systemctl status NetworkManager.service --no-pager || true
+    exit 1
+fi
+
+log "Enabling Wi-Fi radio"
+nmcli radio wifi on || true
+
+log "Waiting for Wi-Fi interface"
+
+attempt=1
+while [ "$attempt" -le 30 ]; do
+    WIFI_DEVICE="$(nmcli -t -f DEVICE,TYPE device 2>/dev/null \
+        | awk -F: '$2 == "wifi" { print $1; exit }')"
+
+    if [ -n "$WIFI_DEVICE" ]; then
+        break
+    fi
+
+    log "Wi-Fi interface is not ready yet; attempt $attempt/30"
+    attempt=$((attempt + 1))
+    sleep 2
+done
+
+if [ -z "$WIFI_DEVICE" ]; then
+    log "No Wi-Fi device detected"
+    nmcli device status || true
+    exit 1
+fi
+
+log "Using Wi-Fi device: $WIFI_DEVICE"
+
+log "Waiting for Wi-Fi scan results"
+
+attempt=1
+while [ "$attempt" -le 10 ]; do
+    nmcli device wifi rescan ifname "$WIFI_DEVICE" || true
+    sleep 5
+
+    if nmcli -t -f SSID device wifi list ifname "$WIFI_DEVICE" 2>/dev/null \
+        | grep -Fxq "$SSID"; then
+        log "SSID found: $SSID"
+        break
+    fi
+
+    log "SSID $SSID not visible yet; attempt $attempt/10"
+    attempt=$((attempt + 1))
+done
+
+attempt=1
+while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+    log "Connection attempt $attempt/$MAX_ATTEMPTS"
+
+    if nmcli -t -f ACTIVE,SSID device wifi 2>/dev/null \
+        | grep -q "^yes:${SSID}$"; then
+        log "Already connected to $SSID"
+        exit 0
+    fi
+
+    nmcli device wifi rescan ifname "$WIFI_DEVICE" || true
+    sleep 3
+
+    if nmcli --wait 30 device wifi connect "$SSID" \
+        password "$PASSWORD" \
+        ifname "$WIFI_DEVICE"; then
+        log "Connected to $SSID"
+        nmcli device status || true
+        exit 0
+    fi
+
+    log "Connection attempt failed"
+    nmcli device status || true
+    sleep 5
+
+    attempt=$((attempt + 1))
+done
+
+log "Unable to connect to $SSID after $MAX_ATTEMPTS attempts"
+nmcli general status || true
+nmcli radio wifi || true
+nmcli device status || true
+nmcli device wifi list ifname "$WIFI_DEVICE" || true
+
+exit 1
+SCRIPT_EOF
+
+    chmod 700 \
+        "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh"
+
+    printf '%s\n' "${wifi_password}" \
+        > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
+
+    chmod 600 \
+        "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
+
+    cat > "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service" <<'SERVICE_EOF'
+[Unit]
+Description=Connect to Hydra Wi-Fi
+Wants=NetworkManager.service
+After=NetworkManager.service
+Before=network-online.target
+Wants=NetworkManager-wait-online.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/wifi-connect.sh
+RemainAfterExit=yes
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
+    chmod 644 \
+        "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service"
+
+    ln -sf \
+        "${systemd_system_unitdir}/wifi-connect.service" \
+        "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service"
+
+    bbnote "Installed Hydra Wi-Fi post-boot service"
+}
+
+ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"
+EOF
 
           chmod 644 "$WORKSPACE/classes/wifi-post-boot.bbclass"
 
-          echo "Created Wi-Fi post-boot BitBake class"
-          echo "Class path: $WORKSPACE/classes/wifi-post-boot.bbclass"
+          echo "Created Wi-Fi post-boot BitBake class:"
+          ls -l "$WORKSPACE/classes/wifi-post-boot.bbclass"
+
+      - name: Verify Wi-Fi build files
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          test -f "$WORKSPACE/classes/wifi-post-boot.bbclass"
+          test -f "$WORKSPACE/.hydra_wifi_password"
+
+          echo "=== Wi-Fi class ==="
+          ls -l "$WORKSPACE/classes/wifi-post-boot.bbclass"
+
+          echo "=== Wi-Fi password file permissions ==="
+          stat -c '%A %a %n' "$WORKSPACE/.hydra_wifi_password"
+
+          echo "Wi-Fi build files are ready"
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/build@git_enable
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
@@ -357,7 +504,7 @@ jobs:
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/inject@git_enable
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
@@ -418,7 +565,7 @@ jobs:
           cat "$WORKSPACE/artifacts/file_list.txt"
 
       - name: Upload artifacts to S3
-        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@git_enable
         with:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
