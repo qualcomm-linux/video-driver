@@ -222,183 +222,149 @@ jobs:
 
           mkdir -p "$WORKSPACE/classes"
 
-          cat > "$WORKSPACE/classes/wifi-post-boot.bbclass" <<'BITBAKE_EOF'
-WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"
+          class_file="$WORKSPACE/classes/wifi-post-boot.bbclass"
 
-wifi_post_boot_service() {
-    if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then
-        bbfatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"
-    fi
+          printf '%s\n' \
+            'WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"' \
+            '' \
+            'wifi_post_boot_service() {' \
+            '    if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then' \
+            '        bbfatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"' \
+            '    fi' \
+            '' \
+            '    wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"' \
+            '' \
+            '    if [ -z "${wifi_password}" ]; then' \
+            '        bbfatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"' \
+            '    fi' \
+            '' \
+            '    install -d "${IMAGE_ROOTFS}${systemd_system_unitdir}"' \
+            '    install -d "${IMAGE_ROOTFS}${sysconfdir}/default"' \
+            '    install -d "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants"' \
+            '    install -d "${IMAGE_ROOTFS}${sbindir}"' \
+            '' \
+            '    printf "%s" "${wifi_password}" > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"' \
+            '    chmod 600 "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"' \
+            '' \
+            '    printf "%s\n" \' \
+            '        "#!/bin/sh" \' \
+            '        "set -u" \' \
+            '        "" \' \
+            '        "SSID=\"Hydra\"" \' \
+            '        "PASSWORD_FILE=\"/etc/default/wifi-connect-password\"" \' \
+            '        "WIFI_DEVICE=\"wlp1s0\"" \' \
+            '        "MAX_ATTEMPTS=12" \' \
+            '        "" \' \
+            '        "log() {" \' \
+            '        "    echo \"wifi-connect: \$*\"" \' \
+            '        "}" \' \
+            '        "" \' \
+            '        "if [ ! -s \"\$PASSWORD_FILE\" ]; then" \' \
+            '        "    log \"Password file is missing or empty: \$PASSWORD_FILE\"" \' \
+            '        "    exit 1" \' \
+            '        "fi" \' \
+            '        "" \' \
+            '        "PASSWORD=\"\$(cat \"\$PASSWORD_FILE\")\"" \' \
+            '        "" \' \
+            '        "log \"Waiting for NetworkManager\"" \' \
+            '        "count=0" \' \
+            '        "while [ \"\$count\" -lt 30 ]; do" \' \
+            '        "    if systemctl is-active --quiet NetworkManager.service; then" \' \
+            '        "        break" \' \
+            '        "    fi" \' \
+            '        "    count=\$((count + 1))" \' \
+            '        "    sleep 2" \' \
+            '        "done" \' \
+            '        "" \' \
+            '        "if ! systemctl is-active --quiet NetworkManager.service; then" \' \
+            '        "    log \"NetworkManager did not become active\"" \' \
+            '        "    systemctl status NetworkManager.service --no-pager || true" \' \
+            '        "    exit 1" \' \
+            '        "fi" \' \
+            '        "" \' \
+            '        "log \"Enabling Wi-Fi radio\"" \' \
+            '        "nmcli radio wifi on || true" \' \
+            '        "" \' \
+            '        "log \"Waiting for Wi-Fi device: \$WIFI_DEVICE\"" \' \
+            '        "count=0" \' \
+            '        "while [ \"\$count\" -lt 30 ]; do" \' \
+            '        "    if nmcli device status | awk -v dev=\"\$WIFI_DEVICE\" '\''\$1 == dev && \$2 == \"wifi\" { found=1 } END { exit !found }'\''; then" \' \
+            '        "        break" \' \
+            '        "    fi" \' \
+            '        "    count=\$((count + 1))" \' \
+            '        "    sleep 2" \' \
+            '        "done" \' \
+            '        "" \' \
+            '        "if ! nmcli device status | awk -v dev=\"\$WIFI_DEVICE\" '\''\$1 == dev && \$2 == \"wifi\" { found=1 } END { exit !found }'\''; then" \' \
+            '        "    log \"Wi-Fi device was not found\"" \' \
+            '        "    nmcli device status || true" \' \
+            '        "    exit 1" \' \
+            '        "fi" \' \
+            '        "" \' \
+            '        "attempt=1" \' \
+            '        "while [ \"\$attempt\" -le \"\$MAX_ATTEMPTS\" ]; do" \' \
+            '        "    log \"Wi-Fi connection attempt \$attempt/\$MAX_ATTEMPTS\"" \' \
+            '        "" \' \
+            '        "    if nmcli -t -f ACTIVE,SSID device wifi 2>/dev/null | grep -q \"^yes:\${SSID}\$\"; then" \' \
+            '        "        log \"Already connected to \$SSID\"" \' \
+            '        "        exit 0" \' \
+            '        "    fi" \' \
+            '        "" \' \
+            '        "    nmcli device wifi rescan ifname \"\$WIFI_DEVICE\" || true" \' \
+            '        "    sleep 3" \' \
+            '        "" \' \
+            '        "    if nmcli --wait 30 device wifi connect \"\$SSID\" password \"\$PASSWORD\" ifname \"\$WIFI_DEVICE\"; then" \' \
+            '        "        log \"Connected to \$SSID\"" \' \
+            '        "        exit 0" \' \
+            '        "    fi" \' \
+            '        "" \' \
+            '        "    nmcli device status || true" \' \
+            '        "    attempt=\$((attempt + 1))" \' \
+            '        "    sleep 5" \' \
+            '        "done" \' \
+            '        "" \' \
+            '        "log \"Failed to connect to \$SSID\"" \' \
+            '        "nmcli general status || true" \' \
+            '        "nmcli device status || true" \' \
+            '        "exit 1" \' \
+            '    > "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh"' \
+            '' \
+            '    chmod 700 "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh"' \
+            '' \
+            '    printf "%s\n" \' \
+            '        "[Unit]" \' \
+            '        "Description=Connect to Hydra Wi-Fi" \' \
+            '        "Wants=NetworkManager.service" \' \
+            '        "After=NetworkManager.service" \' \
+            '        "Before=network-online.target" \' \
+            '        "" \' \
+            '        "[Service]" \' \
+            '        "Type=oneshot" \' \
+            '        "ExecStart=/usr/sbin/wifi-connect.sh" \' \
+            '        "RemainAfterExit=yes" \' \
+            '        "StandardOutput=journal" \' \
+            '        "StandardError=journal" \' \
+            '        "" \' \
+            '        "[Install]" \' \
+            '        "WantedBy=multi-user.target"' \
+            '        > "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service"' \
+            '' \
+            '    ln -sf ../wifi-connect.service \' \
+            '        "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service"' \
+            '' \
+            '    bbnote "Installed Hydra Wi-Fi post-boot service"' \
+            '}' \
+            '' \
+            'ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"' \
+            > "$class_file"
 
-    wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"
+          chmod 644 "$class_file"
 
-    if [ -z "${wifi_password}" ]; then
-        bbfatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"
-    fi
+          echo "Created Wi-Fi BitBake class:"
+          echo "$class_file"
+          echo "Class line count: $(wc -l < "$class_file")"
 
-    install -d "${IMAGE_ROOTFS}${systemd_system_unitdir}"
-    install -d "${IMAGE_ROOTFS}${sysconfdir}/default"
-    install -d "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants"
-    install -d "${IMAGE_ROOTFS}${sbindir}"
-
-    printf '%s' "${wifi_password}" \
-        > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
-
-    chmod 600 \
-        "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
-
-    cat > "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh" <<'SCRIPT_EOF'
-#!/bin/sh
-
-set -u
-
-SSID="Hydra"
-PASSWORD_FILE="/etc/default/wifi-connect-password"
-WIFI_DEVICE="wlp1s0"
-MAX_ATTEMPTS=12
-
-log() {
-    echo "wifi-connect: $*"
-}
-
-wifi_device_exists() {
-    nmcli -t -f DEVICE,TYPE device 2>/dev/null \
-        | awk -F: -v device="$WIFI_DEVICE" \
-            '$1 == device && $2 == "wifi" { found=1 }
-             END { exit !found }'
-}
-
-wifi_connected() {
-    nmcli -t -f ACTIVE,SSID device wifi 2>/dev/null \
-        | grep -Fxq "yes:${SSID}"
-}
-
-if [ ! -s "$PASSWORD_FILE" ]; then
-    log "Password file is missing or empty: $PASSWORD_FILE"
-    exit 1
-fi
-
-PASSWORD="$(cat "$PASSWORD_FILE")"
-
-log "Waiting for NetworkManager"
-
-count=0
-while [ "$count" -lt 30 ]; do
-    if systemctl is-active --quiet NetworkManager.service; then
-        break
-    fi
-
-    count=$((count + 1))
-    sleep 2
-done
-
-if ! systemctl is-active --quiet NetworkManager.service; then
-    log "NetworkManager did not become active"
-    systemctl status NetworkManager.service --no-pager || true
-    exit 1
-fi
-
-log "Enabling Wi-Fi radio"
-nmcli radio wifi on || true
-
-log "Waiting for Wi-Fi device: $WIFI_DEVICE"
-
-count=0
-while [ "$count" -lt 30 ]; do
-    if wifi_device_exists; then
-        break
-    fi
-
-    count=$((count + 1))
-    sleep 2
-done
-
-if ! wifi_device_exists; then
-    log "Wi-Fi device was not found"
-    nmcli device status || true
-    exit 1
-fi
-
-log "Wi-Fi device detected: $WIFI_DEVICE"
-
-attempt=1
-
-while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-    log "Wi-Fi connection attempt $attempt/$MAX_ATTEMPTS"
-
-    if wifi_connected; then
-        log "Already connected to $SSID"
-        exit 0
-    fi
-
-    nmcli device wifi rescan ifname "$WIFI_DEVICE" || true
-    sleep 3
-
-    if nmcli --wait 30 device wifi connect "$SSID" \
-        password "$PASSWORD" \
-        ifname "$WIFI_DEVICE"; then
-        log "Connected to $SSID"
-        exit 0
-    fi
-
-    log "Connection attempt failed"
-    nmcli device status || true
-
-    attempt=$((attempt + 1))
-    sleep 5
-done
-
-log "Failed to connect to $SSID after $MAX_ATTEMPTS attempts"
-nmcli general status || true
-nmcli device status || true
-nmcli device wifi list ifname "$WIFI_DEVICE" || true
-
-exit 1
-SCRIPT_EOF
-
-    chmod 700 \
-        "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh"
-
-    cat > "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service" <<'SERVICE_EOF'
-[Unit]
-Description=Connect to Hydra Wi-Fi
-Wants=NetworkManager.service
-After=NetworkManager.service
-Before=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/sbin/wifi-connect.sh
-RemainAfterExit=yes
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-SERVICE_EOF
-
-    chmod 644 \
-        "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service"
-
-    ln -sf \
-        "${systemd_system_unitdir}/wifi-connect.service" \
-        "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service"
-
-    bbnote "Installed Hydra Wi-Fi post-boot service"
-}
-
-ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"
-BITBAKE_EOF
-
-          chmod 644 "$WORKSPACE/classes/wifi-post-boot.bbclass"
-
-          echo "Created Wi-Fi post-boot BitBake class"
-          echo "Class path: $WORKSPACE/classes/wifi-post-boot.bbclass"
-
-          echo "=== Generated class ==="
-          sed -n '1,260p' "$WORKSPACE/classes/wifi-post-boot.bbclass"
-
-      - name: Verify Wi-Fi class before build
+      - name: Verify Wi-Fi build files
         shell: bash
         env:
           WORKSPACE: ${{ github.workspace }}
@@ -406,14 +372,11 @@ BITBAKE_EOF
           set -euo pipefail
 
           test -f "$WORKSPACE/classes/wifi-post-boot.bbclass"
+          test -f "$WORKSPACE/.hydra_wifi_password"
 
-          if grep -q '<<<<<<\|=======$\|>>>>>>' \
-              "$WORKSPACE/classes/wifi-post-boot.bbclass"; then
-            echo "::error::Git conflict marker found in Wi-Fi BitBake class"
-            exit 1
-          fi
-
-          echo "Wi-Fi BitBake class exists and contains no conflict markers"
+          echo "Wi-Fi BitBake class exists"
+          echo "Wi-Fi password file exists"
+          echo "Workspace: $WORKSPACE"
 
       - name: Build image
         uses: qualcomm-linux/video-driver/.github/actions/build@git_enable
@@ -423,22 +386,19 @@ BITBAKE_EOF
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: bitbake qcom-multimedia-proprietary-image
           kas_local_conf_header: |
-            # Enable the generated Wi-Fi post-boot BitBake class.
             BBPATH:prepend = "/workspace/video-driver:"
-            INHERIT += "wifi-post-boot"
+            BBPATH:prepend = "/workspace/video-driver/classes:"
+
+            INHERIT:append = " wifi-post-boot"
+
             WIFI_PASSWORD_FILE = "/workspace/video-driver/.hydra_wifi_password"
 
-            # Enable ADB daemon.
             IMAGE_FEATURES += "enable-adbd"
-
-            # Install Git in the target root filesystem.
             IMAGE_INSTALL:append = " git"
 
-            # Disable ccache.
             HOSTTOOLS:remove = "ccache"
             INHERIT:remove = "ccache"
 
-            # iris-video-dlkm CI override.
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
             EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
             S:pn-iris-video-dlkm = "${EXTERNALSRC}"
@@ -449,7 +409,6 @@ BITBAKE_EOF
             MAKE_TARGETS:pn-iris-video-dlkm = ""
             EXTRA_OEMAKE:pn-iris-video-dlkm = "-C ${STAGING_KERNEL_DIR} M=${S} modules"
 
-            # OOM mitigation.
             BB_NUMBER_THREADS = "6"
             PARALLEL_MAKE = "-j6"
 
@@ -528,6 +487,7 @@ BITBAKE_EOF
           ls -larth "$resolved_dir"
 
           mkdir -p "$WORKSPACE/artifacts"
+
           : > "$WORKSPACE/artifacts/file_list.txt"
 
           flash_tar="$WORKSPACE/${MACHINE}_flash_files.tar"
