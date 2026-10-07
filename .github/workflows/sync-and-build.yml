@@ -239,8 +239,14 @@ wifi_post_boot_service() {
 
     install -d "${IMAGE_ROOTFS}${systemd_system_unitdir}"
     install -d "${IMAGE_ROOTFS}${sysconfdir}/default"
-    install -d "${IMAGE_ROOTFS}${sbindir}"
     install -d "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants"
+    install -d "${IMAGE_ROOTFS}${sbindir}"
+
+    printf '%s' "${wifi_password}" \
+        > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
+
+    chmod 600 \
+        "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
 
     cat > "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh" <<'SCRIPT_EOF'
 #!/bin/sh
@@ -249,15 +255,27 @@ set -u
 
 SSID="Hydra"
 PASSWORD_FILE="/etc/default/wifi-connect-password"
+WIFI_DEVICE="wlp1s0"
 MAX_ATTEMPTS=12
-WIFI_DEVICE=""
 
 log() {
     echo "wifi-connect: $*"
 }
 
+has_wifi_device() {
+    nmcli -t -f DEVICE,TYPE device 2>/dev/null \
+        | awk -F: -v device="$WIFI_DEVICE" \
+            '$1 == device && $2 == "wifi" { found=1 } END { exit !found }'
+}
+
+is_connected_to_ssid() {
+    nmcli -t -f ACTIVE,SSID device wifi 2>/dev/null \
+        | awk -F: -v ssid="$SSID" \
+            '$1 == "yes" && $2 == ssid { found=1 } END { exit !found }'
+}
+
 if [ ! -s "$PASSWORD_FILE" ]; then
-    log "Password file missing or empty: $PASSWORD_FILE"
+    log "Password file is missing or empty: $PASSWORD_FILE"
     exit 1
 fi
 
@@ -265,14 +283,13 @@ PASSWORD="$(cat "$PASSWORD_FILE")"
 
 log "Waiting for NetworkManager"
 
-attempt=1
-while [ "$attempt" -le 30 ]; do
+count=0
+while [ "$count" -lt 30 ]; do
     if systemctl is-active --quiet NetworkManager.service; then
         break
     fi
 
-    log "NetworkManager is not active yet; attempt $attempt/30"
-    attempt=$((attempt + 1))
+    count=$((count + 1))
     sleep 2
 done
 
@@ -285,53 +302,32 @@ fi
 log "Enabling Wi-Fi radio"
 nmcli radio wifi on || true
 
-log "Waiting for Wi-Fi interface"
+log "Waiting for Wi-Fi device: $WIFI_DEVICE"
 
-attempt=1
-while [ "$attempt" -le 30 ]; do
-    WIFI_DEVICE="$(nmcli -t -f DEVICE,TYPE device 2>/dev/null \
-        | awk -F: '$2 == "wifi" { print $1; exit }')"
-
-    if [ -n "$WIFI_DEVICE" ]; then
+count=0
+while [ "$count" -lt 30 ]; do
+    if has_wifi_device; then
         break
     fi
 
-    log "Wi-Fi interface is not ready yet; attempt $attempt/30"
-    attempt=$((attempt + 1))
+    count=$((count + 1))
     sleep 2
 done
 
-if [ -z "$WIFI_DEVICE" ]; then
-    log "No Wi-Fi device detected"
+if ! has_wifi_device; then
+    log "Wi-Fi device was not found: $WIFI_DEVICE"
     nmcli device status || true
     exit 1
 fi
 
-log "Using Wi-Fi device: $WIFI_DEVICE"
-
-log "Waiting for Wi-Fi scan results"
+log "Wi-Fi device detected: $WIFI_DEVICE"
 
 attempt=1
-while [ "$attempt" -le 10 ]; do
-    nmcli device wifi rescan ifname "$WIFI_DEVICE" || true
-    sleep 5
 
-    if nmcli -t -f SSID device wifi list ifname "$WIFI_DEVICE" 2>/dev/null \
-        | grep -Fxq "$SSID"; then
-        log "SSID found: $SSID"
-        break
-    fi
-
-    log "SSID $SSID not visible yet; attempt $attempt/10"
-    attempt=$((attempt + 1))
-done
-
-attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-    log "Connection attempt $attempt/$MAX_ATTEMPTS"
+    log "Wi-Fi connection attempt $attempt/$MAX_ATTEMPTS"
 
-    if nmcli -t -f ACTIVE,SSID device wifi 2>/dev/null \
-        | grep -q "^yes:${SSID}$"; then
+    if is_connected_to_ssid; then
         log "Already connected to $SSID"
         exit 0
     fi
@@ -343,34 +339,24 @@ while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
         password "$PASSWORD" \
         ifname "$WIFI_DEVICE"; then
         log "Connected to $SSID"
-        nmcli device status || true
         exit 0
     fi
 
     log "Connection attempt failed"
     nmcli device status || true
-    sleep 5
 
     attempt=$((attempt + 1))
+    sleep 5
 done
 
-log "Unable to connect to $SSID after $MAX_ATTEMPTS attempts"
+log "Failed to connect to $SSID after $MAX_ATTEMPTS attempts"
 nmcli general status || true
-nmcli radio wifi || true
 nmcli device status || true
-nmcli device wifi list ifname "$WIFI_DEVICE" || true
-
 exit 1
 SCRIPT_EOF
 
     chmod 700 \
         "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh"
-
-    printf '%s\n' "${wifi_password}" \
-        > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
-
-    chmod 600 \
-        "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"
 
     cat > "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service" <<'SERVICE_EOF'
 [Unit]
@@ -378,13 +364,11 @@ Description=Connect to Hydra Wi-Fi
 Wants=NetworkManager.service
 After=NetworkManager.service
 Before=network-online.target
-Wants=NetworkManager-wait-online.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/sbin/wifi-connect.sh
 RemainAfterExit=yes
-TimeoutStartSec=300
 StandardOutput=journal
 StandardError=journal
 
@@ -407,26 +391,9 @@ EOF
 
           chmod 644 "$WORKSPACE/classes/wifi-post-boot.bbclass"
 
-          echo "Created Wi-Fi post-boot BitBake class:"
+          echo "Created Wi-Fi post-boot BitBake class"
+          echo "Class path: $WORKSPACE/classes/wifi-post-boot.bbclass"
           ls -l "$WORKSPACE/classes/wifi-post-boot.bbclass"
-
-      - name: Verify Wi-Fi build files
-        shell: bash
-        env:
-          WORKSPACE: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-
-          test -f "$WORKSPACE/classes/wifi-post-boot.bbclass"
-          test -f "$WORKSPACE/.hydra_wifi_password"
-
-          echo "=== Wi-Fi class ==="
-          ls -l "$WORKSPACE/classes/wifi-post-boot.bbclass"
-
-          echo "=== Wi-Fi password file permissions ==="
-          stat -c '%A %a %n' "$WORKSPACE/.hydra_wifi_password"
-
-          echo "Wi-Fi build files are ready"
 
       - name: Build image
         uses: qualcomm-linux/video-driver/.github/actions/build@git_enable
@@ -438,7 +405,8 @@ EOF
           kas_local_conf_header: |
             # === Enable Wi-Fi post-boot service ===
             BBPATH:prepend = "/workspace/video-driver:"
-            INHERIT += "wifi-post-boot"
+            BBPATH:prepend = "/workspace/video-driver/classes:"
+            INHERIT:append = " wifi-post-boot"
             WIFI_PASSWORD_FILE = "/workspace/video-driver/.hydra_wifi_password"
 
             # === Enable ADB daemon ===
@@ -508,6 +476,51 @@ EOF
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
+
+      - name: Verify generated Wi-Fi service in rootfs
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          MACHINE: ${{ matrix.build_matrix.machine }}
+        run: |
+          set -euo pipefail
+
+          qcomflash_link="$WORKSPACE/build/tmp/deploy/images/$MACHINE/qcom-multimedia-proprietary-image-${MACHINE}.rootfs.qcomflash"
+
+          if [ ! -L "$qcomflash_link" ]; then
+            echo "::error::qcomflash symlink not found: $qcomflash_link"
+            exit 1
+          fi
+
+          qcomflash_dir="$(readlink -f "$qcomflash_link")"
+          rootfs_img="$qcomflash_dir/rootfs.img"
+
+          if [ ! -f "$rootfs_img" ]; then
+            echo "::error::rootfs.img not found: $rootfs_img"
+            exit 1
+          fi
+
+          if command -v debugfs >/dev/null 2>&1; then
+            echo "=== Verifying Wi-Fi service files in rootfs ==="
+
+            debugfs -R "stat /usr/lib/systemd/system/wifi-connect.service" \
+              "$rootfs_img" 2>/dev/null || \
+            debugfs -R "stat /lib/systemd/system/wifi-connect.service" \
+              "$rootfs_img" 2>/dev/null || {
+                echo "::error::wifi-connect.service was not found in rootfs"
+                exit 1
+              }
+
+            debugfs -R "stat /usr/sbin/wifi-connect.sh" \
+              "$rootfs_img" 2>/dev/null || {
+                echo "::error::wifi-connect.sh was not found in rootfs"
+                exit 1
+              }
+
+            echo "Wi-Fi service files are present in rootfs"
+          else
+            echo "debugfs is not available; skipping rootfs service verification"
+          fi
 
       - name: Prepare qcomflash files
         shell: bash
