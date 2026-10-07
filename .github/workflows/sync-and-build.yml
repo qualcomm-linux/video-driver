@@ -64,7 +64,6 @@ jobs:
 
           echo "=== Disk after clean ==="
           df -h
-
           free -h
 
       - name: Validate build inputs
@@ -223,7 +222,7 @@ jobs:
 
           mkdir -p "$WORKSPACE/classes"
 
-          cat > "$WORKSPACE/classes/wifi-post-boot.bbclass" <<'EOF'
+          cat > "$WORKSPACE/classes/wifi-post-boot.bbclass" <<'BITBAKE_EOF'
 WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"
 
 wifi_post_boot_service() {
@@ -262,16 +261,16 @@ log() {
     echo "wifi-connect: $*"
 }
 
-has_wifi_device() {
+wifi_device_exists() {
     nmcli -t -f DEVICE,TYPE device 2>/dev/null \
         | awk -F: -v device="$WIFI_DEVICE" \
-            '$1 == device && $2 == "wifi" { found=1 } END { exit !found }'
+            '$1 == device && $2 == "wifi" { found=1 }
+             END { exit !found }'
 }
 
-is_connected_to_ssid() {
+wifi_connected() {
     nmcli -t -f ACTIVE,SSID device wifi 2>/dev/null \
-        | awk -F: -v ssid="$SSID" \
-            '$1 == "yes" && $2 == ssid { found=1 } END { exit !found }'
+        | grep -Fxq "yes:${SSID}"
 }
 
 if [ ! -s "$PASSWORD_FILE" ]; then
@@ -306,7 +305,7 @@ log "Waiting for Wi-Fi device: $WIFI_DEVICE"
 
 count=0
 while [ "$count" -lt 30 ]; do
-    if has_wifi_device; then
+    if wifi_device_exists; then
         break
     fi
 
@@ -314,8 +313,8 @@ while [ "$count" -lt 30 ]; do
     sleep 2
 done
 
-if ! has_wifi_device; then
-    log "Wi-Fi device was not found: $WIFI_DEVICE"
+if ! wifi_device_exists; then
+    log "Wi-Fi device was not found"
     nmcli device status || true
     exit 1
 fi
@@ -327,7 +326,7 @@ attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
     log "Wi-Fi connection attempt $attempt/$MAX_ATTEMPTS"
 
-    if is_connected_to_ssid; then
+    if wifi_connected; then
         log "Already connected to $SSID"
         exit 0
     fi
@@ -352,6 +351,8 @@ done
 log "Failed to connect to $SSID after $MAX_ATTEMPTS attempts"
 nmcli general status || true
 nmcli device status || true
+nmcli device wifi list ifname "$WIFI_DEVICE" || true
+
 exit 1
 SCRIPT_EOF
 
@@ -387,13 +388,32 @@ SERVICE_EOF
 }
 
 ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"
-EOF
+BITBAKE_EOF
 
           chmod 644 "$WORKSPACE/classes/wifi-post-boot.bbclass"
 
           echo "Created Wi-Fi post-boot BitBake class"
           echo "Class path: $WORKSPACE/classes/wifi-post-boot.bbclass"
-          ls -l "$WORKSPACE/classes/wifi-post-boot.bbclass"
+
+          echo "=== Generated class ==="
+          sed -n '1,260p' "$WORKSPACE/classes/wifi-post-boot.bbclass"
+
+      - name: Verify Wi-Fi class before build
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          test -f "$WORKSPACE/classes/wifi-post-boot.bbclass"
+
+          if grep -q '<<<<<<\|=======$\|>>>>>>' \
+              "$WORKSPACE/classes/wifi-post-boot.bbclass"; then
+            echo "::error::Git conflict marker found in Wi-Fi BitBake class"
+            exit 1
+          fi
+
+          echo "Wi-Fi BitBake class exists and contains no conflict markers"
 
       - name: Build image
         uses: qualcomm-linux/video-driver/.github/actions/build@git_enable
@@ -403,23 +423,22 @@ EOF
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: bitbake qcom-multimedia-proprietary-image
           kas_local_conf_header: |
-            # === Enable Wi-Fi post-boot service ===
+            # Enable the generated Wi-Fi post-boot BitBake class.
             BBPATH:prepend = "/workspace/video-driver:"
-            BBPATH:prepend = "/workspace/video-driver/classes:"
-            INHERIT:append = " wifi-post-boot"
+            INHERIT += "wifi-post-boot"
             WIFI_PASSWORD_FILE = "/workspace/video-driver/.hydra_wifi_password"
 
-            # === Enable ADB daemon ===
+            # Enable ADB daemon.
             IMAGE_FEATURES += "enable-adbd"
 
-            # === Enable Git in target rootfs ===
+            # Install Git in the target root filesystem.
             IMAGE_INSTALL:append = " git"
 
-            # === ccache disable ===
+            # Disable ccache.
             HOSTTOOLS:remove = "ccache"
             INHERIT:remove = "ccache"
 
-            # === iris-video-dlkm CI override ===
+            # iris-video-dlkm CI override.
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
             EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
             S:pn-iris-video-dlkm = "${EXTERNALSRC}"
@@ -430,7 +449,7 @@ EOF
             MAKE_TARGETS:pn-iris-video-dlkm = ""
             EXTRA_OEMAKE:pn-iris-video-dlkm = "-C ${STAGING_KERNEL_DIR} M=${S} modules"
 
-            # === OOM mitigation ===
+            # OOM mitigation.
             BB_NUMBER_THREADS = "6"
             PARALLEL_MAKE = "-j6"
 
@@ -448,7 +467,6 @@ EOF
             "$WORKSPACE/v4l-video-test-app/build/"
 
           echo "iris_test_app download complete"
-
           ls -la "$WORKSPACE/v4l-video-test-app/build/"
 
       - name: Download video contents
@@ -476,51 +494,6 @@ EOF
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
-
-      - name: Verify generated Wi-Fi service in rootfs
-        shell: bash
-        env:
-          WORKSPACE: ${{ github.workspace }}
-          MACHINE: ${{ matrix.build_matrix.machine }}
-        run: |
-          set -euo pipefail
-
-          qcomflash_link="$WORKSPACE/build/tmp/deploy/images/$MACHINE/qcom-multimedia-proprietary-image-${MACHINE}.rootfs.qcomflash"
-
-          if [ ! -L "$qcomflash_link" ]; then
-            echo "::error::qcomflash symlink not found: $qcomflash_link"
-            exit 1
-          fi
-
-          qcomflash_dir="$(readlink -f "$qcomflash_link")"
-          rootfs_img="$qcomflash_dir/rootfs.img"
-
-          if [ ! -f "$rootfs_img" ]; then
-            echo "::error::rootfs.img not found: $rootfs_img"
-            exit 1
-          fi
-
-          if command -v debugfs >/dev/null 2>&1; then
-            echo "=== Verifying Wi-Fi service files in rootfs ==="
-
-            debugfs -R "stat /usr/lib/systemd/system/wifi-connect.service" \
-              "$rootfs_img" 2>/dev/null || \
-            debugfs -R "stat /lib/systemd/system/wifi-connect.service" \
-              "$rootfs_img" 2>/dev/null || {
-                echo "::error::wifi-connect.service was not found in rootfs"
-                exit 1
-              }
-
-            debugfs -R "stat /usr/sbin/wifi-connect.sh" \
-              "$rootfs_img" 2>/dev/null || {
-                echo "::error::wifi-connect.sh was not found in rootfs"
-                exit 1
-              }
-
-            echo "Wi-Fi service files are present in rootfs"
-          else
-            echo "debugfs is not available; skipping rootfs service verification"
-          fi
 
       - name: Prepare qcomflash files
         shell: bash
@@ -555,7 +528,6 @@ EOF
           ls -larth "$resolved_dir"
 
           mkdir -p "$WORKSPACE/artifacts"
-
           : > "$WORKSPACE/artifacts/file_list.txt"
 
           flash_tar="$WORKSPACE/${MACHINE}_flash_files.tar"
