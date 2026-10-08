@@ -59,6 +59,8 @@ runs:
           iq-8275-evk|\
           qcom-armv8a|\
           glymur-crd|\
+          iq-x5121-evk|\
+          iq-x7181-evk|\
           shikra-evk)
             ;;
           *)

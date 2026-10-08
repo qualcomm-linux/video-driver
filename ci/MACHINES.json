@@ -123,5 +123,34 @@
     "lavaname": "kaanapali-mtp",
     "build_command": "bitbake qcom-multimedia-image",
     "image_name": "qcom-multimedia-image"
+  },
+   },
+  "Hamoa-linux-qcom-6.18": {
+    "machine": "iq-x7181-evk",
+    "kas_file": "../meta-qcom/ci/iq-x7181-evk.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "hamoa-evk",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
+  },
+  "Hamoa": {
+    "machine": "iq-x7181-evk",
+    "kas_file": "../meta-qcom/ci/iq-x7181-evk.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "hamoa-evk",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
+  },
+  "Purwa": {
+    "machine": "iq-x5121-evk",
+    "kas_file": "../meta-qcom/ci/iq-x5121-evk.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "purwa-evk",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
+  },
+  "Purwa-linux-qcom-6.18": {
+    "machine": "iq-x5121-evk",
+    "kas_file": "../meta-qcom/ci/iq-x5121-evk.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
+    "lavaname": "purwa-evk",
+    "build_command": "bitbake qcom-multimedia-image",
+    "image_name": "qcom-multimedia-image"
   }
 }
