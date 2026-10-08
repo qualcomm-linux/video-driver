@@ -85,7 +85,7 @@ jobs:
           fi
 
           echo "Source repository: $SOURCE_REPOSITORY"
-          echo "Commit SHA:       $COMMIT_SHA"
+          echo "Commit SHA:        $COMMIT_SHA"
 
       - name: Checkout exact HEAD commit
         uses: actions/checkout@v4
@@ -207,12 +207,18 @@ jobs:
           chmod 600 "$password_file"
 
           if [ ! -s "$password_file" ]; then
-            echo "::error::Wi-Fi password file was not created"
+            echo "::error::Wi-Fi password file was not created or is empty"
             exit 1
           fi
 
-          echo "Hydra Wi-Fi password file prepared"
+          echo "✅ Hydra Wi-Fi password file prepared"
 
+      # -----------------------------------------------------------------------
+      # REPLACED: Instead of a script + systemd service, we now directly bake
+      # the Hydra.nmconnection profile into the rootfs via a ROOTFS_POSTPROCESS
+      # command. NetworkManager reads it on boot and auto-connects — no script
+      # needed.
+      # -----------------------------------------------------------------------
       - name: Create Wi-Fi post-boot BitBake class
         shell: bash
         env:
@@ -224,145 +230,65 @@ jobs:
 
           class_file="$WORKSPACE/classes/wifi-post-boot.bbclass"
 
-          printf '%s\n' \
-            'WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"' \
-            '' \
-            'wifi_post_boot_service() {' \
-            '    if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then' \
-            '        bbfatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"' \
-            '    fi' \
-            '' \
-            '    wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"' \
-            '' \
-            '    if [ -z "${wifi_password}" ]; then' \
-            '        bbfatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"' \
-            '    fi' \
-            '' \
-            '    install -d "${IMAGE_ROOTFS}${systemd_system_unitdir}"' \
-            '    install -d "${IMAGE_ROOTFS}${sysconfdir}/default"' \
-            '    install -d "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants"' \
-            '    install -d "${IMAGE_ROOTFS}${sbindir}"' \
-            '' \
-            '    printf "%s" "${wifi_password}" > "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"' \
-            '    chmod 600 "${IMAGE_ROOTFS}${sysconfdir}/default/wifi-connect-password"' \
-            '' \
-            '    printf "%s\n" \' \
-            '        "#!/bin/sh" \' \
-            '        "set -u" \' \
-            '        "" \' \
-            '        "SSID=\"Hydra\"" \' \
-            '        "PASSWORD_FILE=\"/etc/default/wifi-connect-password\"" \' \
-            '        "WIFI_DEVICE=\"wlp1s0\"" \' \
-            '        "MAX_ATTEMPTS=12" \' \
-            '        "" \' \
-            '        "log() {" \' \
-            '        "    echo \"wifi-connect: \$*\"" \' \
-            '        "}" \' \
-            '        "" \' \
-            '        "if [ ! -s \"\$PASSWORD_FILE\" ]; then" \' \
-            '        "    log \"Password file is missing or empty: \$PASSWORD_FILE\"" \' \
-            '        "    exit 1" \' \
-            '        "fi" \' \
-            '        "" \' \
-            '        "PASSWORD=\"\$(cat \"\$PASSWORD_FILE\")\"" \' \
-            '        "" \' \
-            '        "log \"Waiting for NetworkManager\"" \' \
-            '        "count=0" \' \
-            '        "while [ \"\$count\" -lt 30 ]; do" \' \
-            '        "    if systemctl is-active --quiet NetworkManager.service; then" \' \
-            '        "        break" \' \
-            '        "    fi" \' \
-            '        "    count=\$((count + 1))" \' \
-            '        "    sleep 2" \' \
-            '        "done" \' \
-            '        "" \' \
-            '        "if ! systemctl is-active --quiet NetworkManager.service; then" \' \
-            '        "    log \"NetworkManager did not become active\"" \' \
-            '        "    systemctl status NetworkManager.service --no-pager || true" \' \
-            '        "    exit 1" \' \
-            '        "fi" \' \
-            '        "" \' \
-            '        "log \"Enabling Wi-Fi radio\"" \' \
-            '        "nmcli radio wifi on || true" \' \
-            '        "" \' \
-            '        "log \"Waiting for Wi-Fi device: \$WIFI_DEVICE\"" \' \
-            '        "count=0" \' \
-            '        "while [ \"\$count\" -lt 30 ]; do" \' \
-            '        "    if nmcli device status | awk -v dev=\"\$WIFI_DEVICE\" '\''\$1 == dev && \$2 == \"wifi\" { found=1 } END { exit !found }'\''; then" \' \
-            '        "        break" \' \
-            '        "    fi" \' \
-            '        "    count=\$((count + 1))" \' \
-            '        "    sleep 2" \' \
-            '        "done" \' \
-            '        "" \' \
-            '        "if ! nmcli device status | awk -v dev=\"\$WIFI_DEVICE\" '\''\$1 == dev && \$2 == \"wifi\" { found=1 } END { exit !found }'\''; then" \' \
-            '        "    log \"Wi-Fi device was not found\"" \' \
-            '        "    nmcli device status || true" \' \
-            '        "    exit 1" \' \
-            '        "fi" \' \
-            '        "" \' \
-            '        "attempt=1" \' \
-            '        "while [ \"\$attempt\" -le \"\$MAX_ATTEMPTS\" ]; do" \' \
-            '        "    log \"Wi-Fi connection attempt \$attempt/\$MAX_ATTEMPTS\"" \' \
-            '        "" \' \
-            '        "    if nmcli -t -f ACTIVE,SSID device wifi 2>/dev/null | grep -q \"^yes:\${SSID}\$\"; then" \' \
-            '        "        log \"Already connected to \$SSID\"" \' \
-            '        "        exit 0" \' \
-            '        "    fi" \' \
-            '        "" \' \
-            '        "    nmcli device wifi rescan ifname \"\$WIFI_DEVICE\" || true" \' \
-            '        "    sleep 3" \' \
-            '        "" \' \
-            '        "    if nmcli --wait 30 device wifi connect \"\$SSID\" password \"\$PASSWORD\" ifname \"\$WIFI_DEVICE\"; then" \' \
-            '        "        log \"Connected to \$SSID\"" \' \
-            '        "        exit 0" \' \
-            '        "    fi" \' \
-            '        "" \' \
-            '        "    nmcli device status || true" \' \
-            '        "    attempt=\$((attempt + 1))" \' \
-            '        "    sleep 5" \' \
-            '        "done" \' \
-            '        "" \' \
-            '        "log \"Failed to connect to \$SSID\"" \' \
-            '        "nmcli general status || true" \' \
-            '        "nmcli device status || true" \' \
-            '        "exit 1" \' \
-            '    > "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh"' \
-            '' \
-            '    chmod 700 "${IMAGE_ROOTFS}${sbindir}/wifi-connect.sh"' \
-            '' \
-            '    printf "%s\n" \' \
-            '        "[Unit]" \' \
-            '        "Description=Connect to Hydra Wi-Fi" \' \
-            '        "Wants=NetworkManager.service" \' \
-            '        "After=NetworkManager.service" \' \
-            '        "Before=network-online.target" \' \
-            '        "" \' \
-            '        "[Service]" \' \
-            '        "Type=oneshot" \' \
-            '        "ExecStart=/usr/sbin/wifi-connect.sh" \' \
-            '        "RemainAfterExit=yes" \' \
-            '        "StandardOutput=journal" \' \
-            '        "StandardError=journal" \' \
-            '        "" \' \
-            '        "[Install]" \' \
-            '        "WantedBy=multi-user.target"' \
-            '        > "${IMAGE_ROOTFS}${systemd_system_unitdir}/wifi-connect.service"' \
-            '' \
-            '    ln -sf ../wifi-connect.service \' \
-            '        "${IMAGE_ROOTFS}${sysconfdir}/systemd/system/multi-user.target.wants/wifi-connect.service"' \
-            '' \
-            '    bbnote "Installed Hydra Wi-Fi post-boot service"' \
-            '}' \
-            '' \
-            'ROOTFS_POSTPROCESS_COMMAND:append = " wifi_post_boot_service;"' \
-            > "$class_file"
+          cat > "$class_file" << 'BBCLASS'
+          WIFI_SSID     ?= "Hydra"
+          WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"
+
+          wifi_inject_nm_profile() {
+              if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then
+                  bbfatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"
+              fi
+
+              wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"
+
+              if [ -z "${wifi_password}" ]; then
+                  bbfatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"
+              fi
+
+              # Create the NM system-connections directory in the rootfs
+              nm_dir="${IMAGE_ROOTFS}${sysconfdir}/NetworkManager/system-connections"
+              install -d "$nm_dir"
+
+              # Write the .nmconnection profile directly — NM auto-connects on boot
+              # No interface-name binding so it works regardless of wlan0 vs wlp1s0
+              cat > "$nm_dir/Hydra.nmconnection" << EOF
+          [connection]
+          id=Hydra
+          uuid=$(cat /proc/sys/kernel/random/uuid)
+          type=wifi
+          autoconnect=true
+          autoconnect-retries=-1
+
+          [wifi]
+          mode=infrastructure
+          ssid=${WIFI_SSID}
+
+          [wifi-security]
+          auth-alg=open
+          key-mgmt=wpa-psk
+          psk=${wifi_password}
+
+          [ipv4]
+          method=auto
+
+          [ipv6]
+          method=auto
+          addr-gen-mode=stable-privacy
+          EOF
+
+              # NM refuses to load profiles that are not chmod 600
+              chmod 600 "$nm_dir/Hydra.nmconnection"
+
+              bbnote "Installed Hydra NM connection profile to ${sysconfdir}/NetworkManager/system-connections/Hydra.nmconnection"
+          }
+
+          ROOTFS_POSTPROCESS_COMMAND:append = " wifi_inject_nm_profile;"
+          BBCLASS
 
           chmod 644 "$class_file"
 
-          echo "Created Wi-Fi BitBake class:"
-          echo "$class_file"
-          echo "Class line count: $(wc -l < "$class_file")"
+          echo "✅ Created Wi-Fi BitBake class: $class_file"
+          echo "   Class line count: $(wc -l < "$class_file")"
 
       - name: Verify Wi-Fi build files
         shell: bash
@@ -374,9 +300,9 @@ jobs:
           test -f "$WORKSPACE/classes/wifi-post-boot.bbclass"
           test -f "$WORKSPACE/.hydra_wifi_password"
 
-          echo "Wi-Fi BitBake class exists"
-          echo "Wi-Fi password file exists"
-          echo "Workspace: $WORKSPACE"
+          echo "✅ Wi-Fi BitBake class exists"
+          echo "✅ Wi-Fi password file exists"
+          echo "   Workspace: $WORKSPACE"
 
       - name: Build image
         uses: qualcomm-linux/video-driver/.github/actions/build@git_enable
@@ -391,7 +317,8 @@ jobs:
 
             INHERIT:append = " wifi-post-boot"
 
-            WIFI_PASSWORD_FILE = "/workspace/video-driver/.hydra_wifi_password"
+            WIFI_SSID             = "Hydra"
+            WIFI_PASSWORD_FILE    = "/workspace/video-driver/.hydra_wifi_password"
 
             IMAGE_FEATURES += "enable-adbd"
             IMAGE_INSTALL:append = " git"
@@ -425,7 +352,7 @@ jobs:
             "s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/iris_test_app/" \
             "$WORKSPACE/v4l-video-test-app/build/"
 
-          echo "iris_test_app download complete"
+          echo "✅ iris_test_app download complete"
           ls -la "$WORKSPACE/v4l-video-test-app/build/"
 
       - name: Download video contents
@@ -446,6 +373,7 @@ jobs:
             exit 1
           fi
 
+          echo "✅ Video contents downloaded"
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
@@ -487,7 +415,6 @@ jobs:
           ls -larth "$resolved_dir"
 
           mkdir -p "$WORKSPACE/artifacts"
-
           : > "$WORKSPACE/artifacts/file_list.txt"
 
           flash_tar="$WORKSPACE/${MACHINE}_flash_files.tar"
@@ -500,11 +427,8 @@ jobs:
 
           cp "$rootfs_img" "$rootfs_dest"
 
-          printf '%s\n' "$flash_tar" \
-            >> "$WORKSPACE/artifacts/file_list.txt"
-
-          printf '%s\n' "$rootfs_dest" \
-            >> "$WORKSPACE/artifacts/file_list.txt"
+          printf '%s\n' "$flash_tar"    >> "$WORKSPACE/artifacts/file_list.txt"
+          printf '%s\n' "$rootfs_dest"  >> "$WORKSPACE/artifacts/file_list.txt"
 
           echo "=== Artifact file list ==="
           cat "$WORKSPACE/artifacts/file_list.txt"
