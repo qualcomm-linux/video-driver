@@ -124,7 +124,6 @@
     "build_command": "bitbake qcom-multimedia-image",
     "image_name": "qcom-multimedia-image"
   },
-   },
   "Hamoa-linux-qcom-6.18": {
     "machine": "iq-x7181-evk",
     "kas_file": "../meta-qcom/ci/iq-x7181-evk.yml:../meta-qcom/ci/linux-qcom-6.18.yml:../meta-qcom/ci/qcom-distro.yml",
