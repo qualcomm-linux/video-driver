@@ -206,6 +206,31 @@ static int __opp_set_rate(struct msm_vidc_core *core, u64 freq)
 #endif
 }
 
+#if (KERNEL_VERSION(6, 13, 0) <= LINUX_VERSION_CODE)
+/*
+ * a NULL opp disables the opp table, dropping the required-level votes on
+ * the rails. call it only after the core and its gdscs are off.
+ */
+int msm_vidc_release_opp_votes(struct msm_vidc_core *core)
+{
+	int rc;
+
+	if (!core->platform->data.opp_tbl)
+		return 0;
+
+	rc = dev_pm_opp_set_opp(&core->pdev->dev, NULL);
+	if (rc)
+		d_vpr_e("%s: failed to release opp votes: %d\n", __func__, rc);
+
+	return rc;
+}
+#else
+int msm_vidc_release_opp_votes(struct msm_vidc_core *core)
+{
+	return 0;
+}
+#endif
+
 static int __init_register_base(struct msm_vidc_core *core)
 {
 	struct msm_vidc_resource *res;
