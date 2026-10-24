@@ -36,10 +36,10 @@ jobs:
     timeout-minutes: 720
 
     runs-on:
-      group: GHA-video-Stg-SelfHosted-RG
+      group: GHA-video-Prd-SelfHosted-RG
       labels:
         - self-hosted
-        - video-stg-u2204-x64-large-od-ephem
+        - video-prd-u2204-x64-large-od-ephem
 
     strategy:
       fail-fast: false
@@ -337,7 +337,7 @@ jobs:
           echo "Workspace: $WORKSPACE"
 
       - name: Build image
-        uses: qualcomm-linux-stg/video-driver/.github/actions/build@job_render_main
+        uses: qualcomm-linux/video-driver/.github/actions/build@complete-build
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
@@ -383,7 +383,7 @@ jobs:
           mkdir -p "$WORKSPACE/v4l-video-test-app/build"
 
           aws s3 sync \
-            "s3://qli-stg-video-gh-artifacts/qualcomm-linux-stg/video-driver/iris_test_app/" \
+            "s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/iris_test_app/" \
             "$WORKSPACE/v4l-video-test-app/build/"
 
           echo "✅ iris_test_app download complete"
@@ -411,7 +411,7 @@ jobs:
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux-stg/video-driver/.github/actions/inject@job_render_main
+        uses: qualcomm-linux/video-driver/.github/actions/inject@complete-build
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
@@ -780,9 +780,9 @@ jobs:
           cat "$WORKSPACE/artifacts/file_list.txt"
 
       - name: Upload single build archive to S3
-        uses: qualcomm-linux-stg/video-driver/.github/actions/aws_s3_helper@job_render_main
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@complete-build
         with:
-          s3_bucket: qli-stg-video-gh-artifacts
+          s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
           mode: multi-upload
           upload_location: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}
