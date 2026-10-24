@@ -7,7 +7,7 @@ on:
 
   push:
     branches:
-      - git_enable
+      - job_render_main
 
   pull_request:
     types:
@@ -15,7 +15,7 @@ on:
       - synchronize
       - reopened
     branches:
-      - git_enable
+      - job_render_main
 
 permissions:
   contents: read
@@ -24,7 +24,7 @@ permissions:
 jobs:
   loading:
     name: Load build configuration
-    uses: qualcomm-linux/video-driver/.github/workflows/loading.yml@git_enable
+    uses: qualcomm-linux-stg/video-driver/.github/workflows/loading.yml@job_render_main
     with:
       event_name: ${{ github.event_name }}
 
@@ -32,7 +32,7 @@ jobs:
     name: Build
     needs:
       - loading
-    uses: qualcomm-linux/video-driver/.github/workflows/sync-and-build.yml@git_enable
+    uses: qualcomm-linux-stg/video-driver/.github/workflows/sync-and-build.yml@job_render_main
     with:
       build_matrix: ${{ needs.loading.outputs.build_matrix }}
       docker_image: kmake-image:ver.1.0
@@ -54,7 +54,7 @@ jobs:
     name: OWL parallel kernel and video-driver build
     needs:
       - loading
-    uses: qualcomm-linux/video-driver/.github/workflows/owl_build.yml@git_enable
+    uses: qualcomm-linux-stg/video-driver/.github/workflows/owl_build.yml@job_render_main
 
   create-metadata:
     name: Create build metadata

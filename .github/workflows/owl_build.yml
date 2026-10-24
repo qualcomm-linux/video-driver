@@ -53,10 +53,10 @@ jobs:
             tag_pattern: ""
 
     runs-on:
-      group: GHA-video-Prd-SelfHosted-RG
+      group: GHA-video-Stg-SelfHosted-RG
       labels:
         - self-hosted
-        - video-prd-u2204-x64-large-od-ephem
+        - video-stg-u2204-x64-large-od-ephem
 
     timeout-minutes: 720
 
