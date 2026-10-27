@@ -344,20 +344,14 @@ jobs:
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: ${{ matrix.build_matrix.build_command }}
           kas_local_conf_header: |
-            BBPATH:prepend = "/workspace/video-driver:"
-            BBPATH:prepend = "/workspace/video-driver/classes:"
-
-            INHERIT:append = " wifi-post-boot"
-
-            WIFI_SSID          = "Hydra"
-            WIFI_PASSWORD_FILE = "/workspace/video-driver/.hydra_wifi_password"
-
+            # === Enable ADB daemon ===
             IMAGE_FEATURES += "enable-adbd"
-            IMAGE_INSTALL:append = " git"
 
+            # === ccache disable (ccache not available in Docker image) ===
             HOSTTOOLS:remove = "ccache"
             INHERIT:remove = "ccache"
 
+            # === iris-video-dlkm CI override ===
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
             EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
             S:pn-iris-video-dlkm = "${EXTERNALSRC}"
