@@ -325,8 +325,7 @@ u32 msm_vidc_encoder_input_size(struct msm_vidc_inst *inst)
 		width = ALIGN(width, inst->capabilities[GRID_SIZE].value);
 		height = ALIGN(height, inst->capabilities[GRID_SIZE].value);
 	}
-	size = video_buffer_size(colorformat, width, height,
-				 inst->capabilities[CODED_FRAMES].value == CODED_FRAMES_INTERLACE);
+	size = video_buffer_size(colorformat, width, height, false);
 	return size;
 }
 

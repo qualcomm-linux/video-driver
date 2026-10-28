@@ -2048,9 +2048,6 @@ static int handle_property_with_payload(struct msm_vidc_inst *inst,
 		break;
 	case HFI_PROP_CODED_FRAMES:
 		inst->subcr_params[port].coded_frames = payload_ptr[0];
-		msm_vidc_update_cap_value(inst, CODED_FRAMES,
-					  inst->subcr_params[port].coded_frames,
-					  __func__);
 		break;
 	case HFI_PROP_BUFFER_FW_MIN_OUTPUT_COUNT:
 		inst->subcr_params[port].fw_min_count = payload_ptr[0];
