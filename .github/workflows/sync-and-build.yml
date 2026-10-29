@@ -23,6 +23,11 @@ on:
         type: string
         required: true
 
+    secrets:
+      HYDRA_WIFI_PASSWORD:
+        description: Password for the Hydra Wi-Fi network
+        required: true
+
 permissions:
   contents: read
 
@@ -50,14 +55,18 @@ jobs:
           set -euo pipefail
 
           echo "=== Disk before clean ==="
-          df -h
+          df -hT
 
           rm -rf "$WORKSPACE/build/tmp" || true
           rm -f "$(dirname "$WORKSPACE")/kas_local_conf_header.txt" || true
+          rm -f "$WORKSPACE/.hydra_wifi_password" || true
+          rm -rf "$WORKSPACE/classes" || true
+          rm -rf "$WORKSPACE/archive-validation" || true
+          rm -f "$WORKSPACE/"*_archive_manifest.txt || true
 
           echo "=== Disk after clean ==="
-          df -h
-
+          df -hT
+          df -ih
           free -h
 
       - name: Validate build inputs
@@ -79,7 +88,7 @@ jobs:
           fi
 
           echo "Source repository: $SOURCE_REPOSITORY"
-          echo "Commit SHA:       $COMMIT_SHA"
+          echo "Commit SHA:        $COMMIT_SHA"
 
       - name: Checkout exact HEAD commit
         uses: actions/checkout@v4
@@ -121,6 +130,45 @@ jobs:
           fi
 
           echo "Correct repository and commit checked out"
+
+      - name: Validate matrix build configuration
+        shell: bash
+        env:
+          MACHINE: '${{ matrix.build_matrix.machine }}'
+          KAS_FILE: '${{ matrix.build_matrix.kas_file }}'
+          LAVA_NAME: '${{ matrix.build_matrix.lavaname }}'
+          BUILD_COMMAND: '${{ matrix.build_matrix.build_command }}'
+          IMAGE_NAME: '${{ matrix.build_matrix.image_name }}'
+        run: |
+          set -euo pipefail
+
+          echo "=== Matrix build configuration ==="
+          echo "Machine:       $MACHINE"
+          echo "KAS file:      $KAS_FILE"
+          echo "Lava name:     ${LAVA_NAME:-<not-set>}"
+          echo "Build command: $BUILD_COMMAND"
+          echo "Image name:    $IMAGE_NAME"
+          echo "=================================="
+
+          if [ -z "$MACHINE" ]; then
+            echo "::error::Matrix field 'machine' is empty"
+            exit 1
+          fi
+
+          if [ -z "$KAS_FILE" ]; then
+            echo "::error::Matrix field 'kas_file' is empty"
+            exit 1
+          fi
+
+          if [ -z "$BUILD_COMMAND" ]; then
+            echo "::error::Matrix field 'build_command' is empty"
+            exit 1
+          fi
+
+          if [ -z "$IMAGE_NAME" ]; then
+            echo "::error::Matrix field 'image_name' is empty"
+            exit 1
+          fi
 
       - name: Clone meta-qcom as sibling repository
         shell: bash
@@ -181,33 +229,147 @@ jobs:
 
           docker images | grep -- "$DOCKER_IMAGE" || true
 
+      - name: Prepare Hydra Wi-Fi password
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          HYDRA_WIFI_PASSWORD: ${{ secrets.HYDRA_WIFI_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${HYDRA_WIFI_PASSWORD:-}" ]; then
+            echo "::error::HYDRA_WIFI_PASSWORD secret is empty or was not passed"
+            exit 1
+          fi
+
+          password_file="$WORKSPACE/.hydra_wifi_password"
+
+          umask 077
+          printf '%s' "$HYDRA_WIFI_PASSWORD" > "$password_file"
+          chmod 600 "$password_file"
+
+          if [ ! -s "$password_file" ]; then
+            echo "::error::Wi-Fi password file was not created or is empty"
+            exit 1
+          fi
+
+          echo "✅ Hydra Wi-Fi password file prepared"
+
+      - name: Create Wi-Fi post-boot BitBake class
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$WORKSPACE/classes"
+
+          class_file="$WORKSPACE/classes/wifi-post-boot.bbclass"
+
+          cat > "$class_file" << 'BBCLASS'
+          WIFI_SSID ?= "Hydra"
+          WIFI_PASSWORD_FILE ?= "/workspace/video-driver/.hydra_wifi_password"
+
+          wifi_inject_nm_profile() {
+              if [ ! -f "${WIFI_PASSWORD_FILE}" ]; then
+                  bbfatal "Wi-Fi password file not found: ${WIFI_PASSWORD_FILE}"
+              fi
+
+              wifi_password="$(cat "${WIFI_PASSWORD_FILE}")"
+
+              if [ -z "${wifi_password}" ]; then
+                  bbfatal "Wi-Fi password file is empty: ${WIFI_PASSWORD_FILE}"
+              fi
+
+              nm_dir="${IMAGE_ROOTFS}${sysconfdir}/NetworkManager/system-connections"
+              install -d "$nm_dir"
+
+              cat > "$nm_dir/Hydra.nmconnection" << EOF
+          [connection]
+          id=Hydra
+          uuid=$(cat /proc/sys/kernel/random/uuid)
+          type=wifi
+          autoconnect=true
+          autoconnect-retries=-1
+
+          [wifi]
+          mode=infrastructure
+          ssid=${WIFI_SSID}
+
+          [wifi-security]
+          auth-alg=open
+          key-mgmt=wpa-psk
+          psk=${wifi_password}
+
+          [ipv4]
+          method=auto
+
+          [ipv6]
+          method=auto
+          addr-gen-mode=stable-privacy
+          EOF
+
+              chmod 600 "$nm_dir/Hydra.nmconnection"
+
+              bbnote "Installed Hydra NM connection profile to ${sysconfdir}/NetworkManager/system-connections/Hydra.nmconnection"
+          }
+
+          ROOTFS_POSTPROCESS_COMMAND:append = " wifi_inject_nm_profile;"
+          BBCLASS
+
+          chmod 644 "$class_file"
+
+          echo "✅ Created Wi-Fi BitBake class: $class_file"
+          echo "Class line count: $(wc -l < "$class_file")"
+
+      - name: Verify Wi-Fi build files
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          test -f "$WORKSPACE/classes/wifi-post-boot.bbclass"
+          test -f "$WORKSPACE/.hydra_wifi_password"
+
+          echo "✅ Wi-Fi BitBake class exists"
+          echo "✅ Wi-Fi password file exists"
+          echo "Workspace: $WORKSPACE"
+
       - name: Build image
         uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
-          build_command: bitbake qcom-multimedia-proprietary-image
+          build_command: ${{ matrix.build_matrix.build_command }}
           kas_local_conf_header: |
-            # === Enable ADB daemon ===
-            IMAGE_FEATURES += "enable-adbd"
+            BBPATH:prepend = "/workspace/video-driver:"
+            BBPATH:prepend = "/workspace/video-driver/classes:"
 
-            # === ccache disable (ccache not available in Docker image) ===
+            INHERIT:append = " wifi-post-boot"
+
+            WIFI_SSID          = "Hydra"
+            WIFI_PASSWORD_FILE = "/workspace/video-driver/.hydra_wifi_password"
+
+            IMAGE_FEATURES += "enable-adbd"
+            IMAGE_INSTALL:append = " git"
+
             HOSTTOOLS:remove = "ccache"
             INHERIT:remove = "ccache"
 
-            # === iris-video-dlkm CI override ===
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
             EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
             S:pn-iris-video-dlkm = "${EXTERNALSRC}"
             B:pn-iris-video-dlkm = "${EXTERNALSRC_BUILD}"
+
             do_fetch:pn-iris-video-dlkm[noexec] = "1"
             do_unpack:pn-iris-video-dlkm[noexec] = "1"
             do_patch:pn-iris-video-dlkm[noexec] = "1"
+
             MAKE_TARGETS:pn-iris-video-dlkm = ""
             EXTRA_OEMAKE:pn-iris-video-dlkm = "-C ${STAGING_KERNEL_DIR} M=${S} modules"
 
-            # === OOM mitigation ===
             BB_NUMBER_THREADS = "6"
             PARALLEL_MAKE = "-j6"
 
@@ -224,8 +386,7 @@ jobs:
             "s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/iris_test_app/" \
             "$WORKSPACE/v4l-video-test-app/build/"
 
-          echo "iris_test_app download complete"
-
+          echo "✅ iris_test_app download complete"
           ls -la "$WORKSPACE/v4l-video-test-app/build/"
 
       - name: Download video contents
@@ -241,11 +402,12 @@ jobs:
             "https://github.com/qualcomm-linux/qcom-linux-testkit/releases/download/IRIS-Video-Files-v1.0/video_clips_iris.tar.gz" \
             -O "$WORKSPACE/downloads/video_clips_iris.tar.gz"
 
-          if [ ! -f "$WORKSPACE/downloads/video_clips_iris.tar.gz" ]; then
-            echo "::error::Video contents download failed"
+          if [ ! -s "$WORKSPACE/downloads/video_clips_iris.tar.gz" ]; then
+            echo "::error::Video contents download failed or file is empty"
             exit 1
           fi
 
+          echo "✅ Video contents downloaded"
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
@@ -254,18 +416,119 @@ jobs:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
 
-      - name: Prepare qcomflash files
+      - name: Check disk space after build
+        if: always()
         shell: bash
         env:
           WORKSPACE: ${{ github.workspace }}
-          MACHINE: ${{ matrix.build_matrix.machine }}
+        run: |
+          set -u
+
+          echo "========================================"
+          echo "Disk diagnostics after build"
+          echo "========================================"
+
+          echo
+          echo "=== Mounted filesystem usage ==="
+          df -hT
+
+          echo
+          echo "=== Inode usage ==="
+          df -ih
+
+          echo
+          echo "=== Memory and swap ==="
+          free -h
+          swapon --show || true
+
+          echo
+          echo "=== Workspace filesystem ==="
+          df -hT "$WORKSPACE"
+
+          echo
+          echo "=== Workspace size ==="
+          du -sh "$WORKSPACE" 2>/dev/null || true
+
+          echo
+          echo "=== Build directory size ==="
+          du -sh "$WORKSPACE/build" 2>/dev/null || true
+
+          echo
+          echo "=== Largest workspace directories ==="
+          du -x -h -d 2 "$WORKSPACE" 2>/dev/null \
+            | sort -h \
+            | tail -30 || true
+
+      - name: Print deploy directory contents
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          MACHINE: '${{ matrix.build_matrix.machine }}'
         run: |
           set -euo pipefail
 
-          symlink_path="$WORKSPACE/build/tmp/deploy/images/$MACHINE/qcom-multimedia-proprietary-image-${MACHINE}.rootfs.qcomflash"
+          images_dir="$WORKSPACE/build/tmp/deploy/images"
+          deploy_dir="$images_dir/$MACHINE"
+
+          echo "========================================"
+          echo "Deploy directory diagnostics"
+          echo "Workspace  : $WORKSPACE"
+          echo "Images dir : $images_dir"
+          echo "Deploy dir : $deploy_dir"
+          echo "========================================"
+
+          echo
+          echo "=== Parent images directory ==="
+          if [ -d "$images_dir" ]; then
+            find "$images_dir" \
+              -maxdepth 3 \
+              -printf '%y %p -> %l\n' | sort
+          else
+            echo "::warning::Directory does not exist: $images_dir"
+          fi
+
+          echo
+          echo "=== Machine-specific deploy directory ==="
+          if [ -d "$deploy_dir" ]; then
+            find "$deploy_dir" \
+              -maxdepth 3 \
+              -printf '%y %p -> %l\n' | sort
+          else
+            echo "::warning::Directory does not exist: $deploy_dir"
+          fi
+
+          echo
+          echo "=== qcomflash-related entries ==="
+          if [ -d "$images_dir" ]; then
+            find "$images_dir" \
+              \( -name '*.qcomflash' -o -name '*qcomflash*' -o -name 'rootfs.img' \) \
+              -printf '%y %p -> %l\n' | sort || true
+          fi
+
+      - name: Prepare compressed build archive
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          MACHINE: '${{ matrix.build_matrix.machine }}'
+          IMAGE_NAME: '${{ matrix.build_matrix.image_name }}'
+        run: |
+          set -euo pipefail
+
+          deploy_dir="$WORKSPACE/build/tmp/deploy/images/$MACHINE"
+          symlink_path="$deploy_dir/${IMAGE_NAME}-${MACHINE}.rootfs.qcomflash"
+          archive_path="$WORKSPACE/${MACHINE}_build.tar.gz"
+          manifest_path="$WORKSPACE/${MACHINE}_archive_manifest.txt"
+          validation_dir="$WORKSPACE/archive-validation"
+
+          echo "Machine:    $MACHINE"
+          echo "Image name: $IMAGE_NAME"
+          echo "Deploy dir: $deploy_dir"
+          echo "qcomflash:  $symlink_path"
+          echo "Archive:    $archive_path"
 
           if [ ! -L "$symlink_path" ]; then
             echo "::error::qcomflash symlink not found: $symlink_path"
+            find "$deploy_dir" -maxdepth 3 -printf '%y %p -> %l\n' | sort || true
             exit 1
           fi
 
@@ -276,40 +539,247 @@ jobs:
             exit 1
           fi
 
-          rootfs_img="$resolved_dir/rootfs.img"
-
-          if [ ! -f "$rootfs_img" ]; then
-            echo "::error::rootfs.img not found: $rootfs_img"
+          if [ ! -f "$resolved_dir/rootfs.img" ]; then
+            echo "::error::rootfs.img not found: $resolved_dir/rootfs.img"
+            find "$resolved_dir" -maxdepth 2 -printf '%y %p -> %l\n' | sort || true
             exit 1
           fi
 
+          echo "Resolved qcomflash directory: $resolved_dir"
+
+          echo
           echo "=== qcomflash contents ==="
-          ls -larth "$resolved_dir"
+          find "$resolved_dir" \
+            -maxdepth 2 \
+            -printf '%y %p -> %l\n' | sort
+
+          echo
+          echo "=== qcomflash size ==="
+          du -sh "$resolved_dir"
+          du -sh "$resolved_dir/rootfs.img"
+
+          echo
+          echo "=== Complete filesystem usage before archive ==="
+          df -hT
+
+          echo
+          echo "=== Inode usage before archive ==="
+          df -ih
+
+          echo
+          echo "=== Archive filesystem usage ==="
+          df -hT "$WORKSPACE"
+
+          echo
+          echo "=== Workspace usage before archive ==="
+          du -sh "$WORKSPACE" 2>/dev/null || true
+
+          echo
+          echo "=== Build usage before archive ==="
+          du -sh "$WORKSPACE/build" 2>/dev/null || true
+
+          source_size_bytes="$(du -sb "$resolved_dir" | awk '{print $1}')"
+          available_bytes="$(df -B1 --output=avail "$WORKSPACE" | tail -1 | tr -d '[:space:]')"
+
+          # The source qcomflash directory remains on disk while the archive
+          # is created. Reserve space for the archive and a safety margin.
+          safety_margin_bytes=$((1024 * 1024 * 1024))
+          required_bytes=$((source_size_bytes + safety_margin_bytes))
+
+          source_size_gib="$(awk "BEGIN {printf \"%.2f\", $source_size_bytes / 1024 / 1024 / 1024}")"
+          available_gib="$(awk "BEGIN {printf \"%.2f\", $available_bytes / 1024 / 1024 / 1024}")"
+          required_gib="$(awk "BEGIN {printf \"%.2f\", $required_bytes / 1024 / 1024 / 1024}")"
+
+          echo
+          echo "=== Archive disk-space calculation ==="
+          echo "Source qcomflash size : ${source_size_gib} GiB"
+          echo "Safety margin         : 1.00 GiB"
+          echo "Required free space   : ${required_gib} GiB"
+          echo "Available free space  : ${available_gib} GiB"
+
+          if [ "$available_bytes" -lt "$required_bytes" ]; then
+            echo "::error::Insufficient disk space for archive creation"
+            echo "::error::Required free space: ${required_gib} GiB"
+            echo "::error::Available free space: ${available_gib} GiB"
+            echo "::error::Filesystem containing workspace: $WORKSPACE"
+
+            echo
+            echo "=== Detailed filesystem usage ==="
+            df -hT
+
+            echo
+            echo "=== Largest workspace entries ==="
+            du -x -h -d 2 "$WORKSPACE" 2>/dev/null \
+              | sort -h \
+              | tail -50 || true
+
+            exit 1
+          fi
+
+          echo "✅ Sufficient disk space is available for archive creation"
+
+          rm -f "$archive_path" "$manifest_path"
+          rm -rf "$validation_dir"
+
+          echo
+          echo "=== Creating compressed build archive ==="
+
+          archive_status=0
+
+          if command -v pigz >/dev/null 2>&1; then
+            pigz_threads="$(nproc)"
+
+            if [ "$pigz_threads" -gt 8 ]; then
+              pigz_threads=8
+            fi
+
+            echo "Using pigz with $pigz_threads threads"
+
+            tar -I "pigz -p $pigz_threads -1" \
+              -cf "$archive_path" \
+              -C "$resolved_dir" \
+              . || archive_status=$?
+          else
+            echo "pigz is not available; using gzip"
+
+            tar -czf "$archive_path" \
+              -C "$resolved_dir" \
+              . || archive_status=$?
+          fi
+
+          if [ "$archive_status" -ne 0 ]; then
+            echo "::error::Archive creation failed with exit code: $archive_status"
+
+            echo
+            echo "=== Filesystem usage after archive failure ==="
+            df -hT
+
+            echo
+            echo "=== Inode usage after archive failure ==="
+            df -ih
+
+            echo
+            echo "=== Partial archive details ==="
+            if [ -e "$archive_path" ]; then
+              ls -lh "$archive_path"
+              du -h "$archive_path" || true
+            else
+              echo "Archive file was not created"
+            fi
+
+            exit "$archive_status"
+          fi
+
+          if [ ! -s "$archive_path" ]; then
+            echo "::error::Build archive was not created or is empty: $archive_path"
+            exit 1
+          fi
+
+          echo
+          echo "=== Archive details ==="
+          ls -lh "$archive_path"
+          du -h "$archive_path"
+
+          echo
+          echo "=== Filesystem usage after archive creation ==="
+          df -hT "$WORKSPACE"
+
+          echo
+          echo "=== Validating gzip stream ==="
+          if ! gzip -t "$archive_path"; then
+            echo "::error::Compressed archive is corrupt: $archive_path"
+            exit 1
+          fi
+
+          echo "✅ Gzip stream is valid"
+
+          echo
+          echo "=== Generating archive manifest ==="
+          if ! tar -tzf "$archive_path" > "$manifest_path"; then
+            echo "::error::Unable to read archive contents: $archive_path"
+            exit 1
+          fi
+
+          echo
+          echo "=== Verifying compressed archive contents ==="
+          sed -n '1,200p' "$manifest_path"
+
+          if ! grep -Fxq './rootfs.img' "$manifest_path"; then
+            echo "::error::rootfs.img is missing from $archive_path"
+            echo "Matching rootfs entries:"
+            grep -i 'rootfs' "$manifest_path" || true
+            exit 1
+          fi
+
+          echo "✅ rootfs.img confirmed inside compressed archive"
+
+          # contents.xml is optional because it is not generated for every
+          # machine. If it exists, verify that it is present in the archive.
+          if [ -f "$resolved_dir/contents.xml" ]; then
+            if grep -Fxq './contents.xml' "$manifest_path"; then
+              echo "✅ contents.xml confirmed inside compressed archive"
+            else
+              echo "::error::contents.xml exists in the source qcomflash directory but is missing from the archive"
+              exit 1
+            fi
+          else
+            echo "ℹ️ contents.xml is not present for machine: $MACHINE"
+            echo "Continuing because contents.xml is optional for this image layout"
+          fi
+
+          echo
+          echo "=== Verifying rootfs.img extraction ==="
+          mkdir -p "$validation_dir"
+
+          if ! tar -xzf "$archive_path" \
+            -C "$validation_dir" \
+            ./rootfs.img; then
+            echo "::error::Unable to extract rootfs.img from archive"
+            rm -rf "$validation_dir"
+            exit 1
+          fi
+
+          extracted_rootfs="$validation_dir/rootfs.img"
+
+          if [ ! -s "$extracted_rootfs" ]; then
+            echo "::error::Extracted rootfs.img is missing or empty"
+            rm -rf "$validation_dir"
+            exit 1
+          fi
+
+          source_rootfs_size="$(stat -c '%s' "$resolved_dir/rootfs.img")"
+          extracted_rootfs_size="$(stat -c '%s' "$extracted_rootfs")"
+
+          echo "Original rootfs.img size : $source_rootfs_size bytes"
+          echo "Extracted rootfs.img size: $extracted_rootfs_size bytes"
+
+          if [ "$source_rootfs_size" -ne "$extracted_rootfs_size" ]; then
+            echo "::error::Extracted rootfs.img size does not match the original"
+            rm -rf "$validation_dir"
+            exit 1
+          fi
+
+          rm -rf "$validation_dir"
+
+          echo "✅ rootfs.img extraction and size validation passed"
+
+          echo
+          echo "=== Final archive details ==="
+          ls -lh "$archive_path"
+          du -h "$archive_path"
+
+          echo
+          echo "=== Final filesystem usage ==="
+          df -hT "$WORKSPACE"
 
           mkdir -p "$WORKSPACE/artifacts"
+          printf '%s\n' "$archive_path" > "$WORKSPACE/artifacts/file_list.txt"
 
-          : > "$WORKSPACE/artifacts/file_list.txt"
-
-          flash_tar="$WORKSPACE/${MACHINE}_flash_files.tar"
-          rootfs_dest="$WORKSPACE/${MACHINE}_rootfs.img"
-
-          tar -cf "$flash_tar" \
-            -C "$resolved_dir" \
-            --exclude='./rootfs.img' \
-            .
-
-          cp "$rootfs_img" "$rootfs_dest"
-
-          printf '%s\n' "$flash_tar" \
-            >> "$WORKSPACE/artifacts/file_list.txt"
-
-          printf '%s\n' "$rootfs_dest" \
-            >> "$WORKSPACE/artifacts/file_list.txt"
-
-          echo "=== Artifact file list ==="
+          echo
+          echo "=== Single S3 upload file list ==="
           cat "$WORKSPACE/artifacts/file_list.txt"
 
-      - name: Upload artifacts to S3
+      - name: Upload single build archive to S3
         uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
         with:
           s3_bucket: qli-prd-video-gh-artifacts
@@ -324,6 +794,15 @@ jobs:
           path: ${{ github.workspace }}/presigned_urls.json
           retention-days: 7
 
+      - name: Upload single build archive as workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: build-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_build.tar.gz
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+
       - name: Clean up
         if: always()
         shell: bash
@@ -332,18 +811,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          rm -f "$WORKSPACE/.hydra_wifi_password" || true
+          rm -rf "$WORKSPACE/classes" || true
           rm -rf "$WORKSPACE/artifacts" || true
           rm -rf "$WORKSPACE/build" || true
           rm -rf "$WORKSPACE/downloads" || true
-          rm -f "$WORKSPACE/"*_flash_files.tar || true
-          rm -f "$WORKSPACE/"*_rootfs.img || true
+          rm -rf "$WORKSPACE/archive-validation" || true
+          rm -f "$WORKSPACE/"*_build.tar || true
+          rm -f "$WORKSPACE/"*_build.tar.gz || true
+          rm -f "$WORKSPACE/"*_archive_manifest.txt || true
           rm -f "$(dirname "$WORKSPACE")/kas_local_conf_header.txt" || true
 
       - name: Update summary
         if: always()
         shell: bash
         env:
-          MACHINE: ${{ matrix.build_matrix.machine }}
+          MACHINE: '${{ matrix.build_matrix.machine }}'
+          BUILD_COMMAND: '${{ matrix.build_matrix.build_command }}'
+          IMAGE_NAME: '${{ matrix.build_matrix.image_name }}'
           COMMIT_SHA: ${{ inputs.commit_sha }}
           EVENT_NAME: ${{ github.event_name }}
           JOB_STATUS: ${{ job.status }}
@@ -361,6 +846,9 @@ jobs:
             echo
             echo "$summary for $MACHINE"
             echo
+            echo "**Machine:** \`$MACHINE\`"
+            echo "**Image:** \`$IMAGE_NAME\`"
+            echo "**Build command:** \`$BUILD_COMMAND\`"
             echo "**Event:** \`$EVENT_NAME\`"
             echo "**Commit:** \`$COMMIT_SHA\`"
             echo
