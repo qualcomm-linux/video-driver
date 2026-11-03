@@ -303,5 +303,6 @@ unsigned long get_clock_freq(struct msm_vidc_core *core, const char *clk_name, i
 unsigned long get_clock_freq_count(struct msm_vidc_core *core, const char *clk_name);
 int get_min_clock_index(struct msm_vidc_core *core);
 int get_max_clock_index(struct msm_vidc_core *core);
+int msm_vidc_release_opp_votes(struct msm_vidc_core *core);
 
 #endif

@@ -647,6 +647,9 @@ static int __venus_power_off(struct msm_vidc_core *core)
 	}
 	msm_vidc_change_core_sub_state(core, CORE_SUBSTATE_POWER_ENABLE, 0, __func__);
 
+	/* core and gdscs are off, drop the rail votes */
+	msm_vidc_release_opp_votes(core);
+
 	return rc;
 }
 

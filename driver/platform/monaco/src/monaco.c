@@ -1865,6 +1865,11 @@ static const struct clk_table monaco_clk_table[] = {
 	 (u64[]) {560000000, 533000000, 444000000, 366000000}, 4},
 };
 
+const char * const monaco_opp_clk_table[] = {
+	"vcodec0_core",
+	NULL,
+};
+
 /* name, exclusive_release */
 static const struct clk_rst_table monaco_clk_reset_table[] = {
 	{ "bus", 0 },
@@ -2033,6 +2038,7 @@ static const struct msm_vidc_platform_data monaco_data = {
 	.opp_tbl_size = ARRAY_SIZE(monaco_opp_pd_table),
 	.clk_tbl = monaco_clk_table,
 	.clk_tbl_size = ARRAY_SIZE(monaco_clk_table),
+	.opp_clk_tbl = monaco_opp_clk_table,
 	.clk_rst_tbl = monaco_clk_reset_table,
 	.clk_rst_tbl_size = ARRAY_SIZE(monaco_clk_reset_table),
 

@@ -2346,6 +2346,11 @@ static const struct clk_table kodiak_clk_table[] = {
 	  (u64[]) {460000048, 424000000, 335000000, 240000000, 133330000},      5},
 };
 
+const char * const kodiak_opp_clk_table[] = {
+	"vcodec_core",
+	NULL,
+};
+
 const struct context_bank_table kodiak_context_bank_table[] = {
 	{"qcom,sc7280-venus", 0x25800000, 0x0,        0, 1, MSM_VIDC_NON_SECURE |
 							    MSM_VIDC_NON_SECURE_BITSTREAM |
@@ -2450,6 +2455,7 @@ static const struct msm_vidc_platform_data kodiak_data_v0 = {
 	.opp_tbl_size = ARRAY_SIZE(kodiak_opp_pd_table),
 	.clk_tbl = kodiak_clk_table,
 	.clk_tbl_size = ARRAY_SIZE(kodiak_clk_table),
+	.opp_clk_tbl = kodiak_opp_clk_table,
 
 	/* populate context bank */
 	.context_bank_tbl = kodiak_context_bank_table,
