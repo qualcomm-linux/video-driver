@@ -20,9 +20,10 @@ inputs:
 
 runs:
   using: composite
+
   steps:
-    - name: Extract presigned URLs for this machine
-      id: get_urls
+    - name: Extract presigned build archive URL
+      id: extract_urls
       shell: bash
       env:
         MACHINE: ${{ inputs.machine }}
@@ -30,30 +31,33 @@ runs:
       run: |
         set -euo pipefail
 
-        flash_key="${MACHINE}_flash_files.tar"
-        rootfs_key="${MACHINE}_rootfs.img"
+        build_key="${MACHINE}_build.tar.gz"
 
         if [ ! -f "$PRESIGNED_FILE" ]; then
-          echo "::error::Presigned URL file not found"
+          echo "::error::Presigned URL file not found: $PRESIGNED_FILE"
           exit 1
         fi
 
-        flash_url="$(
-          jq -r --arg key "$flash_key" '.[$key] // empty' "$PRESIGNED_FILE"
+        jq empty "$PRESIGNED_FILE"
+
+        echo "=== Presigned URL keys ==="
+        jq -r 'keys[]' "$PRESIGNED_FILE"
+
+        build_url="$(
+          jq -r --arg key "$build_key" '.[$key] // empty' "$PRESIGNED_FILE"
         )"
 
-        rootfs_url="$(
-          jq -r --arg key "$rootfs_key" '.[$key] // empty' "$PRESIGNED_FILE"
-        )"
-
-        if [ -z "$flash_url" ] || [ -z "$rootfs_url" ]; then
-          echo "::error::Required presigned URLs are missing"
+        if [ -z "$build_url" ]; then
+          echo "::error::Combined build archive URL is missing"
+          echo "::error::Expected key: $build_key"
           exit 1
         fi
+
+        echo "Build archive found: $build_key"
 
         {
-          printf 'flash_url=%s\n' "$flash_url"
-          printf 'rootfs_url=%s\n' "$rootfs_url"
+          printf 'build_key=%s\n' "$build_key"
+          printf 'build_url=%s\n' "$build_url"
         } >> "$GITHUB_OUTPUT"
 
     - name: Write synthetic cloudData.json and metadata.json
@@ -62,45 +66,65 @@ runs:
       env:
         MACHINE: ${{ inputs.machine }}
         LAVA_NAME: ${{ inputs.lavaname }}
-        FLASH_URL: ${{ steps.get_urls.outputs.flash_url }}
-        ROOTFS_URL: ${{ steps.get_urls.outputs.rootfs_url }}
+        BUILD_URL: ${{ steps.extract_urls.outputs.build_url }}
         WORKSPACE: ${{ github.workspace }}
       run: |
         set -euo pipefail
 
         job_render_dir="$(dirname "$WORKSPACE")/job_render"
+        data_dir="$job_render_dir/data"
 
         if [ ! -d "$job_render_dir" ]; then
-          echo "::error::job_render directory was not found"
+          echo "::error::job_render directory was not found: $job_render_dir"
           exit 1
         fi
 
-        data_dir="$job_render_dir/data"
-        mkdir -p -- "$data_dir"
+        mkdir -p "$data_dir"
 
         case "$MACHINE" in
           qcs9100-ride-sx)
             dtb_name="qcs9100-ride-r3"
             ;;
+
           qcs8300-ride-sx)
             dtb_name="qcs8300-ride"
             ;;
+
           rb3gen2-core-kit)
             dtb_name="qcs6490-rb3gen2"
             ;;
+
           qcs615-ride)
             dtb_name="qcs615-ride"
             ;;
+
           sm8750-mtp)
             dtb_name="sm8750-mtp"
             ;;
+
           kaanapali-mtp)
             dtb_name="kaanapali-mtp"
             ;;
+
+          shikra|shikra-evk)
+            dtb_name="shikra"
+            ;;
+
+          glymur|glymur-crd)
+            dtb_name="glymur"
+            ;;
+
           *)
             dtb_name="$MACHINE"
             ;;
         esac
+
+        if [ "$MACHINE" = "shikra-evk" ] &&
+           [ "$LAVA_NAME" != "shikra-iqs-evk" ]; then
+          echo "::error::Invalid Shikra LAVA name: $LAVA_NAME"
+          echo "::error::Expected: shikra-iqs-evk"
+          exit 1
+        fi
 
         printf 'dtb_name=%s\n' "$dtb_name" >> "$GITHUB_OUTPUT"
         printf 'job_render_dir=%s\n' "$job_render_dir" >> "$GITHUB_OUTPUT"
@@ -108,8 +132,7 @@ runs:
         jq -n \
           --arg machine "$MACHINE" \
           --arg lavaname "$LAVA_NAME" \
-          --arg flash_url "$FLASH_URL" \
-          --arg rootfs_url "$ROOTFS_URL" \
+          --arg build_url "$BUILD_URL" \
           '{
             id: ("ci-" + $machine),
             kind: "kbuild",
@@ -119,6 +142,7 @@ runs:
             parent: "",
             state: "done",
             result: "pass",
+
             artifacts: {
               metadata: "",
               kernel: "",
@@ -127,9 +151,9 @@ runs:
               ramdisk: "",
               firmware: "",
               dtb: "",
-              flash_image: $flash_url,
-              rootfs_image: $rootfs_url
+              flash_image: $build_url
             },
+
             data: {
               kernel_revision: {
                 tree: "qcom-next",
@@ -163,6 +187,7 @@ runs:
               kernel_type: "image",
               regression: null
             },
+
             debug: {},
             jobfilter: null,
             platform_filter: [],
@@ -186,6 +211,12 @@ runs:
             }
           }' > "$data_dir/metadata.json"
 
+        echo "=== cloudData.json ==="
+        jq . "$data_dir/cloudData.json"
+
+        echo "=== metadata.json ==="
+        jq . "$data_dir/metadata.json"
+
     - name: Render LAVA job definition
       shell: bash
       env:
@@ -200,26 +231,105 @@ runs:
         job_render_dir="$(dirname "$WORKSPACE")/job_render"
         renders_dir="$job_render_dir/renders"
 
-        mkdir -p -- "$renders_dir"
+        if [ ! -d "$job_render_dir" ]; then
+          echo "::error::job_render directory not found: $job_render_dir"
+          exit 1
+        fi
 
-        docker run -i --rm \
-          --workdir="$job_render_dir" \
-          -v "$(dirname "$job_render_dir"):$(dirname "$job_render_dir")" \
+        rm -rf "$renders_dir"
+        mkdir -p "$renders_dir"
+
+        echo "=== Render input files ==="
+        find "$job_render_dir/data" \
+          -maxdepth 2 \
+          -type f \
+          -print \
+          -exec sed -n '1,40p' {} \;
+
+        echo "=== Starting LAVA renderer ==="
+
+        docker run --rm \
+          --workdir /job_render \
+          --mount "type=bind,src=$job_render_dir,dst=/job_render" \
           -e "MACHINE=$MACHINE" \
-          -e "TARGET=$MACHINE" \
+          -e "TARGET=$LAVA_NAME" \
           -e "LAVA_NAME=$LAVA_NAME" \
           -e "TARGET_DTB=$TARGET_DTB" \
           -e "BOOT_METHOD=flasher" \
           "$DOCKER_IMAGE" \
           bash -c '
             set -euo pipefail
+
+            test -f /job_render/lava_Job_definition_generator.py
+            test -f /job_render/data/cloudData.json
+            test -f /job_render/data/metadata.json
+
             export BOOT_METHOD=flasher
 
-            python3 lava_Job_definition_generator.py \
-              --localjson ./data/cloudData.json \
+            python3 /job_render/lava_Job_definition_generator.py \
+              --localjson /job_render/data/cloudData.json \
               --meta-qcom \
               --video_pre-merge
+
+            echo "=== YAML files generated inside container ==="
+
+            find /job_render \
+              -maxdepth 8 \
+              -type f \
+              \( -name "*.yaml" -o -name "*.yml" -o -name "*.log" \) \
+              -print | sort
           '
+
+        echo "=== YAML and log files generated on host ==="
+
+        find "$job_render_dir" \
+          -maxdepth 8 \
+          -type f \
+          \( -name "*.yaml" -o -name "*.yml" -o -name "*.log" \) \
+          -print | sort || true
+
+        yaml_file="$renders_dir/lava_job_definition.yaml"
+
+        if [ ! -f "$yaml_file" ]; then
+          discovered_yaml="$(
+            find "$job_render_dir" \
+              -type f \
+              \( \
+                -name "lava_job_definition.yaml" \
+                -o -name "*lava*job*.yaml" \
+                -o -name "*lava*job*.yml" \
+              \) \
+              -print -quit
+          )"
+
+          if [ -n "$discovered_yaml" ] &&
+             [ "$discovered_yaml" != "$yaml_file" ]; then
+            echo "Discovered rendered YAML at: $discovered_yaml"
+            cp "$discovered_yaml" "$yaml_file"
+          fi
+        fi
+
+        if [ ! -f "$yaml_file" ]; then
+          echo "::error::Rendered YAML not found: $yaml_file"
+
+          echo "=== Renderer logs ==="
+          find "$job_render_dir/logs" \
+            -type f \
+            -print \
+            -exec tail -n 120 {} \; || true
+
+          echo "=== Complete job_render directory ==="
+          find "$job_render_dir" -maxdepth 4 -print | sort || true
+
+          exit 1
+        fi
+
+        if [ ! -s "$yaml_file" ]; then
+          echo "::error::Rendered YAML is empty: $yaml_file"
+          exit 1
+        fi
+
+        echo "Rendered YAML created: $yaml_file"
 
     - name: Patch device_type in rendered YAML
       shell: bash
@@ -234,12 +344,114 @@ runs:
         yaml_file="$job_render_dir/renders/lava_job_definition.yaml"
 
         if [ ! -f "$yaml_file" ]; then
-          echo "::error::Rendered YAML not found"
+          echo "::error::Rendered YAML not found: $yaml_file"
+          find "$job_render_dir" -maxdepth 8 -type f -print | sort || true
           exit 1
         fi
 
-        sed -i \
-          "s|^device_type:.*|device_type: ${LAVA_NAME}|" \
-          "$yaml_file"
+        if [ ! -s "$yaml_file" ]; then
+          echo "::error::Rendered YAML is empty: $yaml_file"
+          exit 1
+        fi
 
-        echo "Patched device_type for $MACHINE"
+        if [ "$MACHINE" = "shikra-evk" ] &&
+           [ "$LAVA_NAME" != "shikra-iqs-evk" ]; then
+          echo "::error::Invalid Shikra device mapping"
+          echo "::error::MACHINE=$MACHINE"
+          echo "::error::LAVA_NAME=$LAVA_NAME"
+          echo "::error::Expected LAVA_NAME=shikra-iqs-evk"
+          exit 1
+        fi
+
+        tmp_file="${yaml_file}.tmp"
+
+        if grep -qE '^device_type[[:space:]]*:' "$yaml_file"; then
+          sed \
+            "s|^device_type[[:space:]]*:.*|device_type: ${LAVA_NAME}|" \
+            "$yaml_file" > "$tmp_file"
+        else
+          {
+            printf 'device_type: %s\n' "$LAVA_NAME"
+            cat "$yaml_file"
+          } > "$tmp_file"
+        fi
+
+        mv "$tmp_file" "$yaml_file"
+
+        echo "Patched device_type for $MACHINE -> $LAVA_NAME"
+        grep -n '^device_type:' "$yaml_file"
+
+    - name: Validate rendered LAVA job
+      shell: bash
+      env:
+        MACHINE: ${{ inputs.machine }}
+        LAVA_NAME: ${{ inputs.lavaname }}
+        WORKSPACE: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+
+        job_render_dir="$(dirname "$WORKSPACE")/job_render"
+        yaml_file="$job_render_dir/renders/lava_job_definition.yaml"
+
+        if [ ! -f "$yaml_file" ]; then
+          echo "::error::Rendered YAML not found: $yaml_file"
+          exit 1
+        fi
+
+        if [ ! -s "$yaml_file" ]; then
+          echo "::error::Rendered YAML is empty: $yaml_file"
+          exit 1
+        fi
+
+        if [ "$MACHINE" = "shikra-evk" ]; then
+          if [ "$LAVA_NAME" != "shikra-iqs-evk" ]; then
+            echo "::error::Invalid Shikra LAVA mapping"
+            echo "::error::MACHINE=$MACHINE"
+            echo "::error::LAVA_NAME=$LAVA_NAME"
+            echo "::error::Expected LAVA_NAME=shikra-iqs-evk"
+            exit 1
+          fi
+
+          if ! grep -qE '^device_type:[[:space:]]*shikra-iqs-evk[[:space:]]*$' "$yaml_file"; then
+            echo "::error::Rendered Shikra device_type is not shikra-iqs-evk"
+            grep -n '^device_type:' "$yaml_file" || true
+            exit 1
+          fi
+        fi
+
+        if ! grep -qE '^device_type:[[:space:]]*[^[:space:]]+' "$yaml_file"; then
+          echo "::error::device_type is missing or empty in rendered YAML"
+          exit 1
+        fi
+
+        if ! grep -qE 'url:.*_build\.tar\.gz' "$yaml_file"; then
+          echo "::error::Compressed build archive (_build.tar.gz) URL is missing from rendered LAVA job"
+          exit 1
+        fi
+
+        if grep -qE 'url:.*rootfs\.img' "$yaml_file"; then
+          echo "::error::rootfs.img must not appear as a separate download URL"
+          exit 1
+        fi
+
+        if grep -qE "url:[[:space:]]*['\"]?[[:space:]]*['\"]?$" "$yaml_file"; then
+          echo "::error::Empty URL found in rendered LAVA job"
+          grep -n "url:[[:space:]]*['\"]" "$yaml_file" || true
+          exit 1
+        fi
+
+        if grep -E 'url:.*combined_flash\.tar' "$yaml_file" |
+           grep -qE 'https?://|s3://'; then
+          echo "::error::combined_flash.tar must not appear as a direct S3/HTTP download URL"
+          exit 1
+        fi
+
+        echo "=== Final rendered LAVA job ==="
+        sed -n '1,320p' "$yaml_file"
+
+        echo "Rendered LAVA job validation passed for $MACHINE"
+        echo "  - device_type              : present"
+        echo "  - flash_image (_build.tar.gz): present as download URL"
+        echo "  - rootfs.img               : extracted from archive"
+        echo "  - empty URLs               : none"
+        echo "  - combined_flash.tar       : intermediate only"
