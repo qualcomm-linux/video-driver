@@ -170,29 +170,36 @@ jobs:
             exit 1
           fi
 
-      - name: Clone meta-qcom as sibling repository
+      - name: Copy read-only meta-qcom source into build workspace
         shell: bash
         env:
           WORKSPACE: ${{ github.workspace }}
+          META_QCOM_SOURCE: /efsx/qli/meta-qcom
         run: |
           set -euo pipefail
-
           parent_dir="$(dirname "$WORKSPACE")"
-          meta_qcom_dir="$parent_dir/meta-qcom"
-
-          rm -rf "$meta_qcom_dir"
-
-          git clone \
-            --depth 1 \
-            https://github.com/qualcomm-linux/meta-qcom \
-            "$meta_qcom_dir"
-
-          echo "=== Parent workspace ==="
-          ls -la "$parent_dir"
-
+          meta_qcom_copy="$parent_dir/meta-qcom"
+          if [ ! -d "$META_QCOM_SOURCE" ] || [ ! -r "$META_QCOM_SOURCE" ]; then
+            echo "::error::meta-qcom source is missing or not readable: $META_QCOM_SOURCE"
+            exit 1
+          fi
+          if [ -e "$meta_qcom_copy" ] || [ -L "$meta_qcom_copy" ]; then
+            if [ -f "$meta_qcom_copy/.qgenie-readonly-source-copy" ]; then
+              rm -rf "$meta_qcom_copy"
+            else
+              echo "::error::Build copy path already exists and is not a marked workflow copy; refusing to remove or replace it: $meta_qcom_copy"
+              exit 1
+            fi
+          fi
+          # Copy from the protected source; build tools only see the disposable workspace copy.
+          mkdir -p "$meta_qcom_copy"
+          touch "$meta_qcom_copy/.qgenie-readonly-source-copy"
+          cp -a "$META_QCOM_SOURCE"/. "$meta_qcom_copy"/
+          echo "Read-only source: $META_QCOM_SOURCE"
+          echo "Build copy:      $meta_qcom_copy"
+          echo "Build workspace: $WORKSPACE"
           echo "=== meta-qcom/ci ==="
-          ls -la "$meta_qcom_dir/ci" || true
-
+          ls -la "$meta_qcom_copy/ci" || true
       - name: Pull Docker image
         uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
         with:
@@ -337,7 +344,7 @@ jobs:
           echo "Workspace: $WORKSPACE"
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/build@adb_build
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
@@ -411,7 +418,7 @@ jobs:
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/inject@adb_build
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
@@ -780,7 +787,7 @@ jobs:
           cat "$WORKSPACE/artifacts/file_list.txt"
 
       - name: Upload single build archive to S3
-        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@adb_build
         with:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
