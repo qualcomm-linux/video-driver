@@ -198,7 +198,20 @@ jobs:
           echo "Read-only source: $META_QCOM_SOURCE"
           echo "Build copy:      $meta_qcom_copy"
           echo "Build workspace: $WORKSPACE"
-          echo "=== meta-qcom/ci ==="
+          echo
+          echo "=== Source directory permissions and filesystem ==="
+          stat "$META_QCOM_SOURCE" || true
+          namei -l "$META_QCOM_SOURCE" || true
+          df -hT "$META_QCOM_SOURCE" || true
+          echo
+          echo "=== Source directory contents (top 2 levels) ==="
+          find "$META_QCOM_SOURCE" -maxdepth 2 \
+            -printf '%M %u:%g %s bytes %y %p -> %l\n' 2>&1 | sort || true
+          echo
+          echo "=== Source root listing ==="
+          ls -la "$META_QCOM_SOURCE" || true
+          echo
+          echo "=== Copied meta-qcom/ci listing ==="
           ls -la "$meta_qcom_copy/ci" || true
       - name: Pull Docker image
         uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
