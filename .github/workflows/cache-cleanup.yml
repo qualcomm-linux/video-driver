@@ -1,0 +1,98 @@
+name: Cache Cleanup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 10 * * 6"  # Weekly on Saturday at 10:23 UTC
+
+permissions: {}
+
+env:
+  CACHE_BASE_DIR: /efsx/qli/video-driver
+  CACHE_RETENTION_DAYS: 15
+
+jobs:
+  cache-cleanup:
+    if: github.repository_owner == 'qualcomm-linux'
+    runs-on:
+      group: GHA-video-Prd-SelfHosted-RG
+      labels:
+        - self-hosted
+        - video-prd-u2204-x64-large-od-ephem
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        shell: bash
+        run: |
+          echo "CACHE_BASE_DIR=${CACHE_BASE_DIR}" >> $GITHUB_ENV
+          echo "BUILD_CACHE_DIR=${CACHE_BASE_DIR}/build-cache" >> $GITHUB_ENV
+          echo "OBJECT_CACHE_DIR=${CACHE_BASE_DIR}/build-cache/object-cache" >> $GITHUB_ENV
+          echo "MODULE_CACHE_DIR=${CACHE_BASE_DIR}/build-cache/module-cache" >> $GITHUB_ENV
+
+      - name: Expire unused cache files
+        shell: bash
+        run: |
+          echo "Starting cache cleanup..."
+          echo "Retention period: ${CACHE_RETENTION_DAYS} days"
+          echo ""
+
+          # Count files before cleanup
+          object_before=$(find "${OBJECT_CACHE_DIR}" -type f 2>/dev/null | wc -l)
+          module_before=$(find "${MODULE_CACHE_DIR}" -type f 2>/dev/null | wc -l)
+
+          echo "Before cleanup:"
+          echo "  Object cache files: ${object_before}"
+          echo "  Module cache files: ${module_before}"
+          echo ""
+
+          # Remove object files not accessed in 15+ days
+          echo "Removing old object files..."
+          find "${OBJECT_CACHE_DIR}" -type f -mtime +${CACHE_RETENTION_DAYS} -delete 2>/dev/null || true
+
+          # Remove module files not accessed in 15+ days
+          echo "Removing old module files..."
+          find "${MODULE_CACHE_DIR}" -type f -mtime +${CACHE_RETENTION_DAYS} -delete 2>/dev/null || true
+
+          # Remove empty directories
+          echo "Removing empty directories..."
+          find "${BUILD_CACHE_DIR}" -type d -empty -delete 2>/dev/null || true
+
+          # Count files after cleanup
+          object_after=$(find "${OBJECT_CACHE_DIR}" -type f 2>/dev/null | wc -l)
+          module_after=$(find "${MODULE_CACHE_DIR}" -type f 2>/dev/null | wc -l)
+
+          echo ""
+          echo "After cleanup:"
+          echo "  Object cache files: ${object_after}"
+          echo "  Module cache files: ${module_after}"
+          echo ""
+
+          object_removed=$((object_before - object_after))
+          module_removed=$((module_before - module_after))
+          total_removed=$((object_removed + module_removed))
+
+          echo "Removed:"
+          echo "  Object files: ${object_removed}"
+          echo "  Module files: ${module_removed}"
+          echo "  Total files: ${total_removed}"
+
+      - name: Report cleanup results
+        shell: bash
+        run: |
+          echo "## Cache Cleanup Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Retention Period:** ${CACHE_RETENTION_DAYS} days" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Cache Statistics:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Object Cache Size: $(du -sh ${OBJECT_CACHE_DIR} 2>/dev/null | cut -f1 || echo '0')" >> $GITHUB_STEP_SUMMARY
+          echo "- Module Cache Size: $(du -sh ${MODULE_CACHE_DIR} 2>/dev/null | cut -f1 || echo '0')" >> $GITHUB_STEP_SUMMARY
+          echo "- Total Cache Size: $(du -sh ${BUILD_CACHE_DIR} 2>/dev/null | cut -f1 || echo '0')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Disk Space:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Available: $(df -h ${CACHE_BASE_DIR} | tail -1 | awk '{print $4}')" >> $GITHUB_STEP_SUMMARY
+          echo "- Used: $(df -h ${CACHE_BASE_DIR} | tail -1 | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
+          echo "- Total: $(df -h ${CACHE_BASE_DIR} | tail -1 | awk '{print $2}')" >> $GITHUB_STEP_SUMMARY

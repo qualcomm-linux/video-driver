@@ -1,0 +1,763 @@
+name: Build with Sstate-Cache
+
+on:
+  workflow_call:
+    inputs:
+      docker_image:
+        description: Docker image
+        type: string
+        required: true
+      build_matrix:
+        description: Build matrix for multi-target builds
+        type: string
+        required: true
+      commit_sha:
+        description: Exact commit SHA to build
+        type: string
+        required: true
+      source_repository:
+        description: Repository containing the commit to build
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CACHE_BASE_DIR: /efsx/qli/video-driver
+  ENABLE_SSTATE_CACHE: 1
+  ENABLE_CCACHE: 1
+  CCACHE_MAXSIZE: 50G
+
+jobs:
+  build-with-cache:
+    timeout-minutes: 720
+    runs-on:
+      group: GHA-video-Prd-SelfHosted-RG
+      labels:
+        - self-hosted
+        - video-prd-u2204-x64-large-od-ephem
+
+    strategy:
+      fail-fast: false
+      matrix:
+        build_matrix: ${{ fromJson(inputs.build_matrix) }}
+
+    steps:
+      - name: Setup cache environment
+        shell: bash
+        run: |
+          echo "CACHE_BASE_DIR=${CACHE_BASE_DIR}" >> $GITHUB_ENV
+          echo "BUILD_CACHE_DIR=${CACHE_BASE_DIR}/build-cache" >> $GITHUB_ENV
+          echo "OBJECT_CACHE_DIR=${CACHE_BASE_DIR}/build-cache/object-cache" >> $GITHUB_ENV
+          echo "MODULE_CACHE_DIR=${CACHE_BASE_DIR}/build-cache/module-cache" >> $GITHUB_ENV
+          echo "CCACHE_DIR=${CACHE_BASE_DIR}/ccache" >> $GITHUB_ENV
+          echo "DL_DIR=${CACHE_BASE_DIR}/downloads" >> $GITHUB_ENV
+          echo "METADATA_DIR=${CACHE_BASE_DIR}/build-cache/metadata" >> $GITHUB_ENV
+
+      - name: Initialize cache
+        shell: bash
+        run: |
+          mkdir -p "${CACHE_BASE_DIR}/build-cache"/{object-cache,module-cache,metadata,logs}
+          mkdir -p "${CACHE_BASE_DIR}"/{ccache,downloads}
+          chmod 755 "${CACHE_BASE_DIR}/build-cache"
+          echo "Cache directories initialized"
+
+      - name: Validate cache
+        shell: bash
+        run: |
+          echo "Validating cache structure..."
+          [ -d "${OBJECT_CACHE_DIR}" ] && echo "✓ Object cache exists" || echo "✗ Object cache missing"
+          [ -d "${MODULE_CACHE_DIR}" ] && echo "✓ Module cache exists" || echo "✗ Module cache missing"
+          [ -d "${CCACHE_DIR}" ] && echo "✓ CCache exists" || echo "✗ CCache missing"
+
+      - name: Pre-clean workspace
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          echo "=== Disk before clean ==="
+          df -hT
+
+          rm -rf "$WORKSPACE/build/tmp" || true
+          rm -f "$(dirname "$WORKSPACE")/kas_local_conf_header.txt" || true
+          rm -rf "$WORKSPACE/classes" || true
+          rm -rf "$WORKSPACE/archive-validation" || true
+          rm -f "$WORKSPACE/"*_archive_manifest.txt || true
+
+          echo "=== Disk after clean ==="
+          df -hT
+          df -ih
+          free -h
+
+      - name: Validate build inputs
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$COMMIT_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::Invalid commit SHA: $COMMIT_SHA"
+            exit 1
+          fi
+
+          if ! [[ "$SOURCE_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "::error::Invalid source repository: $SOURCE_REPOSITORY"
+            exit 1
+          fi
+
+          echo "Source repository: $SOURCE_REPOSITORY"
+          echo "Commit SHA:        $COMMIT_SHA"
+
+      - name: Checkout exact HEAD commit
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.source_repository }}
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Verify commit before build
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.commit_sha }}
+          EXPECTED_REPOSITORY: ${{ inputs.source_repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          actual_sha="$(git rev-parse HEAD)"
+
+          echo "========================================"
+          echo "Event      : $EVENT_NAME"
+          echo "Repository : $EXPECTED_REPOSITORY"
+          echo "Input SHA  : $EXPECTED_SHA"
+          echo "HEAD SHA   : $actual_sha"
+          echo "Branch     : $REF_NAME"
+          echo "Commit msg : $(git log -1 --pretty=format:'%s')"
+          echo "Author     : $(git log -1 --pretty=format:'%an <%ae>')"
+          echo "Date       : $(git log -1 --pretty=format:'%ci')"
+          echo "========================================"
+
+          if [ "$actual_sha" != "$EXPECTED_SHA" ]; then
+            echo "::error::SHA mismatch"
+            echo "Expected: $EXPECTED_SHA"
+            echo "Actual  : $actual_sha"
+            exit 1
+          fi
+
+          echo "Correct repository and commit checked out"
+
+      - name: Display cache status before build
+        shell: bash
+        run: |
+          echo "Cache Status Before Build:"
+          echo "=========================="
+          echo "Object Cache Files: $(find "${OBJECT_CACHE_DIR}" -type f 2>/dev/null | wc -l)"
+          echo "Module Cache Files: $(find "${MODULE_CACHE_DIR}" -type f 2>/dev/null | wc -l)"
+          echo "Cache Size: $(du -sh "${CACHE_BASE_DIR}" 2>/dev/null | cut -f1)"
+          echo "Disk Space: $(df -h "${CACHE_BASE_DIR}" | tail -1 | awk '{print $4}')"
+
+      - name: Clone meta-qcom as sibling repository
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          parent_dir="$(dirname "$WORKSPACE")"
+          meta_qcom_dir="$parent_dir/meta-qcom"
+
+          rm -rf "$meta_qcom_dir"
+
+          git clone \
+            --depth 1 \
+            https://github.com/qualcomm-linux/meta-qcom \
+            "$meta_qcom_dir"
+
+          echo "=== Parent workspace ==="
+          ls -la "$parent_dir"
+
+          echo "=== meta-qcom/ci ==="
+          ls -la "$meta_qcom_dir/ci" || true
+
+      - name: Pull Docker image
+        uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
+        with:
+          image: ${{ inputs.docker_image }}
+          registry: artifacts.codelinaro.org/clo-420-qli-registry
+
+      - name: Add swap space
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if sudo swapon --show | grep -q '/swapfile'; then
+            echo "Swap already enabled"
+          else
+            sudo fallocate -l 16G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+          fi
+
+          echo "=== Memory ==="
+          free -h
+
+      - name: Retag Docker image
+        shell: bash
+        env:
+          DOCKER_IMAGE: ${{ inputs.docker_image }}
+        run: |
+          set -euo pipefail
+
+          docker tag \
+            "artifacts.codelinaro.org/clo-420-qli-registry/$DOCKER_IMAGE" \
+            "$DOCKER_IMAGE" || true
+
+          docker images | grep -- "$DOCKER_IMAGE" || true
+
+      - name: Build image with cache
+        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        with:
+          machine: ${{ matrix.build_matrix.machine }}
+          docker_image: ${{ inputs.docker_image }}
+          kas_file: ${{ matrix.build_matrix.kas_file }}
+          build_command: ${{ matrix.build_matrix.build_command }}
+          kas_local_conf_header: |
+
+            IMAGE_FEATURES += "enable-adbd"
+            IMAGE_INSTALL:append = " git"
+
+            HOSTTOOLS:remove = "ccache"
+            INHERIT:remove = "ccache"
+
+            EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
+            EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
+            S:pn-iris-video-dlkm = "${EXTERNALSRC}"
+            B:pn-iris-video-dlkm = "${EXTERNALSRC_BUILD}"
+
+            do_fetch:pn-iris-video-dlkm[noexec] = "1"
+            do_unpack:pn-iris-video-dlkm[noexec] = "1"
+            do_patch:pn-iris-video-dlkm[noexec] = "1"
+
+            MAKE_TARGETS:pn-iris-video-dlkm = ""
+            EXTRA_OEMAKE:pn-iris-video-dlkm = "-C ${STAGING_KERNEL_DIR} M=${S} modules"
+
+            BB_NUMBER_THREADS = "6"
+            PARALLEL_MAKE = "-j6"
+
+      - name: Generate cache manifest
+        if: always()
+        shell: bash
+        run: |
+          echo "Generating cache manifest..."
+          mkdir -p "${METADATA_DIR}"
+          
+          cat > "${METADATA_DIR}/cache-manifest.json" <<EOF
+          {
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "cache_version": "1.0",
+            "statistics": {
+              "object_files": $(find "${OBJECT_CACHE_DIR}" -type f 2>/dev/null | wc -l),
+              "module_files": $(find "${MODULE_CACHE_DIR}" -type f 2>/dev/null | wc -l),
+              "total_size": "$(du -sh "${CACHE_BASE_DIR}" 2>/dev/null | cut -f1)"
+            }
+          }
+          EOF
+          
+          cat "${METADATA_DIR}/cache-manifest.json"
+
+      - name: Display cache status after build
+        if: always()
+        shell: bash
+        run: |
+          echo "Cache Status After Build:"
+          echo "========================="
+          echo "Object Cache Files: $(find "${OBJECT_CACHE_DIR}" -type f 2>/dev/null | wc -l)"
+          echo "Module Cache Files: $(find "${MODULE_CACHE_DIR}" -type f 2>/dev/null | wc -l)"
+          echo "Cache Size: $(du -sh "${CACHE_BASE_DIR}" 2>/dev/null | cut -f1)"
+          echo "Disk Space: $(df -h "${CACHE_BASE_DIR}" | tail -1 | awk '{print $4}')"
+
+      - name: Download iris_test_app from S3
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$WORKSPACE/v4l-video-test-app/build"
+
+          aws s3 sync \
+            "s3://qli-prd-video-gh-artifacts/qualcomm-linux/video-driver/iris_test_app/" \
+            "$WORKSPACE/v4l-video-test-app/build/"
+
+          echo "✅ iris_test_app download complete"
+          ls -la "$WORKSPACE/v4l-video-test-app/build/"
+
+      - name: Download video contents
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$WORKSPACE/downloads"
+
+          wget -q \
+            "https://github.com/qualcomm-linux/qcom-linux-testkit/releases/download/IRIS-Video-Files-v1.0/video_clips_iris.tar.gz" \
+            -O "$WORKSPACE/downloads/video_clips_iris.tar.gz"
+
+          if [ ! -s "$WORKSPACE/downloads/video_clips_iris.tar.gz" ]; then
+            echo "::error::Video contents download failed or file is empty"
+            exit 1
+          fi
+
+          echo "✅ Video contents downloaded"
+          ls -la "$WORKSPACE/downloads"
+
+      - name: Inject Iris test app to rootfs
+        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.main
+        with:
+          docker_image: ${{ inputs.docker_image }}
+          machine: ${{ matrix.build_matrix.machine }}
+
+      - name: Check disk space after build
+        if: always()
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -u
+
+          echo "========================================"
+          echo "Disk diagnostics after build"
+          echo "========================================"
+
+          echo
+          echo "=== Mounted filesystem usage ==="
+          df -hT
+
+          echo
+          echo "=== Inode usage ==="
+          df -ih
+
+          echo
+          echo "=== Memory and swap ==="
+          free -h
+          swapon --show || true
+
+          echo
+          echo "=== Workspace filesystem ==="
+          df -hT "$WORKSPACE"
+
+          echo
+          echo "=== Workspace size ==="
+          du -sh "$WORKSPACE" 2>/dev/null || true
+
+          echo
+          echo "=== Build directory size ==="
+          du -sh "$WORKSPACE/build" 2>/dev/null || true
+
+          echo
+          echo "=== Largest workspace directories ==="
+          du -x -h -d 2 "$WORKSPACE" 2>/dev/null \
+            | sort -h \
+            | tail -30 || true
+
+      - name: Print deploy directory contents
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          MACHINE: '${{ matrix.build_matrix.machine }}'
+        run: |
+          set -euo pipefail
+
+          images_dir="$WORKSPACE/build/tmp/deploy/images"
+          deploy_dir="$images_dir/$MACHINE"
+
+          echo "========================================"
+          echo "Deploy directory diagnostics"
+          echo "Workspace  : $WORKSPACE"
+          echo "Images dir : $images_dir"
+          echo "Deploy dir : $deploy_dir"
+          echo "========================================"
+
+          echo
+          echo "=== Parent images directory ==="
+          if [ -d "$images_dir" ]; then
+            find "$images_dir" \
+              -maxdepth 3 \
+              -printf '%y %p -> %l\n' | sort
+          else
+            echo "::warning::Directory does not exist: $images_dir"
+          fi
+
+          echo
+          echo "=== Machine-specific deploy directory ==="
+          if [ -d "$deploy_dir" ]; then
+            find "$deploy_dir" \
+              -maxdepth 3 \
+              -printf '%y %p -> %l\n' | sort
+          else
+            echo "::warning::Directory does not exist: $deploy_dir"
+          fi
+
+          echo
+          echo "=== qcomflash-related entries ==="
+          if [ -d "$images_dir" ]; then
+            find "$images_dir" \
+              \( -name '*.qcomflash' -o -name '*qcomflash*' -o -name 'rootfs.img' \) \
+              -printf '%y %p -> %l\n' | sort || true
+          fi
+
+      - name: Prepare compressed build archive
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          MACHINE: '${{ matrix.build_matrix.machine }}'
+          IMAGE_NAME: '${{ matrix.build_matrix.image_name }}'
+        run: |
+          set -euo pipefail
+
+          deploy_dir="$WORKSPACE/build/tmp/deploy/images/$MACHINE"
+          symlink_path="$deploy_dir/${IMAGE_NAME}-${MACHINE}.rootfs.qcomflash"
+          archive_path="$WORKSPACE/${MACHINE}_build.tar.gz"
+          manifest_path="$WORKSPACE/${MACHINE}_archive_manifest.txt"
+          validation_dir="$WORKSPACE/archive-validation"
+
+          echo "Machine:    $MACHINE"
+          echo "Image name: $IMAGE_NAME"
+          echo "Deploy dir: $deploy_dir"
+          echo "qcomflash:  $symlink_path"
+          echo "Archive:    $archive_path"
+
+          if [ ! -L "$symlink_path" ]; then
+            echo "::error::qcomflash symlink not found: $symlink_path"
+            find "$deploy_dir" -maxdepth 3 -printf '%y %p -> %l\n' | sort || true
+            exit 1
+          fi
+
+          resolved_dir="$(readlink -f "$symlink_path")"
+
+          if [ ! -d "$resolved_dir" ]; then
+            echo "::error::Resolved qcomflash directory not found: $resolved_dir"
+            exit 1
+          fi
+
+          if [ ! -f "$resolved_dir/rootfs.img" ]; then
+            echo "::error::rootfs.img not found: $resolved_dir/rootfs.img"
+            find "$resolved_dir" -maxdepth 2 -printf '%y %p -> %l\n' | sort || true
+            exit 1
+          fi
+
+          echo "Resolved qcomflash directory: $resolved_dir"
+
+          echo
+          echo "=== qcomflash contents ==="
+          find "$resolved_dir" \
+            -maxdepth 2 \
+            -printf '%y %p -> %l\n' | sort
+
+          echo
+          echo "=== qcomflash size ==="
+          du -sh "$resolved_dir"
+          du -sh "$resolved_dir/rootfs.img"
+
+          echo
+          echo "=== Complete filesystem usage before archive ==="
+          df -hT
+
+          echo
+          echo "=== Inode usage before archive ==="
+          df -ih
+
+          echo
+          echo "=== Archive filesystem usage ==="
+          df -hT "$WORKSPACE"
+
+          echo
+          echo "=== Workspace usage before archive ==="
+          du -sh "$WORKSPACE" 2>/dev/null || true
+
+          echo
+          echo "=== Build usage before archive ==="
+          du -sh "$WORKSPACE/build" 2>/dev/null || true
+
+          source_size_bytes="$(du -sb "$resolved_dir" | awk '{print $1}')"
+          available_bytes="$(df -B1 --output=avail "$WORKSPACE" | tail -1 | tr -d '[:space:]')"
+
+          safety_margin_bytes=$((1024 * 1024 * 1024))
+          required_bytes=$((source_size_bytes + safety_margin_bytes))
+
+          source_size_gib="$(awk "BEGIN {printf \"%.2f\", $source_size_bytes / 1024 / 1024 / 1024}")"
+          available_gib="$(awk "BEGIN {printf \"%.2f\", $available_bytes / 1024 / 1024 / 1024}")"
+          required_gib="$(awk "BEGIN {printf \"%.2f\", $required_bytes / 1024 / 1024 / 1024}")"
+
+          echo
+          echo "=== Archive disk-space calculation ==="
+          echo "Source qcomflash size : ${source_size_gib} GiB"
+          echo "Safety margin         : 1.00 GiB"
+          echo "Required free space   : ${required_gib} GiB"
+          echo "Available free space  : ${available_gib} GiB"
+
+          if [ "$available_bytes" -lt "$required_bytes" ]; then
+            echo "::error::Insufficient disk space for archive creation"
+            echo "::error::Required free space: ${required_gib} GiB"
+            echo "::error::Available free space: ${available_gib} GiB"
+            echo "::error::Filesystem containing workspace: $WORKSPACE"
+
+            echo
+            echo "=== Detailed filesystem usage ==="
+            df -hT
+
+            echo
+            echo "=== Largest workspace entries ==="
+            du -x -h -d 2 "$WORKSPACE" 2>/dev/null \
+              | sort -h \
+              | tail -50 || true
+
+            exit 1
+          fi
+
+          echo "✅ Sufficient disk space is available for archive creation"
+
+          rm -f "$archive_path" "$manifest_path"
+          rm -rf "$validation_dir"
+
+          echo
+          echo "=== Creating compressed build archive ==="
+
+          archive_status=0
+
+          if command -v pigz >/dev/null 2>&1; then
+            pigz_threads="$(nproc)"
+
+            if [ "$pigz_threads" -gt 8 ]; then
+              pigz_threads=8
+            fi
+
+            echo "Using pigz with $pigz_threads threads"
+
+            tar -I "pigz -p $pigz_threads -1" \
+              -cf "$archive_path" \
+              -C "$resolved_dir" \
+              . || archive_status=$?
+          else
+            echo "pigz is not available; using gzip"
+
+            tar -czf "$archive_path" \
+              -C "$resolved_dir" \
+              . || archive_status=$?
+          fi
+
+          if [ "$archive_status" -ne 0 ]; then
+            echo "::error::Archive creation failed with exit code: $archive_status"
+
+            echo
+            echo "=== Filesystem usage after archive failure ==="
+            df -hT
+
+            echo
+            echo "=== Inode usage after archive failure ==="
+            df -ih
+
+            echo
+            echo "=== Partial archive details ==="
+            if [ -e "$archive_path" ]; then
+              ls -lh "$archive_path"
+              du -h "$archive_path" || true
+            else
+              echo "Archive file was not created"
+            fi
+
+            exit "$archive_status"
+          fi
+
+          if [ ! -s "$archive_path" ]; then
+            echo "::error::Build archive was not created or is empty: $archive_path"
+            exit 1
+          fi
+
+          echo
+          echo "=== Archive details ==="
+          ls -lh "$archive_path"
+          du -h "$archive_path"
+
+          echo
+          echo "=== Filesystem usage after archive creation ==="
+          df -hT "$WORKSPACE"
+
+          echo
+          echo "=== Validating gzip stream ==="
+          if ! gzip -t "$archive_path"; then
+            echo "::error::Compressed archive is corrupt: $archive_path"
+            exit 1
+          fi
+
+          echo "✅ Gzip stream is valid"
+
+          echo
+          echo "=== Generating archive manifest ==="
+          if ! tar -tzf "$archive_path" > "$manifest_path"; then
+            echo "::error::Unable to read archive contents: $archive_path"
+            exit 1
+          fi
+
+          echo
+          echo "=== Verifying compressed archive contents ==="
+          sed -n '1,200p' "$manifest_path"
+
+          if ! grep -Fxq './rootfs.img' "$manifest_path"; then
+            echo "::error::rootfs.img is missing from $archive_path"
+            echo "Matching rootfs entries:"
+            grep -i 'rootfs' "$manifest_path" || true
+            exit 1
+          fi
+
+          echo "✅ rootfs.img confirmed inside compressed archive"
+
+          if [ -f "$resolved_dir/contents.xml" ]; then
+            if grep -Fxq './contents.xml' "$manifest_path"; then
+              echo "✅ contents.xml confirmed inside compressed archive"
+            else
+              echo "::error::contents.xml exists in the source qcomflash directory but is missing from the archive"
+              exit 1
+            fi
+          else
+            echo "ℹ️ contents.xml is not present for machine: $MACHINE"
+            echo "Continuing because contents.xml is optional for this image layout"
+          fi
+
+          echo
+          echo "=== Verifying rootfs.img extraction ==="
+          mkdir -p "$validation_dir"
+
+          if ! tar -xzf "$archive_path" \
+            -C "$validation_dir" \
+            ./rootfs.img; then
+            echo "::error::Unable to extract rootfs.img from archive"
+            rm -rf "$validation_dir"
+            exit 1
+          fi
+
+          extracted_rootfs="$validation_dir/rootfs.img"
+
+          if [ ! -s "$extracted_rootfs" ]; then
+            echo "::error::Extracted rootfs.img is missing or empty"
+            rm -rf "$validation_dir"
+            exit 1
+          fi
+
+          source_rootfs_size="$(stat -c '%s' "$resolved_dir/rootfs.img")"
+          extracted_rootfs_size="$(stat -c '%s' "$extracted_rootfs")"
+
+          echo "Original rootfs.img size : $source_rootfs_size bytes"
+          echo "Extracted rootfs.img size: $extracted_rootfs_size bytes"
+
+          if [ "$source_rootfs_size" -ne "$extracted_rootfs_size" ]; then
+            echo "::error::Extracted rootfs.img size does not match the original"
+            rm -rf "$validation_dir"
+            exit 1
+          fi
+
+          rm -rf "$validation_dir"
+
+          echo "✅ rootfs.img extraction and size validation passed"
+
+          echo
+          echo "=== Final archive details ==="
+          ls -lh "$archive_path"
+          du -h "$archive_path"
+
+          echo
+          echo "=== Final filesystem usage ==="
+          df -hT "$WORKSPACE"
+
+          mkdir -p "$WORKSPACE/artifacts"
+          printf '%s\n' "$archive_path" > "$WORKSPACE/artifacts/file_list.txt"
+
+          echo
+          echo "=== Single S3 upload file list ==="
+          cat "$WORKSPACE/artifacts/file_list.txt"
+
+      - name: Upload single build archive to S3
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
+        with:
+          s3_bucket: qli-prd-video-gh-artifacts
+          local_file: ${{ github.workspace }}/artifacts/file_list.txt
+          mode: multi-upload
+          upload_location: ${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.build_matrix.machine }}
+
+      - name: Upload machine-specific pre-signed URLs
+        uses: actions/upload-artifact@v4
+        with:
+          name: presigned-urls-${{ matrix.build_matrix.machine }}
+          path: ${{ github.workspace }}/presigned_urls.json
+          retention-days: 7
+
+      - name: Upload single build archive as workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: build-${{ matrix.build_matrix.machine }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/${{ matrix.build_matrix.machine }}_build.tar.gz
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Clean up
+        if: always()
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+
+          rm -rf "$WORKSPACE/classes" || true
+          rm -rf "$WORKSPACE/artifacts" || true
+          rm -rf "$WORKSPACE/build" || true
+          rm -rf "$WORKSPACE/downloads" || true
+          rm -rf "$WORKSPACE/archive-validation" || true
+          rm -f "$WORKSPACE/"*_build.tar || true
+          rm -f "$WORKSPACE/"*_build.tar.gz || true
+          rm -f "$WORKSPACE/"*_archive_manifest.txt || true
+          rm -f "$(dirname "$WORKSPACE")/kas_local_conf_header.txt" || true
+
+      - name: Update summary
+        if: always()
+        shell: bash
+        env:
+          MACHINE: '${{ matrix.build_matrix.machine }}'
+          BUILD_COMMAND: '${{ matrix.build_matrix.build_command }}'
+          IMAGE_NAME: '${{ matrix.build_matrix.image_name }}'
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -u
+
+          if [ "$JOB_STATUS" = "success" ]; then
+            summary=":heavy_check_mark: Build Success"
+          else
+            summary=":x: Build Failed"
+          fi
+
+          {
+            echo "<details><summary><i>Build Summary</i></summary>"
+            echo
+            echo "$summary for $MACHINE"
+            echo
+            echo "**Machine:** \`$MACHINE\`"
+            echo "**Image:** \`$IMAGE_NAME\`"
+            echo "**Build command:** \`$BUILD_COMMAND\`"
+            echo "**Event:** \`$EVENT_NAME\`"
+            echo "**Commit:** \`$COMMIT_SHA\`"
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
