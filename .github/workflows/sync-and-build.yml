@@ -170,6 +170,25 @@ jobs:
             exit 1
           fi
 
+      - name: Inspect read-only meta-qcom source before copy
+        shell: bash
+        env:
+          META_QCOM_SOURCE: /efsx/qli/meta-qcom
+        run: |
+          set -euo pipefail
+          echo "Read-only source: $META_QCOM_SOURCE"
+          echo
+          echo "=== Source directory permissions and filesystem ==="
+          stat "$META_QCOM_SOURCE" || true
+          namei -l "$META_QCOM_SOURCE" || true
+          df -hT "$META_QCOM_SOURCE" || true
+          echo
+          echo "=== Source directory contents (top 2 levels) ==="
+          find "$META_QCOM_SOURCE" -maxdepth 2 \
+            -printf '%M %u:%g %s bytes %y %p -> %l\n' 2>&1 | sort || true
+          echo
+          echo "=== Source root listing ==="
+          ls -la "$META_QCOM_SOURCE" || true
       - name: Copy read-only meta-qcom source into build workspace
         shell: bash
         env:
