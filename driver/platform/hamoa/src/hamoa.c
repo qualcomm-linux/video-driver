@@ -1910,6 +1910,11 @@ static const struct clk_table hamoa_clk_table[] = {
 	 (u64[]) {481000000, 444000000, 366000000, 338000000, 240000000, 192000000}, 6},
 };
 
+const char * const hamoa_opp_clk_table[] = {
+	"vcodec0_core",
+	NULL,
+};
+
 /* name, exclusive_release */
 static const struct clk_rst_table hamoa_clk_reset_table[] = {
 	{ "bus", 0 },
@@ -2084,6 +2089,7 @@ static const struct msm_vidc_platform_data hamoa_data = {
 	.opp_tbl_size = ARRAY_SIZE(hamoa_opp_pd_table),
 	.clk_tbl = hamoa_clk_table,
 	.clk_tbl_size = ARRAY_SIZE(hamoa_clk_table),
+	.opp_clk_tbl = hamoa_opp_clk_table,
 	.clk_rst_tbl = hamoa_clk_reset_table,
 	.clk_rst_tbl_size = ARRAY_SIZE(hamoa_clk_reset_table),
 

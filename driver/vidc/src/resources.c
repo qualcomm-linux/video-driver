@@ -337,6 +337,9 @@ static int __init_power_domains(struct msm_vidc_core *core)
 	struct power_domain_set *pds;
 #if (KERNEL_VERSION(6, 13, 0) > LINUX_VERSION_CODE)
 	struct device **opp_vdevs = NULL;
+#else
+	struct dev_pm_domain_list *opp_pds;
+	int i;
 #endif
 	const char * const *opp_tbl;
 	u32 pd_count = 0, opp_count = 0, cnt = 0;
@@ -419,12 +422,28 @@ static int __init_power_domains(struct msm_vidc_core *core)
 	struct dev_pm_domain_attach_data opp_pd_data = {
 		.pd_names = opp_tbl,
 		.num_pd_names = opp_count,
-		.pd_flags = PD_FLAG_DEV_LINK_ON | PD_FLAG_REQUIRED_OPP,
+		.pd_flags = PD_FLAG_REQUIRED_OPP,
 	};
 	rc =  devm_pm_domain_attach_list(&core->pdev->dev, &opp_pd_data,
 				&core->platform->data.opp_pmdomain_tbl);
 	if (rc < 0)
 		return rc;
+
+	/*
+	 * map rails(mxc & mmcx) to video devices (venus & vcodec0), so that
+	 * rails follow the runtime pm of these devices, like their gdsc.
+	 */
+	opp_pds = core->platform->data.opp_pmdomain_tbl;
+	venus_hfi_for_each_power_domain(core, pdinfo) {
+		for (i = 0; i < opp_pds->num_pds; i++) {
+			if (!device_link_add(pdinfo->genpd_dev, opp_pds->pd_devs[i],
+					     DL_FLAG_PM_RUNTIME | DL_FLAG_STATELESS)) {
+				d_vpr_e("%s: failed to link %s to %s\n", __func__,
+					dev_name(opp_pds->pd_devs[i]), pdinfo->name);
+				return -EINVAL;
+			}
+		}
+	}
 
 	if (core->platform->data.opp_clk_tbl) {
 		struct dev_pm_opp_config opp_clk_data = {
