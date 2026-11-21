@@ -84,6 +84,7 @@ struct msm_vidc_core {
 	struct media_device                    media_dev;
 	struct list_head                       instances;
 	struct list_head                       dangling_instances;
+	u32                                    num_sessions;
 	struct dentry                         *debugfs_parent;
 	struct dentry                         *debugfs_root;
 	char                                   fw_version[MAX_MSM_VIDC_NAME_LENGTH];

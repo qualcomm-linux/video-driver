@@ -221,7 +221,6 @@ u32 msm_vidc_decoder_input_size(struct msm_vidc_inst *inst)
 	u32 bitstream_size_overwrite = 0;
 	enum msm_vidc_codec_type codec;
 	struct msm_vidc_core *core;
-	struct msm_vidc_inst *i;
 	u32 count = 0;
 
 	bitstream_size_overwrite =
@@ -258,8 +257,14 @@ u32 msm_vidc_decoder_input_size(struct msm_vidc_inst *inst)
 		div_factor = div_factor << 1;
 
 	core = inst->core;
-	list_for_each_entry(i, &core->instances, list)
-		count++;
+	/*
+	 * Use the lock-free num_sessions counter instead of iterating
+	 * core->instances without holding core_lock. Iterating the list
+	 * without the lock is unsafe because concurrent add/remove of
+	 * sessions can corrupt list.next pointers, causing a NULL pointer
+	 * dereference.
+	 */
+	count = READ_ONCE(core->num_sessions);
 
 	/* For image session, use the actual resolution to calc buffer size */
 	if (is_image_session(inst) || count >= 16) {

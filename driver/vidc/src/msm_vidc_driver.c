@@ -3970,6 +3970,7 @@ int msm_vidc_add_session(struct msm_vidc_inst *inst)
 
 	if (count < core->capabilities[MAX_SESSION_COUNT].value) {
 		list_add_tail(&inst->list, &core->instances);
+		core->num_sessions++;
 	} else {
 		i_vpr_e(inst, "%s: max limit %lld already running %d sessions\n",
 			__func__, core->capabilities[MAX_SESSION_COUNT].value, count);
@@ -3993,6 +3994,8 @@ int msm_vidc_remove_session(struct msm_vidc_inst *inst)
 	list_for_each_entry_safe(i, temp, &core->instances, list) {
 		if (i->session_id == inst->session_id) {
 			list_move_tail(&i->list, &core->dangling_instances);
+			if (core->num_sessions)
+				core->num_sessions--;
 			i_vpr_h(inst, "%s: removed session %#x\n",
 				__func__, i->session_id);
 		}
