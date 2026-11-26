@@ -193,7 +193,26 @@ jobs:
 
           echo "=== meta-qcom/ci ==="
           ls -la "$meta_qcom_dir/ci" || true
-
+      
+      - name: Diagnose cache mount
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          echo "=== Runner: $(hostname) ==="
+          echo "=== df -hT (all filesystems, incl. network) ==="
+          df -hT
+          echo "=== Network mounts (nfs/efs) ==="
+          findmnt -t nfs,nfs4,efs,fuse 2>/dev/null || mount | grep -Ei 'efs|nfs' || echo "no nfs/efs mounts found"
+          echo "=== ls -la /efsx ==="
+          ls -la /efsx 2>&1
+          echo "=== ls -la /efsx/video ==="
+          ls -la /efsx/video 2>&1
+          echo "=== findmnt for the path ==="
+          findmnt -T /efsx/video 2>&1
+          echo "=== whoami / in container? ==="
+          id; [ -f /.dockerenv ] && echo "running inside a container" || echo "running on host"
+      
       - name: Prepare EFSx cache
         shell: bash
         run: |
