@@ -37,6 +37,12 @@ jobs:
         - self-hosted
         - video-prd-u2204-x64-large-od-ephem
 
+    env:
+      CACHE_MOUNT: /efsx/video
+      CACHE_ROOT: /efsx/video/yocto-cache
+      # push / workflow_dispatch builds write the cache; PR builds only read it
+      CACHE_WRITABLE: ${{ github.event_name != 'pull_request' }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -188,6 +194,33 @@ jobs:
           echo "=== meta-qcom/ci ==="
           ls -la "$meta_qcom_dir/ci" || true
 
+      - name: Prepare EFSx cache
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! mountpoint -q "$CACHE_MOUNT" && [ ! -d "$CACHE_MOUNT" ]; then
+            echo "::error::Cache mount not found at $CACHE_MOUNT"
+            exit 1
+          fi
+
+          mkdir -p "$CACHE_ROOT/sstate-cache" "$CACHE_ROOT/downloads" || true
+
+          # Everyone needs read access to the cache
+          test -r "$CACHE_ROOT/sstate-cache" || { echo "::error::sstate-cache not readable"; exit 1; }
+          test -r "$CACHE_ROOT/downloads"    || { echo "::error::downloads not readable"; exit 1; }
+
+          # Push builds also need write access
+          if [ "$CACHE_WRITABLE" = "true" ]; then
+            test -w "$CACHE_ROOT/sstate-cache" || { echo "::error::sstate-cache not writable"; exit 1; }
+            test -w "$CACHE_ROOT/downloads"    || { echo "::error::downloads not writable"; exit 1; }
+          fi
+
+          echo "Cache writable: $CACHE_WRITABLE"
+          echo "=== Cache filesystem usage ==="
+          df -hT "$CACHE_MOUNT"
+          du -sh "$CACHE_ROOT"/* 2>/dev/null || true
+
       - name: Pull Docker image
         uses: qualcomm-linux/kernel-config/.github/actions/pull_docker_image@main
         with:
@@ -225,21 +258,24 @@ jobs:
           docker images | grep -- "$DOCKER_IMAGE" || true
 
       - name: Build image
-        uses: qualcomm-linux/video-driver/.github/actions/build@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/build@efs-path-build
         with:
           machine: ${{ matrix.build_matrix.machine }}
           docker_image: ${{ inputs.docker_image }}
           kas_file: ${{ matrix.build_matrix.kas_file }}
           build_command: ${{ matrix.build_matrix.build_command }}
           kas_local_conf_header: |
-
-
-
             IMAGE_FEATURES += "enable-adbd"
             IMAGE_INSTALL:append = " git"
 
             HOSTTOOLS:remove = "ccache"
             INHERIT:remove = "ccache"
+
+            # ---- EFSx cache (/efsx/video) ----
+            DL_DIR = "/efsx/video/yocto-cache/downloads"
+            SSTATE_DIR = "${{ env.CACHE_WRITABLE == 'true' && '/efsx/video/yocto-cache/sstate-cache' || '${TOPDIR}/sstate-cache' }}"
+            SSTATE_MIRRORS = "file://.* file:///efsx/video/yocto-cache/sstate-cache/PATH;downloadfilename=PATH"
+            BB_GENERATE_MIRROR_TARBALLS = "0"
 
             EXTERNALSRC:pn-iris-video-dlkm = "/workspace/video-driver"
             EXTERNALSRC_BUILD:pn-iris-video-dlkm = "/workspace/video-driver/build_iris"
@@ -294,7 +330,7 @@ jobs:
           ls -la "$WORKSPACE/downloads"
 
       - name: Inject Iris test app to rootfs
-        uses: qualcomm-linux/video-driver/.github/actions/inject@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/inject@efs-path-build
         with:
           docker_image: ${{ inputs.docker_image }}
           machine: ${{ matrix.build_matrix.machine }}
@@ -341,6 +377,10 @@ jobs:
           du -x -h -d 2 "$WORKSPACE" 2>/dev/null \
             | sort -h \
             | tail -30 || true
+
+          echo
+          echo "=== Cache usage ==="
+          du -sh "$CACHE_ROOT"/* 2>/dev/null || true
 
       - name: Print deploy directory contents
         shell: bash
@@ -663,7 +703,7 @@ jobs:
           cat "$WORKSPACE/artifacts/file_list.txt"
 
       - name: Upload single build archive to S3
-        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@video.qclinux.main
+        uses: qualcomm-linux/video-driver/.github/actions/aws_s3_helper@efs-path-build
         with:
           s3_bucket: qli-prd-video-gh-artifacts
           local_file: ${{ github.workspace }}/artifacts/file_list.txt
@@ -694,6 +734,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Only workspace files are removed. The shared cache under
+          # /efsx/video/yocto-cache is intentionally left untouched.
           rm -rf "$WORKSPACE/classes" || true
           rm -rf "$WORKSPACE/artifacts" || true
           rm -rf "$WORKSPACE/build" || true

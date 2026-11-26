@@ -3,7 +3,7 @@ name: QC Preflight Checks
 on:
   pull_request:
   push:
-    branches: [video.qclinux.main]
+    branches: [efs-path-build]
   workflow_dispatch:
 
 jobs:

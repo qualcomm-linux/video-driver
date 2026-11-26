@@ -28,6 +28,11 @@ inputs:
     required: false
     default: ""
 
+  cache_mount:
+    description: Host path of the shared cache mount (e.g. /efsx/video). Mounted at the same path inside the container. Leave empty to disable.
+    required: false
+    default: ""
+
 runs:
   using: composite
   steps:
@@ -89,6 +94,16 @@ runs:
         printf '%s\n' 'echo "MACHINE: ${MACHINE}"'                                                                             >> "$BUILD_SCRIPT"
         printf '%s\n' 'echo "KAS_FILE: ${KAS_FILE}"'                                                                           >> "$BUILD_SCRIPT"
         printf '%s\n' 'echo "BUILD_COMMAND: ${BUILD_COMMAND}"'                                                                 >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "CACHE_MOUNT: ${CACHE_MOUNT:-<none>}"'                                                             >> "$BUILD_SCRIPT"
+        printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
+        printf '%s\n' 'if [ -n "${CACHE_MOUNT:-}" ]; then'                                                                     >> "$BUILD_SCRIPT"
+        printf '%s\n' '  if [ ! -d "$CACHE_MOUNT" ]; then'                                                                     >> "$BUILD_SCRIPT"
+        printf '%s\n' '    echo "::error::Cache mount not visible in container: $CACHE_MOUNT"'                                 >> "$BUILD_SCRIPT"
+        printf '%s\n' '    exit 1'                                                                                             >> "$BUILD_SCRIPT"
+        printf '%s\n' '  fi'                                                                                                   >> "$BUILD_SCRIPT"
+        printf '%s\n' '  echo "=== Cache dirs visible in container ==="'                                                       >> "$BUILD_SCRIPT"
+        printf '%s\n' '  ls -ld "$CACHE_MOUNT"/yocto-cache/* 2>/dev/null || true'                                              >> "$BUILD_SCRIPT"
+        printf '%s\n' 'fi'                                                                                                     >> "$BUILD_SCRIPT"
         printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
         printf '%s\n' 'OVERLAY_FILE="/workspace/meta-qcom/ci_externalsrc_overlay.yml"'                                         >> "$BUILD_SCRIPT"
         printf '%s\n' 'if [ ! -f "$OVERLAY_FILE" ]; then'                                                                      >> "$BUILD_SCRIPT"
@@ -104,8 +119,8 @@ runs:
         printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
         printf '%s\n' 'kas shell "$FULL_KAS_FILE" -c "$BUILD_COMMAND"'                                                         >> "$BUILD_SCRIPT"
         printf '%s\n' ''                                                                                                        >> "$BUILD_SCRIPT"
-        printf '%s\n' 'echo "=== local.conf EXTERNALSRC lines ==="'                                                            >> "$BUILD_SCRIPT"
-        printf '%s\n' 'grep -n "EXTERNALSRC\|EXTERNALSRC_BUILD\|do_fetch\|do_unpack\|do_patch" /workspace/video-driver/build/conf/local.conf || true' >> "$BUILD_SCRIPT"
+        printf '%s\n' 'echo "=== local.conf cache/EXTERNALSRC lines ==="'                                                      >> "$BUILD_SCRIPT"
+        printf '%s\n' 'grep -nE "DL_DIR|SSTATE_DIR|SSTATE_MIRRORS|EXTERNALSRC|do_fetch|do_unpack|do_patch" /workspace/video-driver/build/conf/local.conf || true' >> "$BUILD_SCRIPT"
 
         chmod +x "$BUILD_SCRIPT"
 
@@ -121,6 +136,7 @@ runs:
         KAS_FILE: ${{ inputs.kas_file }}
         BUILD_COMMAND: ${{ inputs.build_command }}
         EXTRA_PACKAGES: ${{ inputs.extra_packages }}
+        CACHE_MOUNT: ${{ inputs.cache_mount }}
       run: |
         set -euo pipefail
 
@@ -154,12 +170,24 @@ runs:
           exit 1
         fi
 
+        # Optional cache mount: same path on host and in container, so the
+        # DL_DIR / SSTATE_DIR paths in kas_local_conf_header resolve identically.
+        CACHE_ARGS=()
+        if [ -n "${CACHE_MOUNT:-}" ]; then
+          if [ ! -d "$CACHE_MOUNT" ]; then
+            echo "::error::Cache mount path does not exist on runner: $CACHE_MOUNT"
+            exit 1
+          fi
+          CACHE_ARGS=(-v "${CACHE_MOUNT}:${CACHE_MOUNT}" -e "CACHE_MOUNT=${CACHE_MOUNT}")
+        fi
+
         echo "Machine:        $MACHINE"
         echo "Docker image:   $DOCKER_IMAGE"
         echo "KAS file:       $KAS_FILE"
         echo "Build command:  $BUILD_COMMAND"
         echo "Workspace root: $WORKSPACE_ROOT"
         echo "Repo name:      $REPO_NAME"
+        echo "Cache mount:    ${CACHE_MOUNT:-<none>}"
 
         if [ -n "${EXTRA_PACKAGES:-}" ]; then
           echo "Extra packages: $EXTRA_PACKAGES"
@@ -193,6 +221,7 @@ runs:
           docker run --rm \
             --user "${USER_ID}:${GROUP_ID}" \
             -v "${WORKSPACE_ROOT}:/workspace" \
+            "${CACHE_ARGS[@]}" \
             -w "/workspace/${REPO_NAME}" \
             -e "MACHINE=$MACHINE" \
             -e "KAS_FILE=$KAS_FILE" \
@@ -207,6 +236,7 @@ runs:
           docker run --rm \
             --user "${USER_ID}:${GROUP_ID}" \
             -v "${WORKSPACE_ROOT}:/workspace" \
+            "${CACHE_ARGS[@]}" \
             -w "/workspace/${REPO_NAME}" \
             -e "MACHINE=$MACHINE" \
             -e "KAS_FILE=$KAS_FILE" \
