@@ -41,4 +41,5 @@ modules_install:
 
 clean:
 	rm -f *.o *.ko *.mod.c *.mod.o *~ .*.cmd Module.symvers
+	rm -f video/conftest/*.log
 	rm -rf .tmp_versions

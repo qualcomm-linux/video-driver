@@ -345,7 +345,9 @@ static int msm_vidc_dma_buf_unmap_attachment(struct msm_vidc_core *core,
 		return -EINVAL;
 	}
 
-#if (KERNEL_VERSION(6, 1, 54) < LINUX_VERSION_CODE)
+#if defined(MSM_VIDC_HAS_DMA_BUF_MAP_SGT)
+	dma_buf_unmap_sgt_unlocked(attach, table, DMA_BIDIRECTIONAL);
+#elif (KERNEL_VERSION(6, 1, 54) < LINUX_VERSION_CODE)
 	/* dma_buf_unmap_attachment_unlocked was introduced in 6.1.55 */
 	dma_buf_unmap_attachment_unlocked(attach, table, DMA_BIDIRECTIONAL);
 #else
@@ -366,7 +368,9 @@ static struct sg_table *msm_vidc_dma_buf_map_attachment(
 		return NULL;
 	}
 
-#if (KERNEL_VERSION(6, 1, 54) < LINUX_VERSION_CODE)
+#if defined(MSM_VIDC_HAS_DMA_BUF_MAP_SGT)
+	table = dma_buf_map_sgt_unlocked(attach, DMA_BIDIRECTIONAL);
+#elif (KERNEL_VERSION(6, 1, 54) < LINUX_VERSION_CODE)
 	/* dma_buf_map_attachment_unlocked got introduced in kernel 6.1.55 */
 	table = dma_buf_map_attachment_unlocked(attach, DMA_BIDIRECTIONAL);
 #else
