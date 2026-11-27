@@ -45,6 +45,29 @@ else
   ccflags-y += -DHAVE_QCOM_MDT_PAS_LOAD
 endif
 
+# Check kernel APIs by compiling small test files in video/conftest/
+
+VIDC_TEST_DIR := $(VIDEO_ROOT)/video/conftest
+
+vidc_try_compile = $(shell cd $(objtree) && \
+	$(CC) $(KBUILD_CPPFLAGS) $(LINUXINCLUDE) $(KBUILD_CFLAGS) \
+	-Werror -fsyntax-only $(VIDC_TEST_DIR)/$(1).c \
+	> $(VIDC_TEST_DIR)/$(1).log 2>&1 && echo yes || echo no)
+
+ifeq ($(call vidc_try_compile,sanity),yes)
+
+ifeq ($(call vidc_try_compile,dma_buf_map_sgt),yes)
+  ccflags-y += -DMSM_VIDC_HAS_DMA_BUF_MAP_SGT=1
+endif
+
+ifeq ($(call vidc_try_compile,dma_fence_init_flags),yes)
+  ccflags-y += -DMSM_VIDC_HAS_DMA_FENCE_INIT_FLAGS=1
+endif
+
+else
+  $(warning msm_vidc: conftest sanity check failed, see $(VIDC_TEST_DIR)/sanity.log)
+endif
+
 ifeq ($(CONFIG_ARCH_NIOBE), y)
 include $(VIDEO_ROOT)/config/niobe_video.conf
 LINUXINCLUDE   += -include $(VIDEO_ROOT)/config/niobe_video.h

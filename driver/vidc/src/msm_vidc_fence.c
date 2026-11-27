@@ -177,8 +177,13 @@ struct msm_vidc_fence *msm_vidc_get_sw_fence(
 		fence_id = d_fence->seqno;
 	} else {
 		spin_lock_init(&fence->lock);
+#if defined(MSM_VIDC_HAS_DMA_FENCE_INIT_FLAGS)
+		dma_fence_init(&fence->dma_fence, &msm_vidc_dma_fence_ops,
+			&fence->lock, f_context->ctx_num, fence_seqno, 0);
+#else
 		dma_fence_init(&fence->dma_fence, &msm_vidc_dma_fence_ops,
 			&fence->lock, f_context->ctx_num, fence_seqno);
+#endif
 		fence_id = fence->dma_fence.seqno;
 		fence_fd = INVALID_FD;
 	}
